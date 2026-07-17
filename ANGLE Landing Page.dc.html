@@ -138,14 +138,15 @@
     .iphone17-island { position:absolute; z-index:5; top:9px; left:50%; width:72px; height:20px; transform:translateX(-50%); border-radius:999px; background:#080808; }
     .iphone17-status { position:relative; z-index:4; height:36px; padding:12px 18px 0; box-sizing:border-box; display:flex; direction:ltr; justify-content:space-between; font-size:8px; font-weight:700; }
     .reserve-demo { position:absolute; inset:0; overflow:hidden; background:#FFFFFF; }
-    .reserve-demo-frame { position:absolute; inset:0; width:100%; height:100%; display:block; object-fit:contain; object-position:center top; opacity:0; background:#FFFFFF; will-change:opacity; }
+    .reserve-demo-frame { position:absolute; inset:36px 0 auto; width:100%; height:calc(100% - 36px); display:block; object-fit:contain; object-position:center top; clip-path:inset(1px 0 0); opacity:0; background:#FFFFFF; will-change:opacity; }
     .reserve-demo-frame--1 { opacity:1; background:#252525; }
     .guest-preview-reservations.is-active .reserve-demo-frame--1 { animation:reserveFrameOne 17s linear forwards; }
     .guest-preview-reservations.is-active .reserve-demo-frame--2 { animation:reserveFrameTwo 17s linear forwards; }
     .guest-preview-reservations.is-active .reserve-demo-frame--3 { animation:reserveFrameThree 17s linear forwards; }
     .guest-preview-reservations.is-active .reserve-demo-frame--4 { animation:reserveFrameFour 17s linear forwards; }
-    .reserve-demo-tap { position:absolute; z-index:6; left:50%; top:49%; width:23px; height:23px; opacity:0; transform:translate(-50%, -50%); border:2px solid rgba(255,255,255,0.92); border-radius:50%; background:rgba(17,17,17,0.25); box-shadow:0 0 0 7px rgba(255,255,255,0.32), 0 4px 13px rgba(0,0,0,0.24); pointer-events:none; }
-    .guest-preview-reservations.is-active .reserve-demo-tap { animation:reserveTap 17s cubic-bezier(0.22, 1, 0.36, 1) forwards; }
+    .reserve-demo-tap { position:absolute; z-index:6; left:50%; top:47%; width:18px; height:18px; opacity:0; transform:translate(-50%, -50%); border:1px solid rgba(255,255,255,0.96); border-radius:50%; background:rgba(18,24,34,0.34); box-shadow:0 0 0 6px rgba(255,255,255,0.28), 0 5px 12px rgba(0,0,0,0.2); pointer-events:none; will-change:left, top, opacity, transform; }
+    .reserve-demo-tap::after { content:""; position:absolute; inset:50% auto auto 50%; width:4px; height:4px; transform:translate(-50%, -50%); border-radius:50%; background:rgba(255,255,255,0.92); }
+    .guest-preview-reservations.is-active .reserve-demo-tap { animation:reserveTap 17s linear forwards; }
     @keyframes reserveFrameOne {
       0%, 21% { opacity:1; }
       24%, 100% { opacity:0; }
@@ -165,18 +166,21 @@
       74%, 100% { opacity:1; }
     }
     @keyframes reserveTap {
-      0%, 14% { left:50%; top:49%; opacity:0; transform:translate(-50%, -50%) scale(1); }
-      16% { opacity:1; transform:translate(-50%, -50%) scale(1); }
-      18% { opacity:1; transform:translate(-50%, -50%) scale(0.7); }
-      20%, 30% { left:50%; top:49%; opacity:0; transform:translate(-50%, -50%) scale(1); }
-      31% { left:68%; top:36%; opacity:0; transform:translate(-50%, -50%) scale(1); }
-      34% { opacity:1; transform:translate(-50%, -50%) scale(1); }
-      36% { opacity:1; transform:translate(-50%, -50%) scale(0.7); }
-      38%, 56% { left:68%; top:36%; opacity:0; transform:translate(-50%, -50%) scale(1); }
-      57% { left:50%; top:64%; opacity:0; transform:translate(-50%, -50%) scale(1); }
-      62% { opacity:1; transform:translate(-50%, -50%) scale(1); }
-      64% { opacity:1; transform:translate(-50%, -50%) scale(0.7); }
-      67%, 100% { left:50%; top:64%; opacity:0; transform:translate(-50%, -50%) scale(1); }
+      0%, 3% { left:50%; top:88%; opacity:0; transform:translate(-50%, -50%) scale(1); }
+      5% { left:50%; top:86%; opacity:1; transform:translate(-50%, -50%) scale(1); }
+      16% { left:50%; top:47%; opacity:1; transform:translate(-50%, -50%) scale(1); }
+      18% { left:50%; top:47%; opacity:1; transform:translate(-50%, -50%) scale(0.68); }
+      20% { left:50%; top:47%; opacity:1; transform:translate(-50%, -50%) scale(1); }
+      24% { left:54%; top:44%; opacity:1; transform:translate(-50%, -50%) scale(1); }
+      34% { left:69%; top:35%; opacity:1; transform:translate(-50%, -50%) scale(1); }
+      36% { left:69%; top:35%; opacity:1; transform:translate(-50%, -50%) scale(0.68); }
+      38% { left:69%; top:35%; opacity:1; transform:translate(-50%, -50%) scale(1); }
+      45% { left:69%; top:35%; opacity:1; transform:translate(-50%, -50%) scale(1); }
+      49% { left:66%; top:40%; opacity:1; transform:translate(-50%, -50%) scale(1); }
+      61% { left:50%; top:59%; opacity:1; transform:translate(-50%, -50%) scale(1); }
+      63% { left:50%; top:59%; opacity:1; transform:translate(-50%, -50%) scale(0.68); }
+      65% { left:50%; top:59%; opacity:1; transform:translate(-50%, -50%) scale(1); }
+      68%, 100% { left:50%; top:59%; opacity:0; transform:translate(-50%, -50%) scale(1); }
     }
     .reserve-phone-body { height:calc(100% - 36px); overflow:hidden; display:flex; flex-direction:column; direction:rtl; text-align:right; background:#FFFFFF; }
     .reserve-phone-hero { position:relative; height:104px; overflow:hidden; }
