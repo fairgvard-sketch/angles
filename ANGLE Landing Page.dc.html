@@ -136,7 +136,22 @@
     .iphone17.is-menu { transform:translateY(-50%) rotate(2deg); }
     .iphone17-screen { position:relative; height:100%; overflow:hidden; border-radius:39px; background:#FFFFFF; color:#171717; }
     .iphone17-island { position:absolute; z-index:5; top:9px; left:50%; width:72px; height:20px; transform:translateX(-50%); border-radius:999px; background:#080808; }
-    .iphone17-status { position:relative; z-index:4; height:36px; padding:12px 18px 0; box-sizing:border-box; display:flex; direction:ltr; justify-content:space-between; font-size:8px; font-weight:700; }
+    .iphone17-status { position:relative; z-index:4; height:36px; padding:10px 13px 0; box-sizing:border-box; display:flex; direction:ltr; align-items:flex-start; justify-content:space-between; color:#10131A; font-size:10px; font-weight:700; line-height:1; }
+    .iphone17-status-left, .iphone17-status-right { display:flex; align-items:center; }
+    .iphone17-status-left { gap:4px; }
+    .iphone17-status-right { gap:5px; }
+    .iphone17-status-icon { width:11px; height:11px; display:block; fill:none; stroke:currentColor; stroke-width:2.2; stroke-linecap:round; stroke-linejoin:round; }
+    .iphone17-cellular { width:14px; height:11px; display:flex; align-items:flex-end; gap:1.5px; }
+    .iphone17-cellular i { width:2.5px; border-radius:1px; background:currentColor; }
+    .iphone17-cellular i:nth-child(1) { height:4px; }
+    .iphone17-cellular i:nth-child(2) { height:6px; }
+    .iphone17-cellular i:nth-child(3) { height:8px; }
+    .iphone17-cellular i:nth-child(4) { height:10px; }
+    .iphone17-wifi { width:15px; height:11px; display:block; }
+    .iphone17-wifi path { fill:none; stroke:currentColor; stroke-width:2.25; stroke-linecap:round; }
+    .iphone17-battery { position:relative; width:27px; height:12px; display:flex; align-items:center; justify-content:center; box-sizing:border-box; border:1px solid currentColor; border-radius:4px; font-size:7px; font-weight:800; }
+    .iphone17-battery::after { content:""; position:absolute; top:3px; right:-3px; width:2px; height:5px; border-radius:0 2px 2px 0; background:currentColor; opacity:0.42; }
+    .iphone17-battery-level { position:absolute; z-index:-1; inset:1px; width:58%; border-radius:2px; background:currentColor; opacity:0.12; }
     .reserve-demo { position:absolute; inset:0; overflow:hidden; background:#FFFFFF; }
     .reserve-demo-frame { position:absolute; inset:36px 0 auto; width:100%; height:calc(100% - 36px); display:block; object-fit:contain; object-position:center top; clip-path:inset(1px 0 0); opacity:0; background:#FFFFFF; will-change:opacity; }
     .reserve-demo-frame--1 { overflow:hidden; opacity:1; }
@@ -680,7 +695,10 @@
                   <span class="reserve-demo-tap" aria-hidden="true"></span>
                 </div>
                 <div class="iphone17-island"></div>
-                <div class="iphone17-status"><span>9:41</span><span>5G · 100%</span></div>
+                <div class="iphone17-status">
+                  <span class="iphone17-status-left"><span>20:24</span><svg class="iphone17-status-icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M13.73 21a2 2 0 0 1-3.46 0"></path><path d="M18.63 18A16.9 16.9 0 0 1 3 18c2-2.3 3-5 3-8a6 6 0 0 1 .26-1.76"></path><path d="M9.1 4.24A6 6 0 0 1 18 10c0 1.7.32 3.3.95 4.78"></path><path d="m2 2 20 20"></path></svg></span>
+                  <span class="iphone17-status-right"><span class="iphone17-cellular" aria-hidden="true"><i></i><i></i><i></i><i></i></span><svg class="iphone17-wifi" viewBox="0 0 24 18" aria-hidden="true"><path d="M2 5.5C7.7.5 16.3.5 22 5.5"></path><path d="M5.5 9c3.8-3.2 9.2-3.2 13 0"></path><path d="M9 12.5c1.8-1.5 4.2-1.5 6 0"></path><path d="M12 16h.01"></path></svg><span class="iphone17-battery"><span class="iphone17-battery-level"></span>58</span></span>
+                </div>
               </div>
             </div>
           </div>
@@ -701,7 +719,10 @@
             <div class="iphone17 is-menu" aria-label="QR menu shown on iPhone 17 Pro Max">
               <div class="iphone17-screen">
                 <div class="iphone17-island"></div>
-                <div class="iphone17-status"><span>9:41</span><span>5G · 100%</span></div>
+                <div class="iphone17-status">
+                  <span class="iphone17-status-left"><span>20:24</span><svg class="iphone17-status-icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M13.73 21a2 2 0 0 1-3.46 0"></path><path d="M18.63 18A16.9 16.9 0 0 1 3 18c2-2.3 3-5 3-8a6 6 0 0 1 .26-1.76"></path><path d="M9.1 4.24A6 6 0 0 1 18 10c0 1.7.32 3.3.95 4.78"></path><path d="m2 2 20 20"></path></svg></span>
+                  <span class="iphone17-status-right"><span class="iphone17-cellular" aria-hidden="true"><i></i><i></i><i></i><i></i></span><svg class="iphone17-wifi" viewBox="0 0 24 18" aria-hidden="true"><path d="M2 5.5C7.7.5 16.3.5 22 5.5"></path><path d="M5.5 9c3.8-3.2 9.2-3.2 13 0"></path><path d="M9 12.5c1.8-1.5 4.2-1.5 6 0"></path><path d="M12 16h.01"></path></svg><span class="iphone17-battery"><span class="iphone17-battery-level"></span>58</span></span>
+                </div>
                 <div class="menu-phone-body">
                   <div class="menu-phone-header"><strong>Bulochka</strong><span>פתוח עכשיו</span></div>
                   <div class="menu-phone-tabs"><span class="is-active">פופולרי</span><span>קפה</span><span>מאפים</span><span>כריכים</span></div>
