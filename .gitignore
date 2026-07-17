@@ -1,0 +1,27 @@
+.DS_Store
+**/.DS_Store
+dist/
+.vercel/
+.env
+.env.*
+!.env.example
+.image-slots.state.json
+.thumbnail
+screenshots/
+counter-mrf318vf.png
+
+# Superseded visual drafts kept locally for design history.
+uploads/arlogo-cropped.png
+uploads/arlogo.png
+uploads/c.png
+uploads/paid-942f2f7a.png
+uploads/paid.png
+uploads/payments-cafe-bg.png
+uploads/payments-cafe-white-cup-bg.png
+uploads/payments-macro-bg.png
+uploads/payments-macro-cup-bg.png
+uploads/solution-bakery-v2.png
+uploads/solution-bar-v2.png
+uploads/solution-cafe-v2.png
+uploads/solution-pizzeria-v2.png
+uploads/solution-restaurant-v2.png
