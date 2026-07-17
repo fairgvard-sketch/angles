@@ -139,7 +139,12 @@
     .iphone17-status { position:relative; z-index:4; height:36px; padding:12px 18px 0; box-sizing:border-box; display:flex; direction:ltr; justify-content:space-between; font-size:8px; font-weight:700; }
     .reserve-demo { position:absolute; inset:0; overflow:hidden; background:#FFFFFF; }
     .reserve-demo-frame { position:absolute; inset:36px 0 auto; width:100%; height:calc(100% - 36px); display:block; object-fit:contain; object-position:center top; clip-path:inset(1px 0 0); opacity:0; background:#FFFFFF; will-change:opacity; }
-    .reserve-demo-frame--1 { opacity:1; background:#252525; }
+    .reserve-demo-frame--1 { overflow:hidden; opacity:1; }
+    .reserve-demo-frame--1::before { content:""; position:absolute; z-index:0; inset:75.5% 0 0; background:#252525; }
+    .reserve-demo-frame--1::after { content:""; position:absolute; z-index:2; top:69%; left:0; right:0; height:6.5%; background:#FFFFFF; }
+    .reserve-demo-frame--1 img { position:absolute; z-index:1; inset:0; width:100%; height:100%; display:block; object-fit:contain; object-position:center top; }
+    .reserve-demo-frame--1-main { clip-path:inset(0 0 30.5%); }
+    .reserve-demo-frame--1-footer { clip-path:inset(70.5% 0 0); transform:translateY(5%); }
     .guest-preview-reservations.is-active .reserve-demo-frame--1 { animation:reserveFrameOne 17s linear forwards; }
     .guest-preview-reservations.is-active .reserve-demo-frame--2 { animation:reserveFrameTwo 17s linear forwards; }
     .guest-preview-reservations.is-active .reserve-demo-frame--3 { animation:reserveFrameThree 17s linear forwards; }
@@ -664,7 +669,10 @@
             <div class="iphone17 guest-reserve-phone" aria-label="Reservation flow shown on iPhone 17 Pro Max">
               <div class="iphone17-screen">
                 <div class="reserve-demo" aria-label="Animated booking flow from availability to confirmation">
-                  <img class="reserve-demo-frame reserve-demo-frame--1" src="uploads/reservation-step-1.png" alt="Reservation landing page with date, time and party size" loading="eager" decoding="async">
+                  <div class="reserve-demo-frame reserve-demo-frame--1" role="img" aria-label="Reservation landing page with date, time and party size">
+                    <img class="reserve-demo-frame--1-main" src="uploads/reservation-step-1.png" alt="" loading="eager" decoding="async">
+                    <img class="reserve-demo-frame--1-footer" src="uploads/reservation-step-1.png" alt="" loading="eager" decoding="async">
+                  </div>
                   <img class="reserve-demo-frame reserve-demo-frame--2" src="uploads/reservation-step-2.png" alt="Live reservation times and seating zones" loading="eager" decoding="async">
                   <img class="reserve-demo-frame reserve-demo-frame--3" src="uploads/reservation-step-3-redacted.png" alt="Reservation details form with masked phone number" loading="eager" decoding="async">
                   <img class="reserve-demo-frame reserve-demo-frame--4" src="uploads/reservation-step-4.png" alt="Confirmed reservation" loading="eager" decoding="async">
