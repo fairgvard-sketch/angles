@@ -121,11 +121,7 @@
     .guest-qr-placard { position:absolute; left:7%; top:50%; width:176px; padding:22px 16px 18px; box-sizing:border-box; transform:translateY(-50%) rotate(-4deg); border-radius:6px; background:#FFFFFF; color:#151515; text-align:center; box-shadow:0 22px 48px rgba(38,45,66,0.19); }
     .guest-qr-placard.is-reserve { top:39%; transform:translateY(-50%) rotate(-3deg); }
     .guest-qr-placard > span { display:block; font-size:8px; font-weight:700; color:#777268; }
-    .guest-qr-code { position:relative; width:112px; aspect-ratio:1; margin:16px auto; border:9px solid #FFFFFF; box-sizing:border-box; background-color:#111111; background-image:linear-gradient(90deg, transparent 50%, #FFFFFF 50%), linear-gradient(transparent 50%, #FFFFFF 50%); background-size:11px 11px; }
-    .guest-qr-finder { position:absolute; width:27px; height:27px; border:7px solid #111111; box-sizing:border-box; background:#FFFFFF; box-shadow:inset 0 0 0 5px #FFFFFF; }
-    .guest-qr-finder:nth-child(1) { top:4px; left:4px; }
-    .guest-qr-finder:nth-child(2) { top:4px; right:4px; }
-    .guest-qr-finder:nth-child(3) { bottom:4px; left:4px; }
+    .guest-qr-code { display:block; width:112px; height:auto; aspect-ratio:1; margin:16px auto; background:#FFFFFF; }
     .guest-qr-placard strong { display:block; font-size:14px; }
     .guest-qr-placard small { display:block; margin-top:5px; color:#777268; font-size:9px; }
     .guest-flow-stack { position:absolute; left:6%; bottom:42px; z-index:2; width:205px; display:grid; gap:8px; }
@@ -375,8 +371,7 @@
       .guest-scene-label { top:18px; left:18px; font-size:8px; }
       .guest-qr-placard { left:10px; width:132px; padding:17px 11px 14px; }
       .guest-qr-placard.is-reserve { top:40%; }
-      .guest-qr-code { width:92px; border-width:7px; background-size:9px 9px; }
-      .guest-qr-finder { width:23px; height:23px; border-width:6px; }
+      .guest-qr-code { width:92px; }
       .guest-qr-placard strong { font-size:13px; }
       .guest-flow-stack { display:none; }
       .iphone17 { right:18px; width:280px; border-radius:48px; }
@@ -672,7 +667,7 @@
             <div class="guest-scene-label">QR TO RESERVATION · LIVE AVAILABILITY</div>
             <div class="guest-qr-placard is-reserve">
               <span>RESERVE A TABLE</span>
-              <div class="guest-qr-code" aria-hidden="true"><i class="guest-qr-finder"></i><i class="guest-qr-finder"></i><i class="guest-qr-finder"></i></div>
+              <img class="guest-qr-code" src="uploads/angle-reservation-qr.svg" alt="Demo QR code for reservations">
               <strong>Scan to book</strong>
               <small>Direct · no app required</small>
             </div>
@@ -706,7 +701,7 @@
             <div class="guest-scene-label">QR TO LIVE MENU · ORDER SENT TO ANGLE</div>
             <div class="guest-qr-placard">
               <span>ONLINE MENU</span>
-              <div class="guest-qr-code" aria-hidden="true"><i class="guest-qr-finder"></i><i class="guest-qr-finder"></i><i class="guest-qr-finder"></i></div>
+              <img class="guest-qr-code" src="uploads/angle-menu-qr.svg" alt="Demo QR code for the online menu">
               <strong>Scan to open menu</strong>
               <small>Prices and availability stay live</small>
             </div>
