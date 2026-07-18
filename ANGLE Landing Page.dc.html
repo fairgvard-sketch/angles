@@ -603,18 +603,17 @@
           <h2 class="guest-experience-title">From first click to final check.</h2>
 
           <div class="guest-tabs" role="tablist" aria-label="Guest experience tools">
-            <button class="guest-tab" id="guest-tab-website" type="button" role="tab" aria-selected="true" aria-controls="guest-copy-website" data-guest-tab="website">Website</button>
-            <button class="guest-tab" id="guest-tab-reservations" type="button" role="tab" aria-selected="false" aria-controls="guest-copy-reservations" tabindex="-1" data-guest-tab="reservations">Reservations</button>
-            <button class="guest-tab" id="guest-tab-qr" type="button" role="tab" aria-selected="false" aria-controls="guest-copy-qr" tabindex="-1" data-guest-tab="qr">QR Menu</button>
+            <button class="guest-tab" id="guest-tab-qr" type="button" role="tab" aria-selected="true" aria-controls="guest-copy-qr" data-guest-tab="qr">QR Menu</button>
+            <button class="guest-tab" id="guest-tab-reservations" type="button" role="tab" aria-selected="false" aria-controls="guest-copy-reservations" tabindex="-1" data-guest-tab="reservations">QR Reservations</button>
           </div>
 
           <div class="guest-copy-panels">
-            <div class="guest-copy-panel is-active" id="guest-copy-website" role="tabpanel" aria-labelledby="guest-tab-website" data-guest-copy="website">
-              <p>Give every venue a branded home that connects guests directly to your menu, reservations and location.</p>
+            <div class="guest-copy-panel is-active" id="guest-copy-qr" role="tabpanel" aria-labelledby="guest-tab-qr" data-guest-copy="qr">
+              <p>A printable location QR opens the live ANGLE menu, where guests can configure items and send an order without an app.</p>
               <ul>
-                <li>One destination for menu, hours and directions</li>
-                <li>Direct buttons into ANGLE ordering and booking</li>
-                <li>Designed around the look of your business</li>
+                <li>Categories, item availability and current prices</li>
+                <li>Sizes and modifiers before adding to the basket</li>
+                <li>Here, takeaway or delivery when enabled</li>
               </ul>
             </div>
             <div class="guest-copy-panel" id="guest-copy-reservations" role="tabpanel" aria-labelledby="guest-tab-reservations" hidden data-guest-copy="reservations">
@@ -625,44 +624,10 @@
                 <li>The booking appears in ANGLE with guest history</li>
               </ul>
             </div>
-            <div class="guest-copy-panel" id="guest-copy-qr" role="tabpanel" aria-labelledby="guest-tab-qr" hidden data-guest-copy="qr">
-              <p>A printable location QR opens the live ANGLE menu, where guests can configure items and send an order without an app.</p>
-              <ul>
-                <li>Categories, item availability and current prices</li>
-                <li>Sizes and modifiers before adding to the basket</li>
-                <li>Here, takeaway or delivery when enabled</li>
-              </ul>
-            </div>
           </div>
         </div>
 
         <div class="guest-preview" aria-label="Guest experience product preview">
-          <div class="guest-preview-panel guest-preview-website is-active" data-guest-panel="website" aria-hidden="false">
-            <div class="guest-site-window">
-              <div class="guest-site-browserbar"><span></span><span></span><span></span><div class="guest-site-address"></div></div>
-              <div class="guest-site-page">
-                <div class="guest-site-nav">
-                  <span class="guest-site-brand">Amici</span>
-                  <div class="guest-site-nav-links"><span>Menu</span><span>Our story</span><span>Visit</span></div>
-                </div>
-                <div class="guest-site-hero">
-                  <div class="guest-site-hero-copy">
-                    <span>SEASONAL KITCHEN</span>
-                    <h3>Dinner starts here.</h3>
-                    <p>Fresh plates, warm service and a table waiting for you.</p>
-                    <div class="guest-site-actions"><span class="guest-site-action is-primary">Reserve a table</span><span class="guest-site-action">Order online</span></div>
-                  </div>
-                  <img src="uploads/solution-restaurant-v2.jpg" alt="Restaurant website preview">
-                </div>
-                <div class="guest-site-menu">
-                  <div class="guest-site-menu-item"><strong>Fresh pasta</strong><span>Made every morning in our kitchen.</span></div>
-                  <div class="guest-site-menu-item"><strong>Local produce</strong><span>Seasonal ingredients from nearby farms.</span></div>
-                  <div class="guest-site-menu-item"><strong>Open late</strong><span>Dinner and drinks, seven nights a week.</span></div>
-                </div>
-              </div>
-            </div>
-          </div>
-
           <div class="guest-preview-panel guest-preview-reservations" data-guest-panel="reservations" aria-hidden="true">
             <div class="guest-scene-label">QR TO RESERVATION · LIVE AVAILABILITY</div>
             <div class="guest-qr-placard is-reserve">
@@ -697,7 +662,7 @@
             </div>
           </div>
 
-          <div class="guest-preview-panel guest-preview-qr" data-guest-panel="qr" aria-hidden="true">
+          <div class="guest-preview-panel guest-preview-qr is-active" data-guest-panel="qr" aria-hidden="false">
             <div class="guest-scene-label">QR TO LIVE MENU · ORDER SENT TO ANGLE</div>
             <div class="guest-qr-placard">
               <span>ONLINE MENU</span>
