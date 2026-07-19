@@ -5,7 +5,7 @@
 
 .angle-reserve-demo {
   position: absolute;
-  inset: 36px 0 0;
+  inset: 38px 0 0;
   overflow: hidden;
   background: #ffffff;
   color: #101827;
@@ -212,6 +212,7 @@
 }
 
 .angle-reserve-hours-copy {
+  transform: translateX(5px);
   font-size: 7px;
 }
 
