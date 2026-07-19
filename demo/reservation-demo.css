@@ -222,13 +222,14 @@
 
 .angle-reserve-hours-copy {
   transform: translateX(5px);
-  font-size: 7px;
+  font-size: 10px;
+  line-height: 1.15;
 }
 
 .angle-reserve-hours-copy strong {
   display: block;
   margin-bottom: 5px;
-  font-size: 8px;
+  font-size: 11px;
 }
 
 .angle-reserve-hours-row {
