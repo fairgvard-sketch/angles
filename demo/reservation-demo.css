@@ -330,13 +330,13 @@
 .angle-reserve-availability > small {
   display: block;
   color: #7d8491;
-  font-size: 7px;
+  font-size: 9px;
   font-weight: 700;
 }
 
 .angle-reserve-availability h4 {
   margin: 7px 0 2px;
-  font-size: 13px;
+  font-size: 15px;
   line-height: 1.25;
   font-weight: 850;
 }
@@ -344,7 +344,7 @@
 .angle-reserve-availability > p {
   margin: 0 0 13px;
   color: #7d8491;
-  font-size: 8px;
+  font-size: 10px;
 }
 
 .angle-reserve-zone {
@@ -356,14 +356,14 @@
   display: flex;
   align-items: center;
   gap: 5px;
-  font-size: 10px;
+  font-size: 12px;
   font-weight: 850;
 }
 
 .angle-reserve-zone h5::before {
   content: "▤";
   color: #818896;
-  font-size: 9px;
+  font-size: 11px;
 }
 
 .angle-reserve-times {
@@ -373,7 +373,7 @@
 }
 
 .angle-reserve-time {
-  min-height: 48px;
+  min-height: 54px;
   padding: 5px 2px;
   display: flex;
   flex-direction: column;
@@ -388,14 +388,14 @@
 }
 
 .angle-reserve-time strong {
-  font-size: 9px;
+  font-size: 11px;
   font-weight: 850;
 }
 
 .angle-reserve-time small {
   margin-top: 3px;
   color: #7b8492;
-  font-size: 5px;
+  font-size: 7px;
   white-space: nowrap;
 }
 
