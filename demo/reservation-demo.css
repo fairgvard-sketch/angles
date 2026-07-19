@@ -263,7 +263,10 @@
 
 .angle-reserve-footer {
   flex: 1 0 86px;
+  width: calc(100% + 4px);
   min-height: 86px;
+  margin-right: -2px;
+  margin-left: -2px;
   padding: 13px;
   display: flex;
   flex-direction: column;
