@@ -184,6 +184,70 @@
   text-shadow: 0 1px 4px rgba(0,0,0,0.35);
 }
 
+.angle-menu-footer {
+  min-height: 86px;
+  padding: 13px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 10px;
+  background: #252525;
+  color: #ffffff;
+}
+
+.angle-menu-socials {
+  display: flex;
+  gap: 9px;
+  direction: ltr;
+}
+
+.angle-menu-socials > span {
+  position: relative;
+  width: 27px;
+  height: 27px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 50%;
+  background: #3c3c3c;
+  color: #ffffff;
+  font-size: 12px;
+  font-weight: 850;
+}
+
+.angle-menu-instagram::before {
+  content: "";
+  width: 11px;
+  height: 11px;
+  border: 1.5px solid currentColor;
+  border-radius: 3px;
+}
+
+.angle-menu-instagram::after {
+  content: "";
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  width: 3px;
+  height: 3px;
+  transform: translate(-50%, -50%);
+  border: 1.2px solid currentColor;
+  border-radius: 50%;
+}
+
+.angle-menu-review {
+  min-height: 25px;
+  padding: 0 13px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 999px;
+  background: #3c3c3c;
+  font-size: 7px;
+  font-weight: 750;
+}
+
 .angle-menu-chips {
   position: sticky;
   top: 45px;

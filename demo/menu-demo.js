@@ -327,6 +327,13 @@ class AngleMenuDemo {
         <div class="angle-menu-scroll">
           <div class="angle-menu-hero"><span>תפריט דיגיטלי</span><strong>לחמנייה</strong></div>
           <div class="angle-menu-categories">${this.categoryCards()}</div>
+          <footer class="angle-menu-footer">
+            <div class="angle-menu-socials" aria-label="Social media">
+              <span aria-label="Facebook">f</span>
+              <span class="angle-menu-instagram" aria-label="Instagram"></span>
+            </div>
+            <div class="angle-menu-review">★ השאירו ביקורת בגוגל</div>
+          </footer>
         </div>
         ${this.cartDock()}
       </section>`;
