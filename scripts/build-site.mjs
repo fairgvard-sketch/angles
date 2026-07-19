@@ -1,4 +1,4 @@
-import { copyFile, mkdir, readFile, rm, writeFile } from "node:fs/promises";
+import { copyFile, cp, mkdir, readFile, rm, writeFile } from "node:fs/promises";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 
@@ -56,5 +56,8 @@ for (const relativePath of assetPaths) {
   await mkdir(path.dirname(to), { recursive: true });
   await copyFile(from, to);
 }
+
+await cp(path.join(projectRoot, "demo"), path.join(outputRoot, "demo"), { recursive: true });
+await cp(path.join(projectRoot, "uploads", "qr-demo"), path.join(outputRoot, "uploads", "qr-demo"), { recursive: true });
 
 console.log(`Built dist/index.html with ${assetPaths.size} production assets.`);

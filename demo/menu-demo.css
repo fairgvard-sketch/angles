@@ -1,0 +1,693 @@
+.angle-menu-demo,
+.angle-menu-demo * {
+  box-sizing: border-box;
+}
+
+.angle-menu-demo {
+  position: absolute;
+  inset: 36px 0 0;
+  overflow: hidden;
+  background: #ffffff;
+  color: #101827;
+  font-family: "Helvetica Neue", Helvetica, Arial, sans-serif;
+  line-height: 1.25;
+  direction: rtl;
+}
+
+.angle-menu-app {
+  position: absolute;
+  inset: 0;
+  overflow: hidden;
+  background: #ffffff;
+}
+
+.angle-menu-screen {
+  position: absolute;
+  inset: 0;
+  overflow: hidden;
+  background: #ffffff;
+}
+
+.angle-menu-scroll {
+  position: absolute;
+  inset: 0;
+  overflow-x: hidden;
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  scrollbar-width: none;
+}
+
+.angle-menu-scroll::-webkit-scrollbar {
+  display: none;
+}
+
+.angle-menu-header {
+  position: sticky;
+  top: 0;
+  z-index: 8;
+  min-height: 45px;
+  padding: 8px 10px;
+  display: grid;
+  grid-template-columns: 72px 1fr 72px;
+  align-items: center;
+  border-bottom: 1px solid #e7e8eb;
+  background: rgba(255,255,255,0.96);
+  text-align: center;
+}
+
+.angle-menu-header h3 {
+  grid-column: 2;
+  margin: 0;
+  font-size: 14px;
+  line-height: 1;
+  font-weight: 800;
+  letter-spacing: 0;
+}
+
+.angle-menu-back,
+.angle-menu-reset {
+  min-height: 30px;
+  padding: 0 10px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  border: 0;
+  border-radius: 999px;
+  font: 700 10px/1 "Helvetica Neue", Helvetica, Arial, sans-serif;
+  cursor: pointer;
+}
+
+.angle-menu-back {
+  grid-column: 3;
+  justify-self: end;
+  background: #101827;
+  color: #ffffff;
+}
+
+.angle-menu-back::after {
+  content: "←";
+  font-size: 14px;
+}
+
+.angle-menu-reset {
+  grid-column: 1;
+  justify-self: start;
+  width: 30px;
+  padding: 0;
+  background: #f1f2f4;
+  color: #6f7785;
+  font-size: 15px;
+}
+
+.angle-menu-hero {
+  position: relative;
+  min-height: 82px;
+  padding: 15px 16px 12px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  overflow: hidden;
+  background: #f7f7f8;
+  text-align: center;
+}
+
+.angle-menu-hero::before {
+  content: "";
+  position: absolute;
+  inset: 0;
+  background: radial-gradient(circle at 76% 25%, rgba(241,216,112,0.58), transparent 47%), #f5f5f6;
+}
+
+.angle-menu-hero > * {
+  position: relative;
+}
+
+.angle-menu-hero span {
+  color: #858b97;
+  font-size: 9px;
+  font-weight: 600;
+}
+
+.angle-menu-hero strong {
+  margin-top: 3px;
+  font-size: 22px;
+  font-weight: 900;
+}
+
+.angle-menu-categories {
+  padding: 10px;
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 8px;
+}
+
+.angle-category-card {
+  position: relative;
+  min-width: 0;
+  height: 103px;
+  padding: 0;
+  overflow: hidden;
+  border: 1px solid #e3e4e7;
+  border-radius: 8px;
+  background: #f4f4f5;
+  color: #ffffff;
+  cursor: pointer;
+}
+
+.angle-category-card img {
+  width: 100%;
+  height: 100%;
+  display: block;
+  object-fit: contain;
+  transform: scale(1.05);
+}
+
+.angle-category-card::after {
+  content: "";
+  position: absolute;
+  inset: 42% 0 0;
+  background: linear-gradient(180deg, transparent, rgba(9,13,21,0.78));
+}
+
+.angle-category-card span {
+  position: absolute;
+  z-index: 2;
+  right: 9px;
+  bottom: 8px;
+  left: 9px;
+  overflow-wrap: anywhere;
+  font-size: 12px;
+  font-weight: 800;
+  text-align: right;
+  text-shadow: 0 1px 4px rgba(0,0,0,0.35);
+}
+
+.angle-menu-chips {
+  position: sticky;
+  top: 45px;
+  z-index: 7;
+  padding: 7px 8px;
+  display: flex;
+  gap: 6px;
+  overflow-x: auto;
+  border-bottom: 1px solid #ececef;
+  background: rgba(255,255,255,0.97);
+  scrollbar-width: none;
+}
+
+.angle-menu-chips::-webkit-scrollbar {
+  display: none;
+}
+
+.angle-menu-chip {
+  flex: 0 0 auto;
+  min-height: 29px;
+  padding: 0 11px;
+  border: 0;
+  border-radius: 999px;
+  background: #f1f2f4;
+  color: #596170;
+  font: 700 10px/1 "Helvetica Neue", Helvetica, Arial, sans-serif;
+  white-space: nowrap;
+  cursor: pointer;
+}
+
+.angle-menu-chip.is-active {
+  background: #101827;
+  color: #ffffff;
+}
+
+.angle-menu-list {
+  padding: 10px 9px 74px;
+}
+
+.angle-menu-list h4 {
+  margin: 2px 2px 8px;
+  font-size: 14px;
+  font-weight: 900;
+}
+
+.angle-menu-items {
+  display: grid;
+  gap: 7px;
+}
+
+.angle-menu-item {
+  width: 100%;
+  min-height: 72px;
+  padding: 8px 9px;
+  display: grid;
+  grid-template-columns: 58px minmax(0, 1fr);
+  gap: 9px;
+  align-items: center;
+  border: 1px solid #dfe1e5;
+  border-radius: 8px;
+  background: #ffffff;
+  color: #101827;
+  text-align: right;
+  box-shadow: 0 1px 3px rgba(16,24,39,0.06);
+  cursor: pointer;
+}
+
+.angle-menu-item img {
+  grid-column: 1;
+  width: 58px;
+  height: 52px;
+  display: block;
+  object-fit: contain;
+}
+
+.angle-menu-item-copy {
+  grid-column: 2;
+  min-width: 0;
+}
+
+.angle-menu-item-copy strong {
+  display: block;
+  font-size: 12px;
+  font-weight: 850;
+}
+
+.angle-menu-item-copy small {
+  min-height: 14px;
+  margin-top: 2px;
+  display: block;
+  overflow: hidden;
+  color: #7a818f;
+  font-size: 9px;
+  line-height: 1.3;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.angle-menu-item-price {
+  margin-top: 4px;
+  display: block;
+  font-size: 11px;
+  font-weight: 800;
+  direction: ltr;
+  text-align: right;
+}
+
+.angle-cart-dock {
+  position: absolute;
+  z-index: 10;
+  right: 9px;
+  bottom: 9px;
+  left: 9px;
+  min-height: 50px;
+  padding: 5px 8px;
+  display: grid;
+  grid-template-columns: 34px 1fr auto;
+  gap: 9px;
+  align-items: center;
+  border: 0;
+  border-radius: 8px;
+  background: #101827;
+  color: #ffffff;
+  box-shadow: 0 10px 24px rgba(16,24,39,0.24);
+  cursor: pointer;
+}
+
+.angle-cart-count {
+  width: 34px;
+  height: 34px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 7px;
+  background: #ffffff;
+  color: #101827;
+  font-size: 13px;
+  font-weight: 900;
+}
+
+.angle-cart-label {
+  font-size: 11px;
+  font-weight: 800;
+  text-align: right;
+}
+
+.angle-cart-total {
+  font-size: 13px;
+  font-weight: 900;
+  direction: ltr;
+}
+
+.angle-product-backdrop {
+  position: absolute;
+  inset: 0;
+  z-index: 11;
+  background: rgba(12,17,26,0.34);
+}
+
+.angle-product-sheet {
+  position: absolute;
+  z-index: 12;
+  inset: 70px 0 0;
+  padding: 14px 14px 66px;
+  overflow-y: auto;
+  border-radius: 18px 18px 0 0;
+  background: #ffffff;
+  scrollbar-width: none;
+}
+
+.angle-product-sheet::-webkit-scrollbar {
+  display: none;
+}
+
+.angle-product-image {
+  width: 100%;
+  height: 132px;
+  display: block;
+  object-fit: contain;
+}
+
+.angle-product-close {
+  position: absolute;
+  top: 13px;
+  left: 13px;
+  width: 30px;
+  height: 30px;
+  padding: 0;
+  border: 0;
+  border-radius: 7px;
+  background: #f1f2f4;
+  color: #747b88;
+  font-size: 20px;
+  line-height: 1;
+  cursor: pointer;
+}
+
+.angle-product-sheet h4 {
+  margin: 9px 0 2px;
+  font-size: 17px;
+  font-weight: 900;
+}
+
+.angle-product-description {
+  margin: 0 0 12px;
+  color: #7d8390;
+  font-size: 10px;
+}
+
+.angle-option-label {
+  margin: 13px 0 6px;
+  color: #6e7582;
+  font-size: 10px;
+  font-weight: 800;
+}
+
+.angle-option-row {
+  display: flex;
+  gap: 6px;
+  flex-wrap: wrap;
+}
+
+.angle-option {
+  min-height: 34px;
+  padding: 0 11px;
+  border: 0;
+  border-radius: 8px;
+  background: #f1f2f4;
+  color: #4e5665;
+  font: 700 10px/1 "Helvetica Neue", Helvetica, Arial, sans-serif;
+  cursor: pointer;
+}
+
+.angle-option.is-active {
+  background: #101827;
+  color: #ffffff;
+}
+
+.angle-product-add {
+  position: absolute;
+  z-index: 13;
+  right: 10px;
+  bottom: 9px;
+  left: 10px;
+  min-height: 49px;
+  border: 0;
+  border-radius: 8px;
+  background: #101827;
+  color: #ffffff;
+  font: 850 13px/1 "Helvetica Neue", Helvetica, Arial, sans-serif;
+  cursor: pointer;
+}
+
+.angle-checkout {
+  padding: 8px 10px 18px;
+}
+
+.angle-checkout-lines {
+  display: grid;
+  gap: 7px;
+}
+
+.angle-checkout-line {
+  min-height: 64px;
+  padding: 9px 10px;
+  display: grid;
+  grid-template-columns: minmax(0,1fr) auto auto;
+  gap: 9px;
+  align-items: center;
+  border: 1px solid #dfe1e5;
+  border-radius: 8px;
+  background: #ffffff;
+  box-shadow: 0 1px 3px rgba(16,24,39,0.05);
+}
+
+.angle-checkout-line strong {
+  display: block;
+  font-size: 11px;
+}
+
+.angle-checkout-line small {
+  display: block;
+  margin-top: 2px;
+  color: #8a909b;
+  font-size: 9px;
+}
+
+.angle-checkout-stepper {
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  direction: ltr;
+}
+
+.angle-checkout-stepper button {
+  width: 30px;
+  height: 30px;
+  padding: 0;
+  border: 1px solid #e0e2e6;
+  border-radius: 7px;
+  background: #ffffff;
+  color: #4f5765;
+  font-size: 15px;
+  font-weight: 800;
+}
+
+.angle-checkout-stepper span,
+.angle-checkout-price {
+  font-size: 11px;
+  font-weight: 800;
+  direction: ltr;
+}
+
+.angle-checkout-total {
+  margin: 14px 2px 0;
+  display: flex;
+  justify-content: space-between;
+  align-items: baseline;
+  font-size: 15px;
+  font-weight: 900;
+}
+
+.angle-checkout-hint {
+  margin: 3px 2px 0;
+  color: #858b97;
+  font-size: 9px;
+}
+
+.angle-checkout h4 {
+  margin: 18px 1px 8px;
+  font-size: 15px;
+  font-weight: 900;
+}
+
+.angle-order-types,
+.angle-time-types {
+  display: flex;
+  gap: 6px;
+  flex-wrap: wrap;
+}
+
+.angle-order-type,
+.angle-time-type {
+  min-height: 38px;
+  padding: 0 13px;
+  border: 0;
+  border-radius: 8px;
+  background: #f1f2f4;
+  color: #505867;
+  font: 750 11px/1 "Helvetica Neue", Helvetica, Arial, sans-serif;
+  cursor: pointer;
+}
+
+.angle-order-type.is-active,
+.angle-time-type.is-active {
+  background: #101827;
+  color: #ffffff;
+}
+
+.angle-field {
+  width: 100%;
+  height: 43px;
+  margin-top: 7px;
+  padding: 0 12px;
+  border: 1px solid #dfe1e5;
+  border-radius: 8px;
+  background: #ffffff;
+  color: #101827;
+  font: 500 11px/1 "Helvetica Neue", Helvetica, Arial, sans-serif;
+  text-align: right;
+  outline: none;
+}
+
+.angle-field::placeholder {
+  color: #a7acb6;
+}
+
+.angle-submit-order {
+  width: 100%;
+  min-height: 50px;
+  margin-top: 12px;
+  border: 0;
+  border-radius: 8px;
+  background: #101827;
+  color: #ffffff;
+  font: 850 13px/1 "Helvetica Neue", Helvetica, Arial, sans-serif;
+  cursor: pointer;
+}
+
+.angle-submit-order:disabled {
+  background: #a5a8af;
+}
+
+.angle-status-screen {
+  position: absolute;
+  inset: 0;
+  padding: 18px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  background: #ffffff;
+  text-align: center;
+}
+
+.angle-status-spinner {
+  width: 34px;
+  height: 34px;
+  border: 4px solid #e3e5e9;
+  border-top-color: #101827;
+  border-radius: 50%;
+  animation: angleStatusSpin 900ms linear infinite;
+}
+
+.angle-status-screen h4 {
+  margin: 16px 0 0;
+  font-size: 17px;
+  font-weight: 900;
+}
+
+.angle-status-screen p {
+  max-width: 240px;
+  margin: 7px 0 0;
+  color: #7f8693;
+  font-size: 10px;
+  line-height: 1.45;
+}
+
+.angle-order-number-label {
+  color: #7b8290;
+  font-size: 10px;
+  font-weight: 800;
+}
+
+.angle-order-number {
+  margin-top: 3px;
+  font-size: 50px;
+  font-weight: 950;
+  line-height: 1;
+  direction: ltr;
+}
+
+.angle-new-order {
+  min-height: 44px;
+  margin-top: 17px;
+  padding: 0 20px;
+  border: 0;
+  border-radius: 8px;
+  background: #101827;
+  color: #ffffff;
+  font: 800 11px/1 "Helvetica Neue", Helvetica, Arial, sans-serif;
+  cursor: pointer;
+}
+
+.angle-demo-pointer {
+  position: absolute;
+  z-index: 50;
+  left: 50%;
+  top: 90%;
+  width: 18px;
+  height: 18px;
+  opacity: 0;
+  transform: translate(-50%, -50%);
+  border: 1px solid rgba(255,255,255,0.96);
+  border-radius: 50%;
+  background: rgba(18,24,34,0.38);
+  box-shadow: 0 0 0 6px rgba(255,255,255,0.3), 0 5px 12px rgba(0,0,0,0.2);
+  pointer-events: none;
+  will-change: left, top, opacity, transform;
+}
+
+.angle-demo-pointer::after {
+  content: "";
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  width: 4px;
+  height: 4px;
+  transform: translate(-50%, -50%);
+  border-radius: 50%;
+  background: rgba(255,255,255,0.94);
+}
+
+.angle-demo-pointer.is-visible {
+  opacity: 1;
+}
+
+.angle-demo-pointer.is-pressing {
+  transform: translate(-50%, -50%) scale(0.66);
+}
+
+@keyframes angleStatusSpin {
+  to { transform: rotate(360deg); }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .angle-status-spinner {
+    animation: none;
+  }
+}
+.angle-menu-demo-fallback {
+  width: 100%;
+  height: 100%;
+  display: block;
+  object-fit: cover;
+  object-position: top center;
+}
