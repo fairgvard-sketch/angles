@@ -116,15 +116,15 @@ class AngleMenuDemo {
     this.pointer.classList.add("is-visible");
 
     if (!await this.tap(id, "category-hot")) return;
-    if (!await this.wait(id, 520)) return;
+    if (!await this.wait(id, 600)) return;
     if (!await this.tap(id, "item-cappuccino")) return;
-    if (!await this.wait(id, 520)) return;
+    if (!await this.wait(id, 600)) return;
     if (!await this.tap(id, "add-product")) return;
-    if (!await this.wait(id, 520)) return;
+    if (!await this.wait(id, 600)) return;
     if (!await this.tap(id, "chip-pastries")) return;
-    if (!await this.wait(id, 520)) return;
+    if (!await this.wait(id, 600)) return;
     if (!await this.tap(id, "item-cinnamon-roll")) return;
-    if (!await this.wait(id, 520)) return;
+    if (!await this.wait(id, 600)) return;
     if (!await this.tap(id, "open-cart")) return;
     if (!await this.wait(id, 650)) return;
 
@@ -143,14 +143,14 @@ class AngleMenuDemo {
     if (!this.isCurrentRun(id)) return false;
     const target = this.app.querySelector(`[data-demo-target="${name}"]`);
     if (!target) return false;
-    await this.movePointer(target, 560);
+    await this.movePointer(target, 720);
     if (!this.isCurrentRun(id)) return false;
     this.pointer.classList.add("is-pressing");
-    await pause(120);
+    await pause(150);
     if (!this.isCurrentRun(id)) return false;
     target.click();
     this.pointer.classList.remove("is-pressing");
-    await pause(120);
+    await pause(150);
     return this.isCurrentRun(id);
   }
 
