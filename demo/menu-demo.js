@@ -325,7 +325,6 @@ class AngleMenuDemo {
     return `
       <section class="angle-menu-screen">
         <div class="angle-menu-scroll">
-          ${this.header()}
           <div class="angle-menu-hero"><span>תפריט דיגיטלי</span><strong>לחמנייה</strong></div>
           <div class="angle-menu-categories">${this.categoryCards()}</div>
         </div>
