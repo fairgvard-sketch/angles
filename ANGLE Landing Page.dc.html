@@ -234,104 +234,100 @@
     .reserve-confirmation strong { display:block; font-size:9px; }
     .reserve-confirmation span { display:block; margin-top:3px; color:#71747B; font-size:7px; }
     .menu-demo { position:absolute; inset:0; overflow:hidden; background:#FFFFFF; }
-    .menu-demo-frame { position:absolute; inset:36px 0 0; overflow:hidden; opacity:0; background:#F7F7F5; will-change:opacity; }
+    .menu-demo-frame { position:absolute; inset:36px 0 0; overflow:hidden; opacity:0; background:#FFFFFF; will-change:opacity; }
+    .menu-demo-frame > img { position:absolute; top:-1px; left:50%; width:auto; max-width:none; height:calc(100% + 1px); display:block; transform:translateX(-50%); }
     .menu-demo-frame--1 { opacity:1; }
-    .guest-preview-qr.is-active .menu-demo-frame--1 { animation:menuFrameOne 18s linear forwards; }
-    .guest-preview-qr.is-active .menu-demo-frame--2 { animation:menuFrameTwo 18s linear forwards; }
-    .guest-preview-qr.is-active .menu-demo-frame--3 { animation:menuFrameThree 18s linear forwards; }
-    .guest-preview-qr.is-active .menu-demo-frame--4 { animation:menuFrameFour 18s linear forwards; }
+    .guest-preview-qr.is-active .menu-demo-frame--1 { animation:menuFrameOne 32s linear forwards; }
+    .guest-preview-qr.is-active .menu-demo-frame--2 { animation:menuFrameTwo 32s linear forwards; }
+    .guest-preview-qr.is-active .menu-demo-frame--3 { animation:menuFrameThree 32s linear forwards; }
+    .guest-preview-qr.is-active .menu-demo-frame--4 { animation:menuFrameFour 32s linear forwards; }
+    .guest-preview-qr.is-active .menu-demo-frame--5 { animation:menuFrameFive 32s linear forwards; }
+    .guest-preview-qr.is-active .menu-demo-frame--6 { animation:menuFrameSix 32s linear forwards; }
+    .guest-preview-qr.is-active .menu-demo-frame--7 { animation:menuFrameSeven 32s linear forwards; }
+    .guest-preview-qr.is-active .menu-demo-frame--8 { animation:menuFrameEight 32s linear forwards; }
+    .guest-preview-qr.is-active .menu-demo-frame--9 { animation:menuFrameNine 32s linear forwards; }
+    .menu-demo-phone-mask { position:absolute; z-index:2; top:57.2%; left:0; right:0; height:7.5%; padding:0 10px; box-sizing:border-box; display:flex; align-items:center; direction:ltr; border:1px solid #E1E3E7; border-radius:9px; background:#FFFFFF; color:#8A8E96; font-size:7px; }
     .menu-demo-tap { position:absolute; z-index:6; left:50%; top:50%; width:18px; height:18px; opacity:0; transform:translate(-50%, -50%); border:1px solid rgba(255,255,255,0.96); border-radius:50%; background:rgba(18,24,34,0.34); box-shadow:0 0 0 6px rgba(255,255,255,0.28), 0 5px 12px rgba(0,0,0,0.2); pointer-events:none; will-change:left, top, opacity, transform; }
     .menu-demo-tap::after { content:""; position:absolute; inset:50% auto auto 50%; width:4px; height:4px; transform:translate(-50%, -50%); border-radius:50%; background:rgba(255,255,255,0.92); }
-    .guest-preview-qr.is-active .menu-demo-tap { animation:menuTap 18s linear forwards; }
+    .guest-preview-qr.is-active .menu-demo-tap { animation:menuTap 32s linear forwards; }
     @keyframes menuFrameOne {
-      0%, 20% { opacity:1; }
-      23%, 100% { opacity:0; }
+      0%, 9% { opacity:1; }
+      11%, 100% { opacity:0; }
     }
     @keyframes menuFrameTwo {
-      0%, 20% { opacity:0; }
-      23%, 55% { opacity:1; }
-      58%, 100% { opacity:0; }
+      0%, 9% { opacity:0; }
+      11%, 20% { opacity:1; }
+      22%, 100% { opacity:0; }
     }
     @keyframes menuFrameThree {
-      0%, 55% { opacity:0; }
-      58%, 77% { opacity:1; }
-      80%, 100% { opacity:0; }
+      0%, 20% { opacity:0; }
+      22%, 36% { opacity:1; }
+      38%, 100% { opacity:0; }
     }
     @keyframes menuFrameFour {
-      0%, 77% { opacity:0; }
-      80%, 100% { opacity:1; }
+      0%, 36% { opacity:0; }
+      38%, 46% { opacity:1; }
+      48%, 100% { opacity:0; }
+    }
+    @keyframes menuFrameFive {
+      0%, 46% { opacity:0; }
+      48%, 57% { opacity:1; }
+      59%, 100% { opacity:0; }
+    }
+    @keyframes menuFrameSix {
+      0%, 57% { opacity:0; }
+      59%, 68% { opacity:1; }
+      70%, 100% { opacity:0; }
+    }
+    @keyframes menuFrameSeven {
+      0%, 68% { opacity:0; }
+      70%, 82% { opacity:1; }
+      84%, 100% { opacity:0; }
+    }
+    @keyframes menuFrameEight {
+      0%, 82% { opacity:0; }
+      84%, 91% { opacity:1; }
+      93%, 100% { opacity:0; }
+    }
+    @keyframes menuFrameNine {
+      0%, 91% { opacity:0; }
+      93%, 100% { opacity:1; }
     }
     @keyframes menuTap {
-      0%, 2% { left:20%; top:88%; opacity:0; transform:translate(-50%, -50%) scale(1); }
-      4% { left:18%; top:84%; opacity:1; transform:translate(-50%, -50%) scale(1); }
-      10% { left:11%; top:34%; opacity:1; transform:translate(-50%, -50%) scale(1); }
-      13% { left:11%; top:34%; opacity:1; transform:translate(-50%, -50%) scale(0.68); }
-      15%, 23% { left:11%; top:34%; opacity:1; transform:translate(-50%, -50%) scale(1); }
-      24% { left:13%; top:36%; opacity:1; transform:translate(-50%, -50%) scale(1); }
-      31% { left:63%; top:54%; opacity:1; transform:translate(-50%, -50%) scale(1); }
-      34% { left:63%; top:54%; opacity:1; transform:translate(-50%, -50%) scale(0.68); }
-      36%, 40% { left:63%; top:54%; opacity:1; transform:translate(-50%, -50%) scale(1); }
-      47% { left:50%; top:89%; opacity:1; transform:translate(-50%, -50%) scale(1); }
-      50% { left:50%; top:89%; opacity:1; transform:translate(-50%, -50%) scale(0.68); }
-      52%, 59% { left:50%; top:89%; opacity:1; transform:translate(-50%, -50%) scale(1); }
-      65% { left:50%; top:87%; opacity:1; transform:translate(-50%, -50%) scale(1); }
-      69% { left:50%; top:87%; opacity:1; transform:translate(-50%, -50%) scale(0.68); }
-      71%, 76% { left:50%; top:87%; opacity:1; transform:translate(-50%, -50%) scale(1); }
-      79%, 100% { left:50%; top:87%; opacity:0; transform:translate(-50%, -50%) scale(1); }
+      0%, 2% { left:17%; top:88%; opacity:0; transform:translate(-50%, -50%) scale(1); }
+      3% { left:19%; top:84%; opacity:1; transform:translate(-50%, -50%) scale(1); }
+      6% { left:72%; top:27%; opacity:1; transform:translate(-50%, -50%) scale(1); }
+      8% { left:72%; top:27%; opacity:1; transform:translate(-50%, -50%) scale(0.66); }
+      9.5%, 11% { left:72%; top:27%; opacity:1; transform:translate(-50%, -50%) scale(1); }
+      12% { left:70%; top:30%; opacity:1; transform:translate(-50%, -50%) scale(1); }
+      16% { left:52%; top:54%; opacity:1; transform:translate(-50%, -50%) scale(1); }
+      18% { left:52%; top:54%; opacity:1; transform:translate(-50%, -50%) scale(0.66); }
+      20%, 22% { left:52%; top:54%; opacity:1; transform:translate(-50%, -50%) scale(1); }
+      23% { left:58%; top:49%; opacity:1; transform:translate(-50%, -50%) scale(1); }
+      26% { left:72%; top:53%; opacity:1; transform:translate(-50%, -50%) scale(1); }
+      28% { left:72%; top:53%; opacity:1; transform:translate(-50%, -50%) scale(0.66); }
+      29.5% { left:72%; top:53%; opacity:1; transform:translate(-50%, -50%) scale(1); }
+      33% { left:50%; top:90%; opacity:1; transform:translate(-50%, -50%) scale(1); }
+      35% { left:50%; top:90%; opacity:1; transform:translate(-50%, -50%) scale(0.66); }
+      36%, 38% { left:50%; top:90%; opacity:1; transform:translate(-50%, -50%) scale(1); }
+      39% { left:48%; top:84%; opacity:1; transform:translate(-50%, -50%) scale(1); }
+      43% { left:19%; top:14%; opacity:1; transform:translate(-50%, -50%) scale(1); }
+      45% { left:19%; top:14%; opacity:1; transform:translate(-50%, -50%) scale(0.66); }
+      46%, 48% { left:19%; top:14%; opacity:1; transform:translate(-50%, -50%) scale(1); }
+      49% { left:25%; top:18%; opacity:1; transform:translate(-50%, -50%) scale(1); }
+      53% { left:52%; top:48%; opacity:1; transform:translate(-50%, -50%) scale(1); }
+      55% { left:52%; top:48%; opacity:1; transform:translate(-50%, -50%) scale(0.66); }
+      57%, 59% { left:52%; top:48%; opacity:1; transform:translate(-50%, -50%) scale(1); }
+      60% { left:53%; top:51%; opacity:1; transform:translate(-50%, -50%) scale(1); }
+      64% { left:51%; top:91%; opacity:1; transform:translate(-50%, -50%) scale(1); }
+      66% { left:51%; top:91%; opacity:1; transform:translate(-50%, -50%) scale(0.66); }
+      68%, 70% { left:51%; top:91%; opacity:1; transform:translate(-50%, -50%) scale(1); }
+      71% { left:50%; top:85%; opacity:1; transform:translate(-50%, -50%) scale(1); }
+      76% { left:50%; top:81%; opacity:1; transform:translate(-50%, -50%) scale(1); }
+      79% { left:50%; top:81%; opacity:1; transform:translate(-50%, -50%) scale(0.66); }
+      81% { left:50%; top:81%; opacity:1; transform:translate(-50%, -50%) scale(1); }
+      83%, 100% { left:50%; top:81%; opacity:0; transform:translate(-50%, -50%) scale(1); }
     }
-    .menu-phone-body { height:100%; overflow:hidden; direction:rtl; text-align:right; background:#F7F7F5; }
-    .menu-phone-header { padding:14px 15px 12px; display:flex; align-items:center; justify-content:space-between; background:#FFFFFF; }
-    .menu-phone-header strong { font-family:Georgia, serif; font-size:18px; font-weight:400; }
-    .menu-phone-header span { padding:5px 8px; border-radius:999px; background:#EEEEEB; color:#70706C; font-size:7px; }
-    .menu-phone-tabs { padding:0 14px 10px; display:flex; gap:5px; overflow:hidden; background:#FFFFFF; }
-    .menu-phone-tabs span { padding:6px 8px; border-radius:999px; background:#ECECEA; color:#777772; font-size:7px; white-space:nowrap; }
-    .menu-phone-tabs span.is-active { background:#171717; color:#FFFFFF; }
-    .menu-phone-content { padding:10px 12px 72px; }
-    .menu-phone-content h4 { margin:0 0 8px; font-size:11px; }
-    .menu-product { min-height:72px; padding:8px; display:grid; grid-template-columns:58px 1fr 25px; align-items:center; gap:8px; border-bottom:1px solid #E2E2DE; background:#FFFFFF; }
-    .menu-product:first-of-type { border-radius:11px 11px 0 0; }
-    .menu-product:last-of-type { border-radius:0 0 11px 11px; border-bottom:0; }
-    .menu-product img { width:58px; height:58px; display:block; border-radius:9px; object-fit:cover; background:#EAE8E2; }
-    .menu-product strong { display:block; font-size:9px; }
-    .menu-product span { display:block; margin-top:4px; color:#777A80; font-size:6px; line-height:1.3; }
-    .menu-product b { display:block; margin-top:5px; font-size:8px; }
-    .menu-add { width:23px; height:23px; display:flex; align-items:center; justify-content:center; border-radius:50%; background:#171717; color:#FFFFFF; font-size:13px; }
-    .menu-phone-cart { position:absolute; left:13px; right:13px; bottom:13px; min-height:44px; padding:0 14px; display:flex; align-items:center; justify-content:space-between; border-radius:999px; background:#171717; color:#FFFFFF; font-size:8px; font-weight:700; box-shadow:0 10px 20px rgba(0,0,0,0.18); }
-    .menu-config-ghost { height:74px; padding:15px; box-sizing:border-box; display:flex; align-items:flex-start; justify-content:space-between; direction:rtl; color:#303030; background:#FFFFFF; }
-    .menu-config-ghost strong { font-family:Georgia, serif; font-size:17px; font-weight:400; }
-    .menu-config-ghost span { padding:5px 8px; border-radius:999px; background:#ECECEA; color:#73736F; font-size:7px; }
-    .menu-demo-frame--2::after { content:""; position:absolute; z-index:1; inset:0; background:rgba(18,20,24,0.34); }
-    .menu-config-sheet { position:absolute; z-index:2; left:0; right:0; bottom:0; height:82%; padding:12px 14px 68px; box-sizing:border-box; direction:rtl; text-align:right; border-radius:22px 22px 0 0; background:#FFFFFF; box-shadow:0 -12px 28px rgba(0,0,0,0.14); }
-    .menu-config-product { display:grid; grid-template-columns:66px 1fr 28px; gap:10px; align-items:start; }
-    .menu-config-product img { width:66px; height:66px; display:block; border-radius:12px; object-fit:cover; background:#F0EFEB; }
-    .menu-config-product h4 { margin:5px 0 0; font-size:13px; }
-    .menu-config-product p { margin:5px 0 0; color:#7A7D84; font-size:7px; line-height:1.4; }
-    .menu-config-close { width:27px; height:27px; display:flex; align-items:center; justify-content:center; border-radius:9px; background:#F1F2F3; color:#686B72; font-size:11px; font-weight:700; }
-    .menu-config-label { margin:16px 0 7px; color:#656970; font-size:8px; font-weight:700; }
-    .menu-config-options { display:flex; flex-wrap:wrap; gap:6px; }
-    .menu-config-chip { min-height:28px; padding:0 10px; display:flex; align-items:center; border:1px solid #DFE1E5; border-radius:999px; background:#FFFFFF; color:#4E5157; font-size:7px; font-weight:700; }
-    .menu-config-chip.is-active { border-color:#171717; background:#171717; color:#FFFFFF; }
-    .menu-config-cta, .menu-checkout-cta { position:absolute; left:13px; right:13px; bottom:13px; min-height:44px; padding:0 15px; display:flex; align-items:center; justify-content:space-between; border-radius:14px; background:#171717; color:#FFFFFF; font-size:9px; font-weight:700; box-shadow:0 10px 20px rgba(0,0,0,0.16); }
-    .menu-checkout-screen { position:relative; height:100%; padding:0 12px 70px; box-sizing:border-box; overflow:hidden; direction:rtl; text-align:right; background:#F1F2F4; }
-    .menu-checkout-head { height:54px; display:flex; align-items:center; justify-content:space-between; }
-    .menu-checkout-head strong { font-size:13px; }
-    .menu-checkout-back { width:27px; height:27px; display:flex; align-items:center; justify-content:center; border-radius:9px; background:#FFFFFF; color:#5E626A; font-size:16px; }
-    .menu-cart-item { padding:10px; display:grid; grid-template-columns:48px 1fr auto; gap:8px; align-items:center; border-radius:12px; background:#FFFFFF; box-shadow:0 2px 8px rgba(17,24,39,0.05); }
-    .menu-cart-item img { width:48px; height:48px; display:block; border-radius:9px; object-fit:cover; }
-    .menu-cart-item strong { display:block; font-size:9px; }
-    .menu-cart-item span { display:block; margin-top:4px; color:#777B83; font-size:6px; }
-    .menu-cart-item b { font-size:9px; }
-    .menu-checkout-total { padding:12px 3px; display:flex; align-items:center; justify-content:space-between; font-size:10px; font-weight:800; }
-    .menu-checkout-label { margin:7px 0 6px; color:#666A72; font-size:8px; font-weight:700; }
-    .menu-order-types { display:flex; gap:6px; }
-    .menu-order-type { flex:1; min-height:30px; display:flex; align-items:center; justify-content:center; border:1px solid #D9DCE1; border-radius:9px; background:#FFFFFF; color:#666A72; font-size:7px; font-weight:700; }
-    .menu-order-type.is-active { border-color:#171717; color:#171717; }
-    .menu-checkout-field { min-height:34px; margin-top:7px; padding:0 11px; display:flex; align-items:center; border:1px solid #E0E2E6; border-radius:9px; background:#FFFFFF; color:#90939A; font-size:7px; }
-    .menu-success-screen { height:100%; padding:0 24px; box-sizing:border-box; display:flex; flex-direction:column; align-items:center; justify-content:center; direction:rtl; text-align:center; background:#FFFFFF; }
-    .menu-success-icon { width:56px; height:56px; display:flex; align-items:center; justify-content:center; border-radius:50%; background:#DCF7E5; color:#1DA558; font-size:27px; font-weight:800; }
-    .menu-success-screen h4 { margin:20px 0 0; font-size:18px; }
-    .menu-success-screen p { margin:8px 0 0; color:#7B7F87; font-size:8px; line-height:1.5; }
-    .menu-success-order { width:100%; margin-top:20px; padding:12px; box-sizing:border-box; display:flex; align-items:center; justify-content:space-between; border-radius:12px; background:#F4F5F6; color:#4A4E55; font-size:8px; }
     .product-click { padding:0; background:#F5F5F2; }
     .product-click-inner { max-width:none; margin:0; padding:0; box-sizing:border-box; }
     .product-click-kicker { margin-bottom:22px; font-size:12px; font-weight:600; letter-spacing:0.18em; color:#666660; }
@@ -403,7 +399,7 @@
       .reserve-demo-frame--4 { opacity:1; }
       .reserve-demo-tap { display:none; }
       .menu-demo-frame { animation:none !important; opacity:0; }
-      .menu-demo-frame--4 { opacity:1; }
+      .menu-demo-frame--9 { opacity:1; }
       .menu-demo-tap { display:none; }
     }
     @media (max-width:900px) {
@@ -465,10 +461,6 @@
       .reserve-phone-hero { height:92px; }
       .reserve-phone-content { padding:10px; }
       .reserve-phone-title { margin:9px 0 6px; }
-      .menu-phone-content { padding:8px 9px 68px; }
-      .menu-product { min-height:64px; grid-template-columns:49px 1fr 23px; gap:6px; }
-      .menu-product img { width:49px; height:49px; }
-
       .solutions-section { padding:78px 0 !important; }
       .solutions-inner { padding:0 20px !important; gap:44px !important; }
       .solutions-header { align-items:flex-start !important; flex-direction:column; gap:24px !important; }
@@ -766,57 +758,19 @@
                   <span class="iphone17-status-left"><span>20:24</span></span>
                   <span class="iphone17-status-right"><span class="iphone17-cellular" aria-hidden="true"><i></i><i></i><i></i><i></i></span><svg class="iphone17-wifi" viewBox="0 0 24 18" aria-hidden="true"><path d="M2 5.5C7.7.5 16.3.5 22 5.5"></path><path d="M5.5 9c3.8-3.2 9.2-3.2 13 0"></path><path d="M9 12.5c1.8-1.5 4.2-1.5 6 0"></path><path d="M12 16h.01"></path></svg><span class="iphone17-battery"><span class="iphone17-battery-level"></span>58</span></span>
                 </div>
-                <div class="menu-demo" aria-label="Animated QR menu flow from product selection to order confirmation">
-                  <div class="menu-demo-frame menu-demo-frame--1">
-                    <div class="menu-phone-body">
-                      <div class="menu-phone-header"><strong>Bulochka</strong><span>פתוח עכשיו</span></div>
-                      <div class="menu-phone-tabs"><span class="is-active">פופולרי</span><span>קפה</span><span>מאפים</span><span>כריכים</span></div>
-                      <div class="menu-phone-content">
-                        <h4>פופולרי היום</h4>
-                        <div class="menu-product"><img src="uploads/kassa-croissant.jpg" alt=""><div><strong>קרואסון חמאה</strong><span>טרי מהתנור</span><b>₪16</b></div><div class="menu-add">+</div></div>
-                        <div class="menu-product"><img src="uploads/kassa-latte.jpg" alt=""><div><strong>לאטה</strong><span>בחירת גודל וחלב</span><b>₪18</b></div><div class="menu-add">+</div></div>
-                        <div class="menu-product"><img src="uploads/kassa-avocado.jpg" alt=""><div><strong>כריך אבוקדו</strong><span>לחם מחמצת וירקות</span><b>₪32</b></div><div class="menu-add">+</div></div>
-                      </div>
-                    </div>
+                <div class="menu-demo" aria-label="Animated QR menu flow from category selection to order confirmation">
+                  <div class="menu-demo-frame menu-demo-frame--1"><img src="uploads/qr-menu-step-1.png" alt=""></div>
+                  <div class="menu-demo-frame menu-demo-frame--2"><img src="uploads/qr-menu-step-2.png" alt=""></div>
+                  <div class="menu-demo-frame menu-demo-frame--3"><img src="uploads/qr-menu-step-3.png" alt=""></div>
+                  <div class="menu-demo-frame menu-demo-frame--4"><img src="uploads/qr-menu-step-4.png" alt=""></div>
+                  <div class="menu-demo-frame menu-demo-frame--5"><img src="uploads/qr-menu-step-5.png" alt=""></div>
+                  <div class="menu-demo-frame menu-demo-frame--6"><img src="uploads/qr-menu-step-6.png" alt=""></div>
+                  <div class="menu-demo-frame menu-demo-frame--7">
+                    <img src="uploads/qr-menu-step-7.png" alt="">
+                    <span class="menu-demo-phone-mask">05X-XXX-XXXX</span>
                   </div>
-
-                  <div class="menu-demo-frame menu-demo-frame--2">
-                    <div class="menu-config-ghost"><strong>Bulochka</strong><span>התפריט שלנו</span></div>
-                    <div class="menu-config-sheet">
-                      <div class="menu-config-product">
-                        <img src="uploads/kassa-latte.jpg" alt="">
-                        <div><h4>לאטה</h4><p>אספרסו כפול עם חלב לבחירה</p></div>
-                        <span class="menu-config-close">×</span>
-                      </div>
-                      <div class="menu-config-label">בחרו גודל</div>
-                      <div class="menu-config-options"><span class="menu-config-chip">קטן · ₪18</span><span class="menu-config-chip is-active">רגיל · ₪20</span><span class="menu-config-chip">גדול · ₪23</span></div>
-                      <div class="menu-config-label">בחירת חלב</div>
-                      <div class="menu-config-options"><span class="menu-config-chip is-active">רגיל</span><span class="menu-config-chip">שיבולת שועל</span><span class="menu-config-chip">סויה</span></div>
-                      <div class="menu-config-cta"><span>הוספה להזמנה</span><strong>₪20</strong></div>
-                    </div>
-                  </div>
-
-                  <div class="menu-demo-frame menu-demo-frame--3">
-                    <div class="menu-checkout-screen">
-                      <div class="menu-checkout-head"><strong>ההזמנה שלך</strong><span class="menu-checkout-back">‹</span></div>
-                      <div class="menu-cart-item"><img src="uploads/kassa-latte.jpg" alt=""><div><strong>לאטה</strong><span>רגיל · חלב רגיל</span></div><b>₪20</b></div>
-                      <div class="menu-checkout-total"><span>סה״כ</span><strong>₪20</strong></div>
-                      <div class="menu-checkout-label">איך תרצו לקבל את ההזמנה?</div>
-                      <div class="menu-order-types"><span class="menu-order-type is-active">ישיבה במקום</span><span class="menu-order-type">איסוף עצמי</span></div>
-                      <div class="menu-checkout-field">שם מלא</div>
-                      <div class="menu-checkout-field" dir="ltr">05X-XXX-XXXX</div>
-                      <div class="menu-checkout-cta"><span>שליחת הזמנה</span><strong>₪20</strong></div>
-                    </div>
-                  </div>
-
-                  <div class="menu-demo-frame menu-demo-frame--4">
-                    <div class="menu-success-screen">
-                      <div class="menu-success-icon">✓</div>
-                      <h4>ההזמנה התקבלה!</h4>
-                      <p>הצוות התחיל להכין את ההזמנה<br>ונעדכן כשהיא תהיה מוכנה.</p>
-                      <div class="menu-success-order"><span>מספר הזמנה</span><strong>#1042</strong></div>
-                    </div>
-                  </div>
+                  <div class="menu-demo-frame menu-demo-frame--8"><img src="uploads/qr-menu-step-8.png" alt=""></div>
+                  <div class="menu-demo-frame menu-demo-frame--9"><img src="uploads/qr-menu-step-9.png" alt=""></div>
                   <span class="menu-demo-tap" aria-hidden="true"></span>
                 </div>
               </div>
