@@ -1,0 +1,563 @@
+.angle-reserve-demo,
+.angle-reserve-demo * {
+  box-sizing: border-box;
+}
+
+.angle-reserve-demo {
+  position: absolute;
+  inset: 36px 0 0;
+  overflow: hidden;
+  background: #ffffff;
+  color: #101827;
+  font-family: "Helvetica Neue", Helvetica, Arial, sans-serif;
+  line-height: 1.25;
+  direction: rtl;
+}
+
+.angle-reserve-demo-fallback {
+  width: 100%;
+  height: 100%;
+  display: block;
+  object-fit: cover;
+  object-position: top center;
+}
+
+.angle-reserve-app,
+.angle-reserve-screen {
+  position: absolute;
+  inset: 0;
+  overflow: hidden;
+  background: #ffffff;
+}
+
+.angle-reserve-scroll {
+  position: absolute;
+  inset: 0;
+  overflow-x: hidden;
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  scrollbar-width: none;
+}
+
+.angle-reserve-scroll::-webkit-scrollbar {
+  display: none;
+}
+
+.angle-reserve-header {
+  position: sticky;
+  top: 0;
+  z-index: 8;
+  min-height: 45px;
+  padding: 8px 10px;
+  display: grid;
+  grid-template-columns: 66px 1fr 66px;
+  align-items: center;
+  border-bottom: 1px solid #e7e8eb;
+  background: rgba(255,255,255,0.97);
+  text-align: center;
+}
+
+.angle-reserve-header h3 {
+  grid-column: 2;
+  margin: 0;
+  font-size: 14px;
+  line-height: 1;
+  font-weight: 850;
+  letter-spacing: 0;
+}
+
+.angle-reserve-back,
+.angle-reserve-reset {
+  min-height: 30px;
+  padding: 0 9px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  border: 0;
+  border-radius: 999px;
+  font: 750 10px/1 "Helvetica Neue", Helvetica, Arial, sans-serif;
+  cursor: pointer;
+}
+
+.angle-reserve-back {
+  grid-column: 3;
+  grid-row: 1;
+  background: #101827;
+  color: #ffffff;
+}
+
+.angle-reserve-reset {
+  grid-column: 1;
+  grid-row: 1;
+  width: 30px;
+  justify-self: start;
+  padding: 0;
+  background: #f2f3f5;
+  color: #6f7683;
+  font-size: 16px;
+}
+
+.angle-reserve-hero {
+  position: relative;
+  height: 118px;
+  overflow: hidden;
+  background: #20242c;
+}
+
+.angle-reserve-hero img {
+  width: 100%;
+  height: 100%;
+  display: block;
+  object-fit: cover;
+  object-position: center 44%;
+  filter: brightness(0.73);
+}
+
+.angle-reserve-hero::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  background: linear-gradient(to bottom, transparent 42%, rgba(5,8,13,0.72));
+}
+
+.angle-reserve-hero-title {
+  position: absolute;
+  z-index: 2;
+  right: 16px;
+  bottom: 13px;
+  color: #ffffff;
+  text-align: right;
+}
+
+.angle-reserve-hero-title small {
+  display: block;
+  margin-bottom: 3px;
+  font-size: 7px;
+  font-weight: 650;
+  opacity: 0.8;
+}
+
+.angle-reserve-hero-title strong {
+  display: block;
+  font-size: 20px;
+  line-height: 1;
+  font-weight: 850;
+}
+
+.angle-reserve-intro {
+  padding: 14px 13px 15px;
+  text-align: center;
+}
+
+.angle-reserve-intro > small {
+  display: block;
+  color: #818794;
+  font-size: 8px;
+  font-weight: 650;
+}
+
+.angle-reserve-intro > h4 {
+  margin: 4px 0 2px;
+  font-size: 20px;
+  line-height: 1.05;
+  font-weight: 850;
+}
+
+.angle-reserve-intro > p {
+  margin: 0;
+  color: #878d99;
+  font-size: 8px;
+}
+
+.angle-reserve-summary {
+  margin: 13px 12px 0;
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  overflow: hidden;
+  border: 1px solid #e0e3e8;
+  border-radius: 14px;
+  background: #ffffff;
+  box-shadow: 0 4px 9px rgba(16,24,39,0.06);
+}
+
+.angle-reserve-summary button,
+.angle-reserve-summary span {
+  min-height: 54px;
+  padding: 7px 4px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 3px;
+  border: 0;
+  border-left: 1px solid #e7e9ed;
+  background: #ffffff;
+  color: #101827;
+  font: inherit;
+}
+
+.angle-reserve-summary > :last-child {
+  border-left: 0;
+}
+
+.angle-reserve-summary small {
+  color: #8b919c;
+  font-size: 6px;
+  font-weight: 650;
+}
+
+.angle-reserve-summary strong {
+  font-size: 10px;
+  font-weight: 850;
+}
+
+.angle-reserve-primary {
+  width: calc(100% - 24px);
+  min-height: 43px;
+  margin: 12px 12px 0;
+  border: 0;
+  border-radius: 13px;
+  background: #101827;
+  color: #ffffff;
+  font: 850 11px/1 "Helvetica Neue", Helvetica, Arial, sans-serif;
+  cursor: pointer;
+}
+
+.angle-reserve-hint {
+  margin: 8px 0 0;
+  color: #858b96;
+  font-size: 7px;
+  text-align: center;
+}
+
+.angle-reserve-hours {
+  margin: 15px 12px 12px;
+  padding: 11px 12px;
+  display: grid;
+  grid-template-columns: 1fr 56px;
+  gap: 10px;
+  align-items: center;
+  border: 1px solid #e0e3e8;
+  border-radius: 13px;
+}
+
+.angle-reserve-hours-copy {
+  font-size: 7px;
+}
+
+.angle-reserve-hours-copy strong {
+  display: block;
+  margin-bottom: 5px;
+  font-size: 8px;
+}
+
+.angle-reserve-hours-row {
+  display: flex;
+  justify-content: space-between;
+  gap: 8px;
+  margin-top: 3px;
+  color: #636b79;
+}
+
+.angle-reserve-map {
+  min-height: 55px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 4px;
+  border: 1px solid #dce0e6;
+  border-radius: 12px;
+  color: #101827;
+  font-size: 7px;
+  font-weight: 750;
+}
+
+.angle-reserve-map::before {
+  content: "⌖";
+  font-size: 17px;
+  line-height: 1;
+}
+
+.angle-reserve-footer {
+  min-height: 82px;
+  padding: 13px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 10px;
+  background: #252525;
+  color: #ffffff;
+}
+
+.angle-reserve-socials {
+  display: flex;
+  gap: 9px;
+  direction: ltr;
+}
+
+.angle-reserve-socials span {
+  width: 27px;
+  height: 27px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 50%;
+  background: #3c3c3c;
+  font-size: 11px;
+  font-weight: 850;
+}
+
+.angle-reserve-review {
+  min-height: 25px;
+  padding: 0 13px;
+  display: flex;
+  align-items: center;
+  border-radius: 999px;
+  background: #404040;
+  font-size: 7px;
+  font-weight: 750;
+}
+
+.angle-reserve-availability {
+  padding: 15px 12px 18px;
+}
+
+.angle-reserve-availability > small {
+  display: block;
+  color: #7d8491;
+  font-size: 7px;
+  font-weight: 700;
+}
+
+.angle-reserve-availability h4 {
+  margin: 7px 0 2px;
+  font-size: 13px;
+  line-height: 1.25;
+  font-weight: 850;
+}
+
+.angle-reserve-availability > p {
+  margin: 0 0 13px;
+  color: #7d8491;
+  font-size: 8px;
+}
+
+.angle-reserve-zone {
+  margin-top: 12px;
+}
+
+.angle-reserve-zone h5 {
+  margin: 0 0 7px;
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  font-size: 10px;
+  font-weight: 850;
+}
+
+.angle-reserve-zone h5::before {
+  content: "▤";
+  color: #818896;
+  font-size: 9px;
+}
+
+.angle-reserve-times {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 5px;
+}
+
+.angle-reserve-time {
+  min-height: 48px;
+  padding: 5px 2px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  border: 1px solid #dfe2e7;
+  border-radius: 9px;
+  background: #ffffff;
+  color: #101827;
+  font: inherit;
+  cursor: pointer;
+}
+
+.angle-reserve-time strong {
+  font-size: 9px;
+  font-weight: 850;
+}
+
+.angle-reserve-time small {
+  margin-top: 3px;
+  color: #7b8492;
+  font-size: 5px;
+  white-space: nowrap;
+}
+
+.angle-reserve-time small::before {
+  content: "";
+  width: 4px;
+  height: 4px;
+  margin-left: 3px;
+  display: inline-block;
+  border-radius: 50%;
+  background: #82c92d;
+}
+
+.angle-reserve-time.is-featured {
+  border: 2px solid #101827;
+}
+
+.angle-reserve-details {
+  padding: 12px 12px 18px;
+}
+
+.angle-reserve-details .angle-reserve-summary {
+  margin: 0;
+  background: #f7f8fa;
+  box-shadow: none;
+}
+
+.angle-reserve-details .angle-reserve-summary span {
+  background: #f7f8fa;
+}
+
+.angle-reserve-area {
+  margin: 8px 0 12px;
+  color: #69717f;
+  font-size: 8px;
+  text-align: center;
+}
+
+.angle-reserve-area strong {
+  color: #101827;
+}
+
+.angle-reserve-details h4 {
+  margin: 0 0 10px;
+  font-size: 11px;
+  font-weight: 850;
+  text-align: center;
+}
+
+.angle-reserve-field {
+  width: 100%;
+  min-height: 47px;
+  margin-top: 8px;
+  padding: 0 13px;
+  border: 1px solid #dfe2e7;
+  border-radius: 11px;
+  background: #ffffff;
+  color: #101827;
+  font: 650 10px/1 "Helvetica Neue", Helvetica, Arial, sans-serif;
+  text-align: right;
+}
+
+.angle-reserve-field::placeholder {
+  color: #a1a7b2;
+}
+
+.angle-reserve-confirm {
+  width: 100%;
+  min-height: 46px;
+  margin-top: 12px;
+  border: 0;
+  border-radius: 12px;
+  background: #101827;
+  color: #ffffff;
+  font: 850 11px/1 "Helvetica Neue", Helvetica, Arial, sans-serif;
+  cursor: pointer;
+}
+
+.angle-reserve-status {
+  position: absolute;
+  inset: 45px 0 0;
+  padding: 22px 16px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  text-align: center;
+}
+
+.angle-reserve-status h4 {
+  margin: 16px 0 5px;
+  font-size: 16px;
+  font-weight: 850;
+}
+
+.angle-reserve-status p {
+  max-width: 210px;
+  margin: 0;
+  color: #7e8592;
+  font-size: 8px;
+  line-height: 1.45;
+}
+
+.angle-reserve-spinner {
+  width: 31px;
+  height: 31px;
+  border: 4px solid #e6e8ec;
+  border-top-color: #101827;
+  border-radius: 50%;
+  animation: angleReserveSpin 900ms linear infinite;
+}
+
+.angle-reserve-success-icon {
+  width: 47px;
+  height: 47px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 50%;
+  background: #dcf8e7;
+  color: #16a056;
+  font-size: 24px;
+  font-weight: 850;
+}
+
+.angle-reserve-confirm-card {
+  width: 100%;
+  margin-top: 15px;
+  padding: 11px 12px;
+  border-radius: 12px;
+  background: #f7f8fa;
+  text-align: right;
+}
+
+.angle-reserve-confirm-card strong {
+  display: block;
+  font-size: 10px;
+  font-weight: 850;
+}
+
+.angle-reserve-confirm-card span {
+  display: block;
+  margin-top: 3px;
+  color: #747c89;
+  font-size: 7px;
+}
+
+.angle-reserve-new {
+  min-height: 38px;
+  margin-top: 13px;
+  padding: 0 17px;
+  border: 0;
+  border-radius: 11px;
+  background: #101827;
+  color: #ffffff;
+  font: 800 9px/1 "Helvetica Neue", Helvetica, Arial, sans-serif;
+  cursor: pointer;
+}
+
+@keyframes angleReserveSpin {
+  to { transform: rotate(360deg); }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .angle-reserve-spinner {
+    animation: none;
+  }
+}

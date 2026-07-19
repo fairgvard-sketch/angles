@@ -539,6 +539,8 @@
   </style>
   <link rel="stylesheet" href="demo/menu-demo.css">
   <script src="demo/menu-demo.js" defer></script>
+  <link rel="stylesheet" href="demo/reservation-demo.css">
+  <script src="demo/reservation-demo.js" defer></script>
 </helmet>
 
 <div class="site-shell" style="background:#FFFFFF; color:#0B0B0B; overflow:hidden">
@@ -734,15 +736,10 @@
             </div>
             <div class="iphone17 guest-reserve-phone" aria-label="Reservation flow shown on iPhone 17 Pro Max">
               <div class="iphone17-screen">
-                <div class="reserve-demo" aria-label="Animated booking flow from availability to confirmation">
-                  <div class="reserve-demo-frame reserve-demo-frame--1" role="img" aria-label="Reservation landing page with date, time and party size">
-                    <img class="reserve-demo-frame--1-main" src="uploads/reservation-step-1.png" alt="" loading="eager" decoding="async">
-                    <img class="reserve-demo-frame--1-footer" src="uploads/reservation-step-1.png" alt="" loading="eager" decoding="async">
+                <div class="reserve-demo" aria-label="Interactive booking flow from availability to confirmation">
+                  <div class="angle-reserve-demo" data-angle-reserve-demo>
+                    <img class="angle-reserve-demo-fallback" src="uploads/reservation-step-1.png" alt="ANGLE reservation flow on iPhone">
                   </div>
-                  <img class="reserve-demo-frame reserve-demo-frame--2" src="uploads/reservation-step-2.png" alt="Live reservation times and seating zones" loading="eager" decoding="async">
-                  <img class="reserve-demo-frame reserve-demo-frame--3" src="uploads/reservation-step-3-redacted.png" alt="Reservation details form with masked phone number" loading="eager" decoding="async">
-                  <img class="reserve-demo-frame reserve-demo-frame--4" src="uploads/reservation-step-4.png" alt="Confirmed reservation" loading="eager" decoding="async">
-                  <span class="reserve-demo-tap" aria-hidden="true"></span>
                 </div>
                 <div class="iphone17-island"></div>
                 <div class="iphone17-status">
