@@ -173,8 +173,7 @@ class AngleReservationDemo {
     return `<section class="angle-reserve-screen">
       <div class="angle-reserve-scroll">
         <div class="angle-reserve-hero">
-          <img src="uploads/solution-cafe-v2.jpg" alt="">
-          <div class="angle-reserve-hero-title"><small>הזמנת מקום</small><strong>לחמנייה</strong></div>
+          <img src="uploads/reservation-step-1.png" alt="">
         </div>
         <div class="angle-reserve-intro"><small>הזמנת מקום</small><h4>לחמנייה</h4><p>כתובת העסק</p></div>
         ${this.summary()}
