@@ -43,6 +43,15 @@
   display: none;
 }
 
+.angle-reserve-start .angle-reserve-scroll {
+  display: flex;
+  flex-direction: column;
+}
+
+.angle-reserve-start .angle-reserve-scroll > * {
+  flex-shrink: 0;
+}
+
 .angle-reserve-header {
   position: sticky;
   top: 0;
@@ -252,6 +261,7 @@
 }
 
 .angle-reserve-footer {
+  flex: 1 0 82px;
   min-height: 82px;
   padding: 13px;
   display: flex;
@@ -277,8 +287,28 @@
   justify-content: center;
   border-radius: 50%;
   background: #3c3c3c;
-  font-size: 11px;
-  font-weight: 850;
+}
+
+.angle-reserve-socials svg {
+  width: 14px;
+  height: 14px;
+  display: block;
+}
+
+.angle-reserve-socials path {
+  fill: currentColor;
+}
+
+.angle-reserve-socials rect,
+.angle-reserve-socials circle {
+  fill: none;
+  stroke: currentColor;
+  stroke-width: 1.8;
+}
+
+.angle-reserve-socials .social-dot {
+  fill: currentColor;
+  stroke: none;
 }
 
 .angle-reserve-review {

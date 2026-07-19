@@ -41,6 +41,15 @@
   display: none;
 }
 
+.angle-menu-start .angle-menu-scroll {
+  display: flex;
+  flex-direction: column;
+}
+
+.angle-menu-start .angle-menu-scroll > * {
+  flex-shrink: 0;
+}
+
 .angle-menu-header {
   position: sticky;
   top: 0;
@@ -185,6 +194,7 @@
 }
 
 .angle-menu-footer {
+  flex: 1 0 86px;
   min-height: 86px;
   padding: 13px;
   display: flex;
@@ -212,28 +222,28 @@
   border-radius: 50%;
   background: #3c3c3c;
   color: #ffffff;
-  font-size: 12px;
-  font-weight: 850;
 }
 
-.angle-menu-instagram::before {
-  content: "";
-  width: 11px;
-  height: 11px;
-  border: 1.5px solid currentColor;
-  border-radius: 3px;
+.angle-menu-socials svg {
+  width: 14px;
+  height: 14px;
+  display: block;
 }
 
-.angle-menu-instagram::after {
-  content: "";
-  position: absolute;
-  top: 50%;
-  left: 50%;
-  width: 3px;
-  height: 3px;
-  transform: translate(-50%, -50%);
-  border: 1.2px solid currentColor;
-  border-radius: 50%;
+.angle-menu-socials path {
+  fill: currentColor;
+}
+
+.angle-menu-socials rect,
+.angle-menu-socials circle {
+  fill: none;
+  stroke: currentColor;
+  stroke-width: 1.8;
+}
+
+.angle-menu-socials .social-dot {
+  fill: currentColor;
+  stroke: none;
 }
 
 .angle-menu-review {

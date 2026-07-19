@@ -323,14 +323,14 @@ class AngleMenuDemo {
 
   renderCategories() {
     return `
-      <section class="angle-menu-screen">
+      <section class="angle-menu-screen angle-menu-start">
         <div class="angle-menu-scroll">
           <div class="angle-menu-hero"><span>תפריט דיגיטלי</span><strong>לחמנייה</strong></div>
           <div class="angle-menu-categories">${this.categoryCards()}</div>
           <footer class="angle-menu-footer">
             <div class="angle-menu-socials" aria-label="Social media">
-              <span aria-label="Facebook">f</span>
-              <span class="angle-menu-instagram" aria-label="Instagram"></span>
+              <span aria-label="Facebook"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M13.7 22v-8.7h2.9l.44-3.4H13.7V7.72c0-.98.27-1.65 1.68-1.65h1.8V3.03c-.31-.04-1.38-.13-2.63-.13-2.6 0-4.38 1.59-4.38 4.5v2.5H7.23v3.4h2.94V22h3.53Z"/></svg></span>
+              <span aria-label="Instagram"><svg viewBox="0 0 24 24" aria-hidden="true"><rect x="3.25" y="3.25" width="17.5" height="17.5" rx="5"/><circle cx="12" cy="12" r="4.1"/><circle class="social-dot" cx="17.45" cy="6.65" r="1"/></svg></span>
             </div>
             <div class="angle-menu-review">★ השאירו ביקורת בגוגל</div>
           </footer>
