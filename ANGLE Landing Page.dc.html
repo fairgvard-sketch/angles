@@ -235,7 +235,11 @@
     .reserve-confirmation span { display:block; margin-top:3px; color:#71747B; font-size:7px; }
     .menu-demo { position:absolute; inset:0; overflow:hidden; background:#FFFFFF; }
     .menu-demo-frame { position:absolute; inset:36px 0 0; overflow:hidden; opacity:0; background:#FFFFFF; will-change:opacity; }
-    .menu-demo-frame > img { position:absolute; top:-1px; left:50%; width:auto; max-width:none; height:calc(100% + 1px); display:block; transform:translateX(-50%); }
+    .menu-demo-frame > img { position:absolute; top:-1px; left:0; width:100%; max-width:none; height:calc(100% + 1px); display:block; transform:none; }
+    .menu-demo-frame--6 > img,
+    .menu-demo-frame--7 > img,
+    .menu-demo-frame--8 > img,
+    .menu-demo-frame--9 > img { left:50%; width:282.4%; transform:translateX(-50%); }
     .menu-demo-frame--1 { opacity:1; }
     .guest-preview-qr.is-active .menu-demo-frame--1 { animation:menuFrameOne 32s linear forwards; }
     .guest-preview-qr.is-active .menu-demo-frame--2 { animation:menuFrameTwo 32s linear forwards; }
