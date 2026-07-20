@@ -12,7 +12,7 @@ import { supabase } from './supabase'
 export const PERIODS = [
   { key: 'today', label: 'Today' },
   { key: '7d', label: '7 days' },
-  { key: '30d', label: '30 days' },
+  { key: 'month', label: 'Month' },
   { key: 'year', label: 'Year' },
   { key: 'custom', label: 'Dates' },
 ]
@@ -24,12 +24,27 @@ export function startOfDay(offsetDays = 0) {
   return d
 }
 
-/** Диапазон [from, to). Для custom — по выбранным датам (to эксклюзивна). */
+/**
+ * Диапазон [from, to). Месяц и год — КАЛЕНДАРНЫЕ: месяц с 1-го по последнее
+ * число текущего месяца, год с 1 января по 31 декабря (а не скользящее окно
+ * в 30/365 дней). Для custom — по выбранным датам (to эксклюзивна).
+ */
 export function periodRange(period, custom) {
+  const now = new Date()
   if (period === 'today') return { from: startOfDay(0), to: startOfDay(1) }
   if (period === '7d') return { from: startOfDay(-6), to: startOfDay(1) }
-  if (period === '30d') return { from: startOfDay(-29), to: startOfDay(1) }
-  if (period === 'year') return { from: startOfDay(-364), to: startOfDay(1) }
+  if (period === 'month') {
+    return {
+      from: new Date(now.getFullYear(), now.getMonth(), 1),
+      to: new Date(now.getFullYear(), now.getMonth() + 1, 1),
+    }
+  }
+  if (period === 'year') {
+    return {
+      from: new Date(now.getFullYear(), 0, 1),
+      to: new Date(now.getFullYear() + 1, 0, 1),
+    }
+  }
   if (period === 'custom' && custom?.from && custom?.to) {
     const from = new Date(`${custom.from}T00:00:00`)
     const to = new Date(`${custom.to}T00:00:00`)
@@ -39,7 +54,11 @@ export function periodRange(period, custom) {
   return { from: startOfDay(-6), to: startOfDay(1) }
 }
 
-/** Как рисовать график для периода: по часам (день), по дням, по месяцам (год). */
+/**
+ * Как рисовать график: по часам (сегодня), по дням (неделя, календарный
+ * месяц), по месяцам (календарный год и длинные custom-диапазоны).
+ * Внимание: период 'month' рисуется в режиме 'day' — это дни месяца.
+ */
 export function chartMode(period, custom) {
   if (period === 'today') return 'hour'
   if (period === 'year') return 'month'
