@@ -46,10 +46,19 @@
 .angle-reserve-start .angle-reserve-scroll {
   display: flex;
   flex-direction: column;
+  background: #252525;
 }
 
 .angle-reserve-start .angle-reserve-scroll > * {
   flex-shrink: 0;
+}
+
+.angle-reserve-start {
+  background: #252525;
+}
+
+.angle-reserve-start-content {
+  background: #ffffff;
 }
 
 .angle-reserve-header {
@@ -263,10 +272,7 @@
 
 .angle-reserve-footer {
   flex: 1 0 86px;
-  width: calc(100% + 4px);
   min-height: 86px;
-  margin-right: -2px;
-  margin-left: -2px;
   padding: 13px;
   display: flex;
   flex-direction: column;

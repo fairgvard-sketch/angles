@@ -325,8 +325,10 @@ class AngleMenuDemo {
     return `
       <section class="angle-menu-screen angle-menu-start">
         <div class="angle-menu-scroll">
-          <div class="angle-menu-hero"><span>תפריט דיגיטלי</span><strong>לחמנייה</strong></div>
-          <div class="angle-menu-categories">${this.categoryCards()}</div>
+          <div class="angle-menu-start-content">
+            <div class="angle-menu-hero"><span>תפריט דיגיטלי</span><strong>לחמנייה</strong></div>
+            <div class="angle-menu-categories">${this.categoryCards()}</div>
+          </div>
           <footer class="angle-menu-footer">
             <div class="angle-menu-socials" aria-label="Social media">
               <span aria-label="Facebook"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M13.7 22v-8.7h2.9l.44-3.4H13.7V7.72c0-.98.27-1.65 1.68-1.65h1.8V3.03c-.31-.04-1.38-.13-2.63-.13-2.6 0-4.38 1.59-4.38 4.5v2.5H7.23v3.4h2.94V22h3.53Z"/></svg></span>

@@ -175,13 +175,15 @@ class AngleReservationDemo {
         <div class="angle-reserve-hero">
           <img src="uploads/reservation-step-1.png" alt="">
         </div>
-        <div class="angle-reserve-intro"><small>הזמנת מקום</small><h4>לחמנייה</h4><p>כתובת העסק</p></div>
-        ${this.summary()}
-        <button class="angle-reserve-primary" type="button" data-reserve-action="search" data-reserve-target="reservation-search">להזמין עכשיו</button>
-        <p class="angle-reserve-hint">בחרו תאריך, שעה וכמות אורחים</p>
-        <div class="angle-reserve-hours">
-          <div class="angle-reserve-hours-copy"><strong>שעות פעילות</strong><div class="angle-reserve-hours-row"><b>א׳–ה׳</b><span>08:00–20:00</span></div><div class="angle-reserve-hours-row"><b>שישי</b><span>08:00–15:00</span></div><div class="angle-reserve-hours-row"><b>שבת</b><span>סגור</span></div></div>
-          <div class="angle-reserve-map">ניווט</div>
+        <div class="angle-reserve-start-content">
+          <div class="angle-reserve-intro"><small>הזמנת מקום</small><h4>לחמנייה</h4><p>כתובת העסק</p></div>
+          ${this.summary()}
+          <button class="angle-reserve-primary" type="button" data-reserve-action="search" data-reserve-target="reservation-search">להזמין עכשיו</button>
+          <p class="angle-reserve-hint">בחרו תאריך, שעה וכמות אורחים</p>
+          <div class="angle-reserve-hours">
+            <div class="angle-reserve-hours-copy"><strong>שעות פעילות</strong><div class="angle-reserve-hours-row"><b>א׳–ה׳</b><span>08:00–20:00</span></div><div class="angle-reserve-hours-row"><b>שישי</b><span>08:00–15:00</span></div><div class="angle-reserve-hours-row"><b>שבת</b><span>סגור</span></div></div>
+            <div class="angle-reserve-map">ניווט</div>
+          </div>
         </div>
         <footer class="angle-reserve-footer"><div class="angle-reserve-socials"><span aria-label="Facebook"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M13.7 22v-8.7h2.9l.44-3.4H13.7V7.72c0-.98.27-1.65 1.68-1.65h1.8V3.03c-.31-.04-1.38-.13-2.63-.13-2.6 0-4.38 1.59-4.38 4.5v2.5H7.23v3.4h2.94V22h3.53Z"/></svg></span><span aria-label="Instagram"><svg viewBox="0 0 24 24" aria-hidden="true"><rect x="3.25" y="3.25" width="17.5" height="17.5" rx="5"/><circle cx="12" cy="12" r="4.1"/><circle class="social-dot" cx="17.45" cy="6.65" r="1"/></svg></span></div><div class="angle-reserve-review">★ השאירו ביקורת בגוגל</div></footer>
       </div>
