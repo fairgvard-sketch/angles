@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from 'react'
-import { Plus, Trash2, X } from 'lucide-react'
+import { ChevronDown, ChevronRight, Plus, Trash2, X } from 'lucide-react'
 import {
   agorotToShekels, shekelsToAgorot,
   fetchCategories, fetchItems, fetchModifierGroups, fetchStations,
@@ -25,6 +25,33 @@ const TABS = [
 
 function money(agorot) {
   return `${agorotToShekels(agorot).toLocaleString('he-IL', { minimumFractionDigits: agorot % 100 ? 2 : 0 })} ₪`
+}
+
+/** Набор свёрнутых секций по id. По умолчанию всё раскрыто. */
+function useCollapsed() {
+  const [collapsed, setCollapsed] = useState(() => new Set())
+  const isCollapsed = (id) => collapsed.has(id)
+  const toggle = (id) => setCollapsed((prev) => {
+    const next = new Set(prev)
+    next.has(id) ? next.delete(id) : next.add(id)
+    return next
+  })
+  const collapseAll = (ids) => setCollapsed(new Set(ids))
+  const expandAll = () => setCollapsed(new Set())
+  return { isCollapsed, toggle, collapseAll, expandAll, anyCollapsed: collapsed.size > 0 }
+}
+
+/** Кликабельная шапка секции с шевроном сворачивания. */
+function CollapsibleHead({ collapsed, onToggle, title, subtitle, action }) {
+  return (
+    <div className="panel-heading collapsible">
+      <button className="collapse-toggle" onClick={onToggle} aria-expanded={!collapsed}>
+        {collapsed ? <ChevronRight /> : <ChevronDown />}
+        <span><strong>{title}</strong>{subtitle && <small>{subtitle}</small>}</span>
+      </button>
+      {action}
+    </div>
+  )
 }
 
 // ── Вкладка «Товары» ─────────────────────────────────────────
@@ -59,6 +86,9 @@ function ItemsTab({ context, data, reload }) {
     try { await deleteCategory(id); reload() } catch (e) { setError(e.message) }
   }
 
+  const { isCollapsed, toggle, collapseAll, expandAll, anyCollapsed } = useCollapsed()
+  const allCatIds = byCat.list.map((c) => c.id).concat(byCat.orphans.length ? ['__orphans__'] : [])
+
   return (
     <>
       <div className="menu-toolbar">
@@ -81,42 +111,65 @@ function ItemsTab({ context, data, reload }) {
             <button className="icon-button" onClick={() => { setAddingCat(false); setCatName('') }} aria-label="Cancel"><X /></button>
           </div>
         )}
+        {byCat.list.length > 0 && (
+          <button className="text-button collapse-all" onClick={() => anyCollapsed ? expandAll() : collapseAll(allCatIds)}>
+            {anyCollapsed ? 'Expand all' : 'Collapse all'}
+          </button>
+        )}
       </div>
 
       {error && <p className="form-error" role="alert">{error}</p>}
 
       <div className="menu-groups">
-        {byCat.list.map((cat) => (
-          <section className="panel menu-category" key={cat.id}>
-            <div className="panel-heading">
-              <div><h2>{cat.name}</h2><p>{cat.items.length} item{cat.items.length === 1 ? '' : 's'}</p></div>
-              <button className="icon-button" onClick={() => removeCategory(cat.id)} aria-label="Delete category"><Trash2 /></button>
-            </div>
-            <div className="menu-list">
-              {cat.items.length === 0
-                ? <p className="empty-state">No items.</p>
-                : cat.items.map((it) => (
-                  <button className={`menu-row as-button ${it.is_available ? '' : 'is-off'}`} key={it.id} onClick={() => setEditorItem(it)}>
-                    <span className="menu-name">{it.name}{!it.is_available && <small> · hidden</small>}</span>
-                    <span className="menu-price">{money(it.price)}</span>
-                  </button>
-                ))}
-            </div>
-          </section>
-        ))}
-        {byCat.orphans.length > 0 && (
-          <section className="panel menu-category">
-            <div className="panel-heading"><div><h2>Uncategorised</h2><p>{byCat.orphans.length} items</p></div></div>
-            <div className="menu-list">
-              {byCat.orphans.map((it) => (
-                <button className="menu-row as-button" key={it.id} onClick={() => setEditorItem(it)}>
-                  <span className="menu-name">{it.name}</span>
-                  <span className="menu-price">{money(it.price)}</span>
-                </button>
-              ))}
-            </div>
-          </section>
-        )}
+        {byCat.list.map((cat) => {
+          const collapsed = isCollapsed(cat.id)
+          return (
+            <section className="panel menu-category" key={cat.id}>
+              <CollapsibleHead
+                collapsed={collapsed}
+                onToggle={() => toggle(cat.id)}
+                title={cat.name}
+                subtitle={`${cat.items.length} item${cat.items.length === 1 ? '' : 's'}`}
+                action={<button className="icon-button" onClick={() => removeCategory(cat.id)} aria-label="Delete category"><Trash2 /></button>}
+              />
+              {!collapsed && (
+                <div className="menu-list">
+                  {cat.items.length === 0
+                    ? <p className="empty-state">No items.</p>
+                    : cat.items.map((it) => (
+                      <button className={`menu-row as-button ${it.is_available ? '' : 'is-off'}`} key={it.id} onClick={() => setEditorItem(it)}>
+                        <span className="menu-name">{it.name}{!it.is_available && <small> · hidden</small>}</span>
+                        <span className="menu-price">{money(it.price)}</span>
+                      </button>
+                    ))}
+                </div>
+              )}
+            </section>
+          )
+        })}
+        {byCat.orphans.length > 0 && (() => {
+          const collapsed = isCollapsed('__orphans__')
+          return (
+            <section className="panel menu-category">
+              <CollapsibleHead
+                collapsed={collapsed}
+                onToggle={() => toggle('__orphans__')}
+                title="Uncategorised"
+                subtitle={`${byCat.orphans.length} items`}
+              />
+              {!collapsed && (
+                <div className="menu-list">
+                  {byCat.orphans.map((it) => (
+                    <button className="menu-row as-button" key={it.id} onClick={() => setEditorItem(it)}>
+                      <span className="menu-name">{it.name}</span>
+                      <span className="menu-price">{money(it.price)}</span>
+                    </button>
+                  ))}
+                </div>
+              )}
+            </section>
+          )
+        })()}
       </div>
 
       {editorItem && (
@@ -158,6 +211,8 @@ function ModifiersTab({ context, data, reload }) {
     catch (e) { setError(e.message) }
   }
 
+  const { isCollapsed, toggle, collapseAll, expandAll, anyCollapsed } = useCollapsed()
+
   return (
     <>
       <div className="menu-toolbar">
@@ -165,39 +220,49 @@ function ModifiersTab({ context, data, reload }) {
           <input placeholder="Group name (e.g. Milk, Syrup)" value={newGroup} onChange={(e) => setNewGroup(e.target.value)} />
           <button className="icon-button" onClick={addGroup} aria-label="Add group"><Plus /></button>
         </div>
+        {data.modifierGroups.length > 0 && (
+          <button className="text-button collapse-all" onClick={() => anyCollapsed ? expandAll() : collapseAll(data.modifierGroups.map((g) => g.id))}>
+            {anyCollapsed ? 'Expand all' : 'Collapse all'}
+          </button>
+        )}
       </div>
       {error && <p className="form-error" role="alert">{error}</p>}
 
       <div className="menu-groups">
         {data.modifierGroups.length === 0 && <p className="empty-state">No modifier groups yet.</p>}
-        {data.modifierGroups.map((g) => (
-          <section className="panel menu-category" key={g.id}>
-            <div className="panel-heading">
-              <div>
-                <h2>{g.name}</h2>
-                <p>Choose {g.min_select}–{g.max_select}</p>
-              </div>
-              <button className="icon-button" onClick={async () => {
-                if (!confirm(`Delete group "${g.name}" and its modifiers?`)) return
-                try { await deleteModifierGroup(g.id); reload() } catch (e) { setError(e.message) }
-              }} aria-label="Delete group"><Trash2 /></button>
-            </div>
-            <div className="menu-list">
-              {(g.modifiers || []).map((m) => (
-                <div className="menu-row" key={m.id}>
-                  <span className="menu-name">{m.name}</span>
-                  <span className="menu-price">{m.price_delta ? `+${money(m.price_delta)}` : '—'}</span>
-                  <button className="icon-button" onClick={async () => {
-                    try { await deleteModifier(m.id); reload() } catch (e) { setError(e.message) }
-                  }} aria-label="Delete"><Trash2 /></button>
+        {data.modifierGroups.map((g) => {
+          const collapsed = isCollapsed(g.id)
+          return (
+            <section className="panel menu-category" key={g.id}>
+              <CollapsibleHead
+                collapsed={collapsed}
+                onToggle={() => toggle(g.id)}
+                title={g.name}
+                subtitle={`Choose ${g.min_select}–${g.max_select} · ${(g.modifiers || []).length}`}
+                action={<button className="icon-button" onClick={async () => {
+                  if (!confirm(`Delete group "${g.name}" and its modifiers?`)) return
+                  try { await deleteModifierGroup(g.id); reload() } catch (e) { setError(e.message) }
+                }} aria-label="Delete group"><Trash2 /></button>}
+              />
+              {!collapsed && (
+                <div className="menu-list">
+                  {(g.modifiers || []).map((m) => (
+                    <div className="menu-row" key={m.id}>
+                      <span className="menu-name">{m.name}</span>
+                      <span className="menu-price">{m.price_delta ? `+${money(m.price_delta)}` : '—'}</span>
+                      <button className="icon-button" onClick={async () => {
+                        try { await deleteModifier(m.id); reload() } catch (e) { setError(e.message) }
+                      }} aria-label="Delete"><Trash2 /></button>
+                    </div>
+                  ))}
+                  <button className="menu-add-row" onClick={() => addModifier(g.id, (g.modifiers || []).length)}>
+                    <Plus /> Add modifier
+                  </button>
                 </div>
-              ))}
-              <button className="menu-add-row" onClick={() => addModifier(g.id, (g.modifiers || []).length)}>
-                <Plus /> Add modifier
-              </button>
-            </div>
-          </section>
-        ))}
+              )}
+            </section>
+          )
+        })}
       </div>
     </>
   )

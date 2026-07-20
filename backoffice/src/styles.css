@@ -184,7 +184,16 @@ a { color: inherit; }
 .inline-add { display: inline-flex; align-items: center; gap: 6px; }
 .inline-add input, .inline-add select { height: 40px; padding: 0 12px; border: 1px solid #cfd2d8; border-radius: 7px; font-size: 14px; background: #fff; }
 .inline-add input:focus, .inline-add select:focus { outline: none; border-color: #1b1e24; }
-.menu-groups { display: grid; gap: 14px; }
+.collapse-all { margin-left: auto; }
+.panel-heading.collapsible { padding: 0; }
+.collapse-toggle { flex: 1; min-width: 0; display: flex; align-items: center; gap: 10px; min-height: 60px; padding: 14px 8px 14px 20px; border: 0; background: transparent; text-align: left; cursor: pointer; }
+.collapse-toggle:hover { background: #fafafa; }
+.collapse-toggle > svg { width: 18px; height: 18px; flex: 0 0 18px; color: #7c8087; }
+.collapse-toggle > span { min-width: 0; display: flex; flex-direction: column; gap: 3px; }
+.collapse-toggle strong { font-size: 15px; font-weight: 700; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.collapse-toggle small { color: #868b93; font-size: 12px; }
+.panel-heading.collapsible .icon-button { margin-right: 12px; }
+.menu-groups { display: grid; gap: 10px; }
 .menu-list { display: grid; }
 .menu-row { display: grid; grid-template-columns: minmax(0, 1fr) auto; align-items: center; gap: 12px; min-height: 52px; padding: 8px 22px; border-bottom: 1px solid #edeef0; }
 .menu-row:has(.icon-button) { grid-template-columns: minmax(0, 1fr) auto 40px; }
