@@ -143,7 +143,7 @@ class AngleMenuDemo {
     if (!this.isCurrentRun(id)) return false;
     const target = this.app.querySelector(`[data-demo-target="${name}"]`);
     if (!target) return false;
-    await this.movePointer(target, 720);
+    await this.movePointer(target, 860);
     if (!this.isCurrentRun(id)) return false;
     this.pointer.classList.add("is-pressing");
     await pause(150);

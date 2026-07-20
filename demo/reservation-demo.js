@@ -69,7 +69,7 @@ class AngleReservationDemo {
     if (!this.isCurrent(id)) return false;
     const target = this.app.querySelector(`[data-reserve-target="${name}"]`);
     if (!target) return false;
-    await this.movePointer(target, 760);
+    await this.movePointer(target, 900);
     if (!this.isCurrent(id)) return false;
     this.pointer.classList.add("is-pressing");
     await wait(155);
