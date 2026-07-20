@@ -5,11 +5,33 @@ The editable source is `ANGLE Landing Page.dc.html`. The public site is generate
 ## Build locally
 
 ```bash
+npm install
 npm run build
 python3 -m http.server 8001 --directory dist
 ```
 
 Open `http://127.0.0.1:8001/`.
+
+## Owner back office
+
+The authenticated owner workspace is built into `dist/account/`. It is a
+separate management interface from the POS, but uses the same Supabase project
+and organisation data.
+
+Create a local `.env` or configure these variables in Vercel:
+
+```bash
+VITE_SUPABASE_URL=https://your-project.supabase.co
+VITE_SUPABASE_ANON_KEY=your-public-anon-key
+```
+
+Before publishing `/account/`, deploy Kassa migration
+`088_backoffice_memberships.sql`. The Kassa frontend must keep
+`MIN_SCHEMA_VERSION = 88`. The release order is:
+
+1. Supabase migrations through `088`.
+2. Kassa frontend built against schema `88`.
+3. ANGLE website and owner back office.
 
 ## Deploy on Vercel
 
@@ -19,4 +41,6 @@ Open `http://127.0.0.1:8001/`.
 4. Add the public domain under **Project Settings -> Domains**.
 5. Copy the exact A and CNAME records shown by Vercel into Wix DNS.
 
-The future customer dashboard should be deployed separately at `app.<domain>` so the public website and authenticated product can evolve independently.
+The owner workspace is currently available at `/account/`. It can later move
+to `app.<domain>` without changing the shared Supabase identity or organisation
+membership model.
