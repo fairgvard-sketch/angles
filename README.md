@@ -27,10 +27,10 @@ VITE_SUPABASE_ANON_KEY=your-public-anon-key
 
 Before publishing `/account/`, deploy Kassa migrations
 `088_backoffice_memberships.sql` and `089_sales_report_backoffice.sql`. The
-Kassa frontend must keep `MIN_SCHEMA_VERSION = 89`. The release order is:
+Kassa frontend must keep `MIN_SCHEMA_VERSION = 90`. The release order is:
 
-1. Supabase migrations through `089`.
-2. Kassa frontend built against schema `89`.
+1. Supabase migrations through `090`.
+2. Kassa frontend built against schema `90`.
 3. ANGLE website and owner back office.
 
 The Overview screen reads `sales_report`. Migration `089` lets an owner or
