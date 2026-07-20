@@ -34,6 +34,9 @@ function Chart({ bars, title }) {
 
   useEffect(() => { setPicked(null) }, [bars])
 
+  // Замер ширины скроллера. Зависимость от bars важна: элемент появляется
+  // только после загрузки данных, при пустом [] ref ещё null и observer
+  // никогда не подключался — из-за этого прокрутка не включалась.
   useEffect(() => {
     const el = axisRef.current
     if (!el) return undefined
@@ -41,12 +44,11 @@ function Chart({ bars, title }) {
     ro.observe(el)
     setWidth(el.getBoundingClientRect().width)
     return () => ro.disconnect()
-  }, [])
+  }, [bars.length])
 
-  // Столбику нужно минимум 28px. Если всё влезает — рисуем по ширине
-  // контейнера и прореживаем подписи; если нет — включаем прокрутку,
-  // и тогда подписи помещаются все.
-  const MIN_BAR = 28
+  // Столбику нужно минимум 30px. Не влезает — включаем прокрутку и
+  // показываем все подписи; влезает — прежнее поведение.
+  const MIN_BAR = 30
   const scrolls = width > 0 && bars.length * MIN_BAR > width
   const fit = width > 0 ? Math.max(1, Math.floor(width / 26)) : bars.length
   const step = !scrolls && bars.length > fit ? Math.ceil(bars.length / fit) : 1
@@ -70,7 +72,7 @@ function Chart({ bars, title }) {
           // график листается пальцем. Ширина задаётся минимумом на столбик.
           <div className="chart-scroll" ref={axisRef}>
             <div className={`chart-inner ${scrolls ? 'is-scrolling' : ''}`}
-              style={{ '--bar-count': bars.length, '--min-bar': '28px' }}>
+              style={{ '--bar-count': bars.length, '--min-bar': `${MIN_BAR}px` }}>
               <div className="chart-bars" role="img" aria-label={title}>
                 {bars.map((b, i) => {
                   const height = maxAmount > 0 ? Math.max((b.amount / maxAmount) * 100, b.amount > 0 ? 3 : 0) : 0

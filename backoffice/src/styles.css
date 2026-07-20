@@ -169,8 +169,12 @@ a { color: inherit; }
  * корня это не влияет (сдвиг всей страницы по-прежнему запрещён).
  */
 .chart-scroll { overflow-x: auto; overscroll-behavior-x: contain; -webkit-overflow-scrolling: touch; scrollbar-width: thin; }
-.chart-inner { min-width: 100%; }
-.chart-inner.is-scrolling { min-width: calc(var(--bar-count) * var(--min-bar)); }
+/*
+ * Ширину задаёт CSS, а не JS-замер: min-width гарантирует, что столбики
+ * не ужмутся в ниточки даже если замер не сработал. max() — график
+ * растягивается на всю ширину, когда точек мало.
+ */
+.chart-inner { min-width: max(100%, calc(var(--bar-count) * var(--min-bar, 30px))); }
 /* Ось времени всегда LTR: часы и дни идут слева направо в любой локали */
 .chart-bars, .chart-axis { direction: ltr; }
 .chart-bars { display: flex; align-items: flex-end; gap: 2px; height: 148px; }
@@ -182,9 +186,11 @@ a { color: inherit; }
 /* Ширина подписи = ширине столбика, иначе ось разъезжается */
 .chart-axis span { flex: 1 1 0; min-width: 0; max-width: 76px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; text-align: center; color: #9ba0a8; font-size: 10px; font-variant-numeric: tabular-nums; }
 .chart-axis span.is-active { color: #1b1e24; font-weight: 750; }
-/* В режиме прокрутки ширину задаёт --min-bar, ограничение сверху мешает */
+/* Ширину столбика задаёт --min-bar, ограничение сверху мешает распределению */
 .chart-inner.is-scrolling .chart-bar,
 .chart-inner.is-scrolling .chart-axis span { max-width: none; }
+/* Столбики не уже минимума — иначе на телефоне превращаются в ниточки */
+.chart-bar, .chart-axis span { min-width: var(--min-bar, 30px); }
 
 .overview-columns { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 14px; margin-top: 14px; }
 .data-list { display: grid; padding: 6px 0; }
