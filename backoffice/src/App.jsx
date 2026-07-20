@@ -19,6 +19,7 @@ import {
 } from 'lucide-react'
 import { isSupabaseConfigured, supabase } from './supabase'
 import SalesOverview from './SalesOverview'
+import LocationSettings from './LocationSettings'
 
 const navigation = [
   { id: 'overview', label: 'Home', icon: LayoutDashboard },
@@ -232,7 +233,8 @@ function Dashboard({ session, context, refresh }) {
         <main className="content">
           {active === 'overview' && <Overview context={context} onNavigate={setActive} />}
           {active === 'sales' && <SalesOverview organizationName={context.organization?.name} />}
-          {active !== 'overview' && active !== 'sales' && (
+          {active === 'locations' && <LocationSettings context={context} />}
+          {active !== 'overview' && active !== 'sales' && active !== 'locations' && (
             <SectionPage section={active} context={context} />
           )}
         </main>
