@@ -60,7 +60,6 @@
     .solution-card-media img { object-fit:cover; object-position:center; }
     .solution-card.is-active .solution-card-media { transform:scale(1.025); }
     .solution-card-shade { position:absolute; inset:0; z-index:-1; background:linear-gradient(180deg, rgba(0,0,0,0.06) 20%, rgba(0,0,0,0.72) 100%); pointer-events:none; }
-    .solution-card-number { position:absolute; top:24px; left:24px; font-size:11px; font-weight:600; letter-spacing:0.16em; color:rgba(255,255,255,0.72); }
     .solution-card-copy { position:absolute; left:0; right:0; bottom:0; padding:28px; display:flex; flex-direction:column; align-items:flex-start; gap:9px; box-sizing:border-box; }
     .solution-card-title { margin:0; font-size:28px; line-height:1.08; font-weight:600; letter-spacing:0; white-space:nowrap; transform-origin:left bottom; transition:transform 600ms cubic-bezier(0.22, 1, 0.36, 1), font-size 500ms ease; }
     .solution-card:not(.is-active) .solution-card-title { font-size:22px; transform:translateY(-6px) rotate(-90deg); }
@@ -482,7 +481,7 @@
       .solution-card.is-active { flex:none; height:440px; }
       .solution-card-copy { padding:22px; }
       .solution-card-title, .solution-card:not(.is-active) .solution-card-title { font-size:23px; transform:none; }
-      .solution-card-number { top:20px; left:auto; right:20px; }
+      .solution-card:not(.is-active) .solution-card-details { display:none; }
       .solution-card:not(.is-active) .solution-card-media { filter:brightness(0.72); }
 
       .pricing-section { padding:76px 0 82px !important; }
@@ -801,7 +800,6 @@
             <img src="uploads/solution-restaurant-v2.jpg" alt="Waiter serving guests in a bright modern restaurant">
           </div>
           <div class="solution-card-shade"></div>
-          <span class="solution-card-number">01</span>
           <div class="solution-card-copy">
             <h3 class="solution-card-title">Restaurants</h3>
             <div class="solution-card-details">
@@ -816,7 +814,6 @@
             <img src="uploads/solution-cafe-v2.jpg" alt="Barista serving coffee in a colorful specialty café">
           </div>
           <div class="solution-card-shade"></div>
-          <span class="solution-card-number">02</span>
           <div class="solution-card-copy">
             <h3 class="solution-card-title">Cafés</h3>
             <div class="solution-card-details">
@@ -831,7 +828,6 @@
             <img src="uploads/solution-bar-v2.jpg" alt="Bartender serving a cocktail in a vibrant evening bar">
           </div>
           <div class="solution-card-shade"></div>
-          <span class="solution-card-number">03</span>
           <div class="solution-card-copy">
             <h3 class="solution-card-title">Bars</h3>
             <div class="solution-card-details">
@@ -846,7 +842,6 @@
             <img src="uploads/solution-pizzeria-v2.jpg" alt="Pizza maker working beside a red tiled wood-fired oven">
           </div>
           <div class="solution-card-shade"></div>
-          <span class="solution-card-number">04</span>
           <div class="solution-card-copy">
             <h3 class="solution-card-title">Pizzerias</h3>
             <div class="solution-card-details">
@@ -861,7 +856,6 @@
             <img src="uploads/solution-bakery-v2.jpg" alt="Baker arranging fresh bread and pastries in a bright bakery">
           </div>
           <div class="solution-card-shade"></div>
-          <span class="solution-card-number">05</span>
           <div class="solution-card-copy">
             <h3 class="solution-card-title">Bakeries</h3>
             <div class="solution-card-details">
