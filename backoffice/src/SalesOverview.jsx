@@ -34,8 +34,6 @@ function Chart({ bars, title }) {
 
   useEffect(() => { setPicked(null) }, [bars])
 
-  // Ширина графика решает, сколько подписей влезет: на телефоне фиксированный
-  // порог резал даже 7 дней. ~26px на подпись — минимум для читаемости.
   useEffect(() => {
     const el = axisRef.current
     if (!el) return undefined
@@ -45,8 +43,13 @@ function Chart({ bars, title }) {
     return () => ro.disconnect()
   }, [])
 
+  // Столбику нужно минимум 28px. Если всё влезает — рисуем по ширине
+  // контейнера и прореживаем подписи; если нет — включаем прокрутку,
+  // и тогда подписи помещаются все.
+  const MIN_BAR = 28
+  const scrolls = width > 0 && bars.length * MIN_BAR > width
   const fit = width > 0 ? Math.max(1, Math.floor(width / 26)) : bars.length
-  const step = bars.length > fit ? Math.ceil(bars.length / fit) : 1
+  const step = !scrolls && bars.length > fit ? Math.ceil(bars.length / fit) : 1
 
   return (
     <section className="panel chart-panel">
@@ -63,33 +66,38 @@ function Chart({ bars, title }) {
         {bars.length === 0 ? (
           <p className="empty-state">No sales in this period.</p>
         ) : (
-          <>
-            <div className="chart-bars" role="img" aria-label={title}>
-              {bars.map((b, i) => {
-                const height = maxAmount > 0 ? Math.max((b.amount / maxAmount) * 100, b.amount > 0 ? 3 : 0) : 0
-                const active = picked === null ? i === maxIdx : picked === i
-                return (
-                  <button key={b.key} type="button" onClick={() => setPicked(picked === i ? null : i)}
-                    aria-label={`${b.full}: ${formatMoney(b.amount)}`} className="chart-bar">
-                    <span className={active ? 'bar is-active' : 'bar'} style={{ height: `${height}%` }} />
-                  </button>
-                )
-              })}
+          // Скроллер: при 30+ точках столбики не сжимаются в ниточки,
+          // график листается пальцем. Ширина задаётся минимумом на столбик.
+          <div className="chart-scroll" ref={axisRef}>
+            <div className={`chart-inner ${scrolls ? 'is-scrolling' : ''}`}
+              style={{ '--bar-count': bars.length, '--min-bar': '28px' }}>
+              <div className="chart-bars" role="img" aria-label={title}>
+                {bars.map((b, i) => {
+                  const height = maxAmount > 0 ? Math.max((b.amount / maxAmount) * 100, b.amount > 0 ? 3 : 0) : 0
+                  const active = picked === null ? i === maxIdx : picked === i
+                  return (
+                    <button key={b.key} type="button" onClick={() => setPicked(picked === i ? null : i)}
+                      aria-label={`${b.full}: ${formatMoney(b.amount)}`} className="chart-bar">
+                      <span className={active ? 'bar is-active' : 'bar'} style={{ height: `${height}%` }} />
+                    </button>
+                  )
+                })}
+              </div>
+              <div className="chart-axis">
+                {bars.map((b, i) => {
+                  const active = picked === null ? i === maxIdx : picked === i
+                  // При прокрутке подписи влезают все — прореживаем только
+                  // если график целиком помещается в видимую ширину
+                  const show = active || !scrolls || i % step === 0
+                  return (
+                    <span key={b.key} className={active ? 'is-active' : ''}>
+                      {show ? b.label : ''}
+                    </span>
+                  )
+                })}
+              </div>
             </div>
-            <div className="chart-axis" ref={axisRef}>
-              {bars.map((b, i) => {
-                const active = picked === null ? i === maxIdx : picked === i
-                // Подпись показываем по шагу прореживания; выбранный/пиковый
-                // столбик подписан всегда, иначе непонятно, что за ридаут
-                const show = active || i % step === 0
-                return (
-                  <span key={b.key} className={active ? 'is-active' : ''}>
-                    {show ? b.label : ''}
-                  </span>
-                )
-              })}
-            </div>
-          </>
+          </div>
         )}
       </div>
     </section>

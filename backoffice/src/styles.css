@@ -18,7 +18,9 @@ html, body, #root { min-height: 100%; margin: 0; }
 html { overscroll-behavior-x: none; }
 body { min-height: 100svh; overscroll-behavior-x: none; background: #f4f5f7; -webkit-font-smoothing: antialiased; }
 button, input { font: inherit; letter-spacing: 0; }
-button { cursor: pointer; }
+/* color: inherit обязателен — иначе Safari красит текст кнопок
+   в системный синий (видно было на названиях категорий) */
+button { cursor: pointer; color: inherit; }
 a { color: inherit; }
 
 .brand { display: inline-flex; align-items: center; gap: 10px; color: #111317; text-decoration: none; font-size: 20px; font-weight: 800; }
@@ -161,6 +163,14 @@ a { color: inherit; }
 .chart-readout { color: #71757e; font-size: 12px; font-variant-numeric: tabular-nums; }
 .chart-readout strong { color: #1b1e24; }
 .chart-body { padding: 20px 22px 18px; }
+/*
+ * Горизонтальный скроллер графика: при 30+ точках столбики не сжимаются,
+ * а лист прокручивается пальцем. Скроллер внутренний — на overscroll-behavior-x
+ * корня это не влияет (сдвиг всей страницы по-прежнему запрещён).
+ */
+.chart-scroll { overflow-x: auto; overscroll-behavior-x: contain; -webkit-overflow-scrolling: touch; scrollbar-width: thin; }
+.chart-inner { min-width: 100%; }
+.chart-inner.is-scrolling { min-width: calc(var(--bar-count) * var(--min-bar)); }
 /* Ось времени всегда LTR: часы и дни идут слева направо в любой локали */
 .chart-bars, .chart-axis { direction: ltr; }
 .chart-bars { display: flex; align-items: flex-end; gap: 2px; height: 148px; }
@@ -172,6 +182,9 @@ a { color: inherit; }
 /* Ширина подписи = ширине столбика, иначе ось разъезжается */
 .chart-axis span { flex: 1 1 0; min-width: 0; max-width: 76px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; text-align: center; color: #9ba0a8; font-size: 10px; font-variant-numeric: tabular-nums; }
 .chart-axis span.is-active { color: #1b1e24; font-weight: 750; }
+/* В режиме прокрутки ширину задаёт --min-bar, ограничение сверху мешает */
+.chart-inner.is-scrolling .chart-bar,
+.chart-inner.is-scrolling .chart-axis span { max-width: none; }
 
 .overview-columns { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 14px; margin-top: 14px; }
 .data-list { display: grid; padding: 6px 0; }
@@ -208,14 +221,20 @@ a { color: inherit; }
 .inline-add input, .inline-add select { height: 40px; padding: 0 12px; border: 1px solid #cfd2d8; border-radius: 7px; font-size: 14px; background: #fff; }
 .inline-add input:focus, .inline-add select:focus { outline: none; border-color: #1b1e24; }
 .collapse-all { margin-left: auto; }
-.panel-heading.collapsible { padding: 0; }
-.collapse-toggle { flex: 1; min-width: 0; display: flex; align-items: center; gap: 10px; min-height: 60px; padding: 14px 8px 14px 20px; border: 0; background: transparent; text-align: left; cursor: pointer; }
+/* min-height у .panel-heading (88px) в свёрнутой карточке даёт пустоту снизу */
+.panel-heading.collapsible { min-height: 0; padding: 0; }
+/* color обязателен: без него Safari красит текст кнопки в системный синий */
+.collapse-toggle { flex: 1; min-width: 0; display: flex; align-items: center; gap: 10px; min-height: 56px; padding: 12px 8px 12px 18px; border: 0; background: transparent; color: #16181d; text-align: left; cursor: pointer; }
 .collapse-toggle:hover { background: #fafafa; }
 .collapse-toggle > svg { width: 18px; height: 18px; flex: 0 0 18px; color: #7c8087; }
 .collapse-toggle > span { min-width: 0; display: flex; flex-direction: column; gap: 3px; }
 .collapse-toggle strong { font-size: 15px; font-weight: 700; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .collapse-toggle small { color: #868b93; font-size: 12px; }
 .panel-heading.collapsible .icon-button { margin-right: 12px; }
+/* Удаление категории/группы — сдержанной строкой внутри раскрытого блока */
+.menu-delete-row { display: flex; align-items: center; gap: 7px; width: 100%; min-height: 46px; padding: 10px 20px; border: 0; border-top: 1px solid #f0f1f3; background: #fff; color: #97545c; font-size: 13px; font-weight: 650; text-align: left; }
+.menu-delete-row:hover { background: #fdf7f7; color: #b4453c; }
+.menu-delete-row svg { width: 15px; height: 15px; }
 .menu-groups { display: grid; gap: 10px; }
 .menu-list { display: grid; }
 .menu-row { display: grid; grid-template-columns: minmax(0, 1fr) auto; align-items: center; gap: 12px; min-height: 52px; padding: 8px 22px; border-bottom: 1px solid #edeef0; }

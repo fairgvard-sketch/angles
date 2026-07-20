@@ -140,12 +140,13 @@ function ItemsTab({ context, data, reload }) {
           const collapsed = isCollapsed(cat.id)
           return (
             <section className="panel menu-category" key={cat.id}>
+              {/* Корзина не в шапке: в свёрнутом списке она визуально шумит.
+                  Удаление — строкой внутри раскрытой категории. */}
               <CollapsibleHead
                 collapsed={collapsed}
                 onToggle={() => toggle(cat.id)}
                 title={cat.name}
                 subtitle={`${cat.items.length} item${cat.items.length === 1 ? '' : 's'}`}
-                action={<button className="icon-button" onClick={() => removeCategory(cat.id)} aria-label="Delete category"><Trash2 /></button>}
               />
               {!collapsed && (
                 <div className="menu-list">
@@ -157,6 +158,9 @@ function ItemsTab({ context, data, reload }) {
                         <span className="menu-price">{money(it.price)}</span>
                       </button>
                     ))}
+                  <button className="menu-delete-row" onClick={() => removeCategory(cat.id)}>
+                    <Trash2 /> Delete category
+                  </button>
                 </div>
               )}
             </section>
@@ -255,10 +259,6 @@ function ModifiersTab({ context, data, reload }) {
                 onToggle={() => toggle(g.id)}
                 title={g.name}
                 subtitle={`Choose ${g.min_select}–${g.max_select} · ${(g.modifiers || []).length}`}
-                action={<button className="icon-button" onClick={async () => {
-                  if (!confirm(`Delete group "${g.name}" and its modifiers?`)) return
-                  try { await deleteModifierGroup(g.id); reload() } catch (e) { setError(e.message) }
-                }} aria-label="Delete group"><Trash2 /></button>}
               />
               {!collapsed && (
                 <div className="menu-list">
@@ -273,6 +273,12 @@ function ModifiersTab({ context, data, reload }) {
                   ))}
                   <button className="menu-add-row" onClick={() => addModifier(g.id, (g.modifiers || []).length)}>
                     <Plus /> Add modifier
+                  </button>
+                  <button className="menu-delete-row" onClick={async () => {
+                    if (!confirm(`Delete group "${g.name}" and its modifiers?`)) return
+                    try { await deleteModifierGroup(g.id); reload() } catch (e) { setError(e.message) }
+                  }}>
+                    <Trash2 /> Delete group
                   </button>
                 </div>
               )}
