@@ -18,9 +18,11 @@ import {
   X,
 } from 'lucide-react'
 import { isSupabaseConfigured, supabase } from './supabase'
+import SalesOverview from './SalesOverview'
 
 const navigation = [
-  { id: 'overview', label: 'Overview', icon: LayoutDashboard },
+  { id: 'overview', label: 'Home', icon: LayoutDashboard },
+  { id: 'sales', label: 'Overview', icon: BarChart3 },
   { id: 'locations', label: 'Locations', icon: Store },
   { id: 'menu', label: 'Menu & catalogue', icon: MenuIcon },
   { id: 'team', label: 'Team', icon: Users },
@@ -166,6 +168,7 @@ function Overview({ context, onNavigate }) {
         <section className="panel quick-panel">
           <div className="panel-heading"><div><h2>Quick access</h2><p>Common owner tasks.</p></div></div>
           <div className="quick-list">
+            <button onClick={() => onNavigate('sales')}><BarChart3 /><span><strong>Sales overview</strong><small>Revenue, orders and top items</small></span><ChevronRight /></button>
             <button onClick={() => onNavigate('menu')}><MenuIcon /><span><strong>Menu & catalogue</strong><small>Prices, items and modifiers</small></span><ChevronRight /></button>
             <button onClick={() => onNavigate('online')}><QrCode /><span><strong>Online channels</strong><small>QR menu and reservations</small></span><ChevronRight /></button>
             <button onClick={() => onNavigate('team')}><Users /><span><strong>Team access</strong><small>Roles, PINs and permissions</small></span><ChevronRight /></button>
@@ -227,7 +230,11 @@ function Dashboard({ session, context, refresh }) {
           </div>
         </header>
         <main className="content">
-          {active === 'overview' ? <Overview context={context} onNavigate={setActive} /> : <SectionPage section={active} context={context} />}
+          {active === 'overview' && <Overview context={context} onNavigate={setActive} />}
+          {active === 'sales' && <SalesOverview organizationName={context.organization?.name} />}
+          {active !== 'overview' && active !== 'sales' && (
+            <SectionPage section={active} context={context} />
+          )}
         </main>
       </div>
     </div>
