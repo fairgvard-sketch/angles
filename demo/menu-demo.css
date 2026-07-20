@@ -7,7 +7,7 @@
   position: absolute;
   inset: 38px 0 0;
   overflow: hidden;
-  background: #ffffff;
+  background: #252525;
   color: #101827;
   font-family: "Helvetica Neue", Helvetica, Arial, sans-serif;
   line-height: 1.25;
@@ -18,7 +18,7 @@
   position: absolute;
   inset: 0;
   overflow: hidden;
-  background: #ffffff;
+  background: #252525;
 }
 
 .angle-menu-screen {
@@ -155,7 +155,7 @@
 }
 
 .angle-menu-categories {
-  padding: 10px;
+  padding: 10px 10px 0;
   display: grid;
   grid-template-columns: repeat(2, minmax(0, 1fr));
   gap: 8px;
@@ -203,6 +203,8 @@
 }
 
 .angle-menu-footer {
+  position: relative;
+  z-index: 1;
   flex: 1 0 86px;
   min-height: 86px;
   padding: 13px;
@@ -212,6 +214,7 @@
   justify-content: center;
   gap: 10px;
   background: #252525;
+  box-shadow: 0 0 0 3px #252525;
   color: #ffffff;
 }
 
