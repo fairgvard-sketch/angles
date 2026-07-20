@@ -255,13 +255,28 @@ a { color: inherit; }
 .photo-row { display: flex; align-items: center; gap: 12px; flex-wrap: wrap; }
 .photo-preview { width: 64px; height: 64px; object-fit: cover; border-radius: 8px; border: 1px solid #e0e2e6; }
 .file-button { display: inline-flex; align-items: center; height: 40px; padding: 0 16px; border: 1px solid #cfd2d8; border-radius: 8px; font-size: 13px; font-weight: 700; cursor: pointer; }
-.modal-foot { display: flex; align-items: center; justify-content: space-between; gap: 12px; padding: 16px 22px; border-top: 1px solid #e8e9ec; }
-.modal-foot-right { display: flex; gap: 10px; margin-left: auto; }
-.danger-button { display: inline-flex; align-items: center; gap: 6px; height: 42px; padding: 0 16px; border: 1px solid #e3b7b3; border-radius: 8px; background: #fff; color: #b4453c; font-size: 14px; font-weight: 700; }
+.modal-foot { display: flex; align-items: stretch; gap: 10px; padding: 16px 22px; border-top: 1px solid #e8e9ec; }
+.modal-foot-right { display: flex; align-items: stretch; gap: 10px; margin-left: auto; }
+/*
+ * Кнопки футера — одна высота и общее выравнивание: у primary/secondary/danger
+ * свои min-height (54/40/42) и .narrow добавлял margin-top, из-за чего они
+ * разъезжались по вертикали.
+ */
+.modal-foot .primary-button,
+.modal-foot .secondary-button,
+.modal-foot .danger-button {
+  min-height: 46px; height: auto; margin: 0; padding: 0 18px;
+  border-radius: 8px; font-size: 14px;
+}
+.danger-button { display: inline-flex; align-items: center; justify-content: center; gap: 6px; border: 1px solid #e3b7b3; background: #fff; color: #b4453c; font-weight: 700; }
 .danger-button svg { width: 16px; height: 16px; }
 
 @media (max-width: 640px) {
   .field-row { grid-template-columns: 1fr; }
+  /* .modal-body label задаёт grid — для чекбокса нужна строка: иначе
+     галочка оказывается над подписью (как на скриншоте) */
+  .modal-body label.check-field { display: flex; flex-direction: row; align-items: center; gap: 10px; min-height: 46px; }
+  .modal-body label.check-field > span { font-weight: 600; }
   .variant-row { grid-template-columns: minmax(0, 1fr) 80px auto auto; }
   /*
    * Редактор товара на телефоне — лист на весь экран снизу вверх,
@@ -275,9 +290,15 @@ a { color: inherit; }
   }
   .modal-head { position: sticky; top: 0; z-index: 1; background: #fff; padding: max(14px, env(safe-area-inset-top)) 18px 14px; }
   .modal-body { padding: 16px 18px 20px; gap: 14px; }
-  .modal-foot { position: sticky; bottom: 0; background: #fff; padding: 12px 18px calc(12px + env(safe-area-inset-bottom)); flex-wrap: wrap; }
-  .modal-foot-right { flex: 1; }
-  .modal-foot-right .primary-button { flex: 1; }
+  .modal-foot { position: sticky; bottom: 0; background: #fff; padding: 12px 16px calc(12px + env(safe-area-inset-bottom)); gap: 8px; }
+  .modal-foot-right { flex: 1; gap: 8px; }
+  /* Delete сжимается в квадрат-иконку, Cancel и Save делят ширину поровну.
+     Подпись скрыта визуально, но остаётся для скринридера. */
+  .modal-foot .danger-button { flex: 0 0 46px; padding: 0; gap: 0; }
+  .modal-foot .danger-button .btn-label { position: absolute; width: 1px; height: 1px; overflow: hidden; clip-path: inset(50%); white-space: nowrap; }
+  .modal-foot .danger-button svg { width: 18px; height: 18px; }
+  .modal-foot-right .secondary-button,
+  .modal-foot-right .primary-button { flex: 1; padding: 0 12px; }
   /* На телефоне поля крупнее: 16px не даёт iOS зумить при фокусе */
   .modal-body input, .modal-body select { height: 46px; font-size: 16px; }
 }

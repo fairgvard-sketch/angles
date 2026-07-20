@@ -114,7 +114,9 @@ export default function ItemEditor({ context, item, categories, stations, modifi
 
         <div className="modal-body">
           <label><span>Name</span>
-            <input value={name} onChange={(e) => setName(e.target.value)} autoFocus />
+            {/* Без autoFocus: на телефоне это сразу выбрасывало клавиатуру
+                и уводило форму вверх, хотя пользователь просто открыл товар */}
+            <input value={name} onChange={(e) => setName(e.target.value)} />
           </label>
 
           <div className="field-row">
@@ -196,8 +198,8 @@ export default function ItemEditor({ context, item, categories, stations, modifi
 
         <footer className="modal-foot">
           {!isNew && (
-            <button className="danger-button" onClick={remove} disabled={saving}>
-              <Trash2 /> Delete
+            <button className="danger-button" onClick={remove} disabled={saving} aria-label="Delete item">
+              <Trash2 /><span className="btn-label">Delete</span>
             </button>
           )}
           <div className="modal-foot-right">
