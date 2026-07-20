@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from 'react'
+import { useEffect, useMemo, useRef, useState } from 'react'
 import { ChevronDown, ChevronRight, Plus, Trash2, X } from 'lucide-react'
 import {
   agorotToShekels, shekelsToAgorot,
@@ -27,9 +27,21 @@ function money(agorot) {
   return `${agorotToShekels(agorot).toLocaleString('he-IL', { minimumFractionDigits: agorot % 100 ? 2 : 0 })} ₪`
 }
 
-/** Набор свёрнутых секций по id. По умолчанию всё раскрыто. */
-function useCollapsed() {
+/**
+ * Набор свёрнутых секций по id. По умолчанию секции СВЁРНУТЫ: при первом
+ * появлении данных все известные id схлопываются один раз (дальше — ручное
+ * управление, initedRef не даёт повторно свернуть уже раскрытое пользователем).
+ */
+function useCollapsed(allIds) {
   const [collapsed, setCollapsed] = useState(() => new Set())
+  const inited = useRef(false)
+
+  useEffect(() => {
+    if (inited.current || allIds.length === 0) return
+    inited.current = true
+    setCollapsed(new Set(allIds))
+  }, [allIds])
+
   const isCollapsed = (id) => collapsed.has(id)
   const toggle = (id) => setCollapsed((prev) => {
     const next = new Set(prev)
@@ -86,8 +98,11 @@ function ItemsTab({ context, data, reload }) {
     try { await deleteCategory(id); reload() } catch (e) { setError(e.message) }
   }
 
-  const { isCollapsed, toggle, collapseAll, expandAll, anyCollapsed } = useCollapsed()
-  const allCatIds = byCat.list.map((c) => c.id).concat(byCat.orphans.length ? ['__orphans__'] : [])
+  const allCatIds = useMemo(
+    () => byCat.list.map((c) => c.id).concat(byCat.orphans.length ? ['__orphans__'] : []),
+    [byCat]
+  )
+  const { isCollapsed, toggle, collapseAll, expandAll, anyCollapsed } = useCollapsed(allCatIds)
 
   return (
     <>
@@ -211,7 +226,8 @@ function ModifiersTab({ context, data, reload }) {
     catch (e) { setError(e.message) }
   }
 
-  const { isCollapsed, toggle, collapseAll, expandAll, anyCollapsed } = useCollapsed()
+  const groupIds = useMemo(() => data.modifierGroups.map((g) => g.id), [data.modifierGroups])
+  const { isCollapsed, toggle, collapseAll, expandAll, anyCollapsed } = useCollapsed(groupIds)
 
   return (
     <>
