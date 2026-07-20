@@ -104,21 +104,61 @@ export function hourBars(report) {
   return bars
 }
 
-export function dayBars(report) {
-  return (report?.by_day || []).map((d) => {
-    const date = new Date(`${d.day}T00:00:00`)
-    return {
-      key: d.day,
-      label: date.toLocaleDateString('en-GB', { day: 'numeric', month: 'short' }),
-      full: date.toLocaleDateString('en-GB', { day: 'numeric', month: 'long', weekday: 'long' }),
-      amount: d.amount,
-      count: d.count,
-    }
-  })
+/**
+ * Дни диапазона. Ось непрерывна: дни без продаж — пустые слоты, иначе
+ * несколько торговых дней растянулись бы на всю ширину графика.
+ */
+export function dayBars(report, from, to) {
+  const acc = new Map((report?.by_day || []).map((d) => [d.day, d]))
+  if (!from || !to) {
+    // Фолбэк на случай вызова без границ: только дни с данными
+    return [...acc.values()].map((d) => {
+      const date = new Date(`${d.day}T00:00:00`)
+      return {
+        key: d.day,
+        label: date.toLocaleDateString('en-GB', { day: 'numeric', month: 'short' }),
+        full: date.toLocaleDateString('en-GB', { day: 'numeric', month: 'long', weekday: 'long' }),
+        amount: d.amount,
+        count: d.count,
+      }
+    })
+  }
+
+  const bars = []
+  const cursor = new Date(from.getFullYear(), from.getMonth(), from.getDate())
+  const last = new Date(to.getTime() - 86400000) // to эксклюзивна
+  let prevMonth = null
+  while (cursor <= last) {
+    const key = `${cursor.getFullYear()}-${String(cursor.getMonth() + 1).padStart(2, '0')}-${String(cursor.getDate()).padStart(2, '0')}`
+    const d = acc.get(key)
+    // Подпись короткая — только число: «14 Jul» для каждого дня не влезает
+    // на телефоне. Месяц показываем один раз, на его первом дне в оси.
+    const month = cursor.getMonth()
+    const showMonth = month !== prevMonth
+    prevMonth = month
+    bars.push({
+      key,
+      label: showMonth
+        ? cursor.toLocaleDateString('en-GB', { day: 'numeric', month: 'short' })
+        : String(cursor.getDate()),
+      full: cursor.toLocaleDateString('en-GB', { day: 'numeric', month: 'long', weekday: 'long' }),
+      amount: d?.amount ?? 0,
+      count: d?.count ?? 0,
+    })
+    cursor.setDate(cursor.getDate() + 1)
+  }
+  return bars
 }
 
-/** Свод by_day в месяцы: сервер по месяцам не группирует, делаем на клиенте. */
-export function monthBars(report) {
+/**
+ * Свод by_day в месяцы: сервер по месяцам не группирует, делаем на клиенте.
+ *
+ * Ось строится по ВСЕМУ запрошенному диапазону, а не по месяцам с продажами:
+ * иначе единственный месяц растягивается на всю ширину. Месяцы без продаж
+ * (прошедшие пустые и ещё не наступившие) остаются пустыми слотами — столбика
+ * нет, но позиция на оси занята.
+ */
+export function monthBars(report, from, to) {
   const acc = new Map()
   for (const d of report?.by_day || []) {
     const key = d.day.slice(0, 7) // YYYY-MM
@@ -127,21 +167,31 @@ export function monthBars(report) {
     cur.count += d.count
     acc.set(key, cur)
   }
-  return [...acc.entries()].sort().map(([key, v]) => {
-    const date = new Date(`${key}-01T00:00:00`)
-    return {
+
+  const bars = []
+  const cursor = new Date(from.getFullYear(), from.getMonth(), 1)
+  // to эксклюзивна: последний включённый месяц — тот, в котором лежит to-1 день
+  const last = new Date(to.getTime() - 86400000)
+  const end = new Date(last.getFullYear(), last.getMonth(), 1)
+
+  while (cursor <= end) {
+    const key = `${cursor.getFullYear()}-${String(cursor.getMonth() + 1).padStart(2, '0')}`
+    const v = acc.get(key)
+    bars.push({
       key,
-      label: date.toLocaleDateString('en-GB', { month: 'short' }),
-      full: date.toLocaleDateString('en-GB', { month: 'long', year: 'numeric' }),
-      amount: v.amount,
-      count: v.count,
-    }
-  })
+      label: cursor.toLocaleDateString('en-GB', { month: 'short' }),
+      full: cursor.toLocaleDateString('en-GB', { month: 'long', year: 'numeric' }),
+      amount: v?.amount ?? 0,
+      count: v?.count ?? 0,
+    })
+    cursor.setMonth(cursor.getMonth() + 1)
+  }
+  return bars
 }
 
 /** Выбор набора столбиков под режим графика. */
-export function barsFor(mode, report) {
+export function barsFor(mode, report, from, to) {
   if (mode === 'hour') return hourBars(report)
-  if (mode === 'month') return monthBars(report)
-  return dayBars(report)
+  if (mode === 'month') return monthBars(report, from, to)
+  return dayBars(report, from, to)
 }

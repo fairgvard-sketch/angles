@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
 import { Plus, Trash2, X } from 'lucide-react'
 import { agorotToShekels, shekelsToAgorot } from './menu'
 
@@ -32,6 +32,14 @@ export default function ItemEditor({ context, item, categories, stations, modifi
   const [uploading, setUploading] = useState(false)
   const [saving, setSaving] = useState(false)
   const [error, setError] = useState('')
+
+  // Пока открыт лист — фон под ним не скроллится (иначе на телефоне
+  // страница уезжает вместе с формой)
+  useEffect(() => {
+    const prev = document.body.style.overflow
+    document.body.style.overflow = 'hidden'
+    return () => { document.body.style.overflow = prev }
+  }, [])
 
   function addVariant() {
     setVariants((v) => [...v, { name: '', price: price || '0', is_default: v.length === 0 }])

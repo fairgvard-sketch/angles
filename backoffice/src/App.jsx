@@ -215,6 +215,14 @@ function Dashboard({ session, context, refresh }) {
   const [active, setActive] = useState('overview')
   const [drawer, setDrawer] = useState(false)
 
+  // Полноэкранное меню открыто — фон под ним не скроллится
+  useEffect(() => {
+    if (!drawer) return undefined
+    const prev = document.body.style.overflow
+    document.body.style.overflow = 'hidden'
+    return () => { document.body.style.overflow = prev }
+  }, [drawer])
+
   async function signOut() {
     await supabase.auth.signOut()
   }

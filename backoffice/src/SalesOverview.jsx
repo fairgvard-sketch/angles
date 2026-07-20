@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from 'react'
+import { useEffect, useMemo, useRef, useState } from 'react'
 import { CreditCard, Receipt, RefreshCw, ShoppingBag, TrendingUp } from 'lucide-react'
 import {
   PERIODS, barsFor, chartMode, fetchSalesReport, formatMoney, methodLabel, periodRange,
@@ -25,14 +25,28 @@ function StatCard({ icon: Icon, label, value, sub }) {
 
 function Chart({ bars, title }) {
   const maxAmount = bars.reduce((m, b) => Math.max(m, b.amount), 0)
-  const maxIdx = bars.findIndex((b) => b.amount === maxAmount)
+  // Пиковый столбик подсвечиваем только если продажи вообще были
+  const maxIdx = maxAmount > 0 ? bars.findIndex((b) => b.amount === maxAmount) : -1
   const [picked, setPicked] = useState(null)
   const readout = picked !== null && bars[picked] ? bars[picked] : maxIdx >= 0 ? bars[maxIdx] : null
+  const axisRef = useRef(null)
+  const [width, setWidth] = useState(0)
 
   useEffect(() => { setPicked(null) }, [bars])
 
-  // При многих столбиках прореживаем подписи, чтобы ось не слипалась
-  const step = bars.length > 24 ? Math.ceil(bars.length / 12) : bars.length > 14 ? 3 : 1
+  // Ширина графика решает, сколько подписей влезет: на телефоне фиксированный
+  // порог резал даже 7 дней. ~26px на подпись — минимум для читаемости.
+  useEffect(() => {
+    const el = axisRef.current
+    if (!el) return undefined
+    const ro = new ResizeObserver(([entry]) => setWidth(entry.contentRect.width))
+    ro.observe(el)
+    setWidth(el.getBoundingClientRect().width)
+    return () => ro.disconnect()
+  }, [])
+
+  const fit = width > 0 ? Math.max(1, Math.floor(width / 26)) : bars.length
+  const step = bars.length > fit ? Math.ceil(bars.length / fit) : 1
 
   return (
     <section className="panel chart-panel">
@@ -62,12 +76,18 @@ function Chart({ bars, title }) {
                 )
               })}
             </div>
-            <div className="chart-axis">
-              {bars.map((b, i) => (
-                <span key={b.key} className={(picked === null ? i === maxIdx : picked === i) ? 'is-active' : ''}>
-                  {i % step === 0 ? b.label : ''}
-                </span>
-              ))}
+            <div className="chart-axis" ref={axisRef}>
+              {bars.map((b, i) => {
+                const active = picked === null ? i === maxIdx : picked === i
+                // Подпись показываем по шагу прореживания; выбранный/пиковый
+                // столбик подписан всегда, иначе непонятно, что за ридаут
+                const show = active || i % step === 0
+                return (
+                  <span key={b.key} className={active ? 'is-active' : ''}>
+                    {show ? b.label : ''}
+                  </span>
+                )
+              })}
             </div>
           </>
         )}
@@ -112,7 +132,7 @@ export default function SalesOverview({ organizationName }) {
 
   const summary = report?.summary
   const net = summary ? summary.gross_sales - summary.refunds : 0
-  const bars = useMemo(() => barsFor(mode, report), [mode, report])
+  const bars = useMemo(() => barsFor(mode, report, from, to), [mode, report, from, to])
 
   const chartTitle = mode === 'hour' ? 'By hour' : mode === 'month' ? 'By month' : 'By day'
 
