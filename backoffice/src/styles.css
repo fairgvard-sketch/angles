@@ -125,16 +125,29 @@ a { color: inherit; }
 .period-switch button { min-height: 38px; padding: 0 16px; border: 0; border-radius: 6px; background: transparent; color: #5c616a; font-size: 13px; font-weight: 750; }
 .period-switch button.is-active { background: #fff; color: #1b1e24; box-shadow: 0 1px 2px rgb(20 22 27 / 10%); }
 
-.hero-panel { padding: 26px 24px; }
-.hero-label { margin: 0; color: #71757e; font-size: 13px; }
-.hero-value { margin: 6px 0 0; font-size: clamp(34px, 4vw, 46px); line-height: 1.05; font-weight: 780; font-variant-numeric: tabular-nums; }
-.hero-reference { margin: 10px 0 0; color: #767b83; font-size: 12px; font-variant-numeric: tabular-nums; }
-.hero-split { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 16px; margin-top: 22px; padding-top: 18px; border-top: 1px solid #edeef0; }
-.hero-split-label { display: block; color: #71757e; font-size: 12px; }
-.hero-split-value { display: block; margin-top: 5px; font-size: 21px; font-weight: 760; font-variant-numeric: tabular-nums; }
-.hero-adjustments { margin-top: 16px; padding-top: 14px; border-top: 1px solid #edeef0; display: grid; gap: 7px; }
-.hero-adjustments div { display: flex; justify-content: space-between; gap: 12px; color: #6c717a; font-size: 13px; font-variant-numeric: tabular-nums; }
-.hero-adjustments .is-negative { color: #b4453c; }
+/* Выбор дат для произвольного периода */
+.date-range { display: flex; flex-wrap: wrap; gap: 14px; margin-bottom: 14px; }
+.date-range label { display: grid; gap: 6px; }
+.date-range span { font-size: 12px; font-weight: 700; color: #71757e; }
+.date-range input { height: 42px; padding: 0 12px; border: 1px solid #cfd2d8; border-radius: 8px; font-size: 14px; background: #fff; }
+.date-range input:focus { outline: none; border-color: #1b1e24; }
+
+/* Hero выручки — тёмная выразительная карточка */
+.ov-hero { padding: 30px 28px; border-radius: 12px; background: linear-gradient(135deg, #1b1e24, #2b3038); color: #fff; }
+.ov-hero-label { margin: 0; color: #b7bcc4; font-size: 13px; font-weight: 650; letter-spacing: .02em; }
+.ov-hero-value { margin: 8px 0 0; font-size: clamp(38px, 5vw, 56px); line-height: 1; font-weight: 800; font-variant-numeric: tabular-nums; }
+
+.ov-stats { margin-top: 12px; }
+.ov-stat { min-height: 108px; }
+.ov-stat .stat-value { font-size: 24px; font-variant-numeric: tabular-nums; }
+
+.ov-adjust { margin-top: 12px; padding: 14px 20px; display: grid; gap: 8px; }
+.ov-adjust div { display: flex; justify-content: space-between; gap: 12px; color: #6c717a; font-size: 13px; }
+.ov-adjust strong { font-variant-numeric: tabular-nums; }
+.ov-adjust .is-negative { color: #b4453c; }
+
+.chart-panel .panel-heading h2, .overview-columns .panel-heading h2 { display: inline-flex; align-items: center; gap: 8px; }
+.chart-panel .panel-heading svg, .overview-columns .panel-heading svg { width: 16px; height: 16px; color: #7c8087; }
 
 .chart-panel { margin-top: 14px; }
 .chart-readout { color: #71757e; font-size: 12px; font-variant-numeric: tabular-nums; }

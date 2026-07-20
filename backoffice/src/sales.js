@@ -9,7 +9,13 @@ import { supabase } from './supabase'
  * инвариант кассы: во float их переводит только форматирование.
  */
 
-export const PERIODS = ['today', 'yesterday', '7d']
+export const PERIODS = [
+  { key: 'today', label: 'Today' },
+  { key: '7d', label: '7 days' },
+  { key: '30d', label: '30 days' },
+  { key: 'year', label: 'Year' },
+  { key: 'custom', label: 'Dates' },
+]
 
 export function startOfDay(offsetDays = 0) {
   const d = new Date()
@@ -18,10 +24,30 @@ export function startOfDay(offsetDays = 0) {
   return d
 }
 
-export function periodRange(period) {
+/** Диапазон [from, to). Для custom — по выбранным датам (to эксклюзивна). */
+export function periodRange(period, custom) {
   if (period === 'today') return { from: startOfDay(0), to: startOfDay(1) }
-  if (period === 'yesterday') return { from: startOfDay(-1), to: startOfDay(0) }
-  return { from: startOfDay(-6), to: startOfDay(1) } // 7 дней включая сегодня
+  if (period === '7d') return { from: startOfDay(-6), to: startOfDay(1) }
+  if (period === '30d') return { from: startOfDay(-29), to: startOfDay(1) }
+  if (period === 'year') return { from: startOfDay(-364), to: startOfDay(1) }
+  if (period === 'custom' && custom?.from && custom?.to) {
+    const from = new Date(`${custom.from}T00:00:00`)
+    const to = new Date(`${custom.to}T00:00:00`)
+    to.setDate(to.getDate() + 1) // включительно по выбранный день
+    return { from, to }
+  }
+  return { from: startOfDay(-6), to: startOfDay(1) }
+}
+
+/** Как рисовать график для периода: по часам (день), по дням, по месяцам (год). */
+export function chartMode(period, custom) {
+  if (period === 'today') return 'hour'
+  if (period === 'year') return 'month'
+  if (period === 'custom' && custom?.from && custom?.to) {
+    const days = (new Date(custom.to) - new Date(custom.from)) / 86400000
+    return days > 92 ? 'month' : 'day'
+  }
+  return 'day'
 }
 
 export function formatMoney(agorot) {
@@ -83,10 +109,39 @@ export function dayBars(report) {
     const date = new Date(`${d.day}T00:00:00`)
     return {
       key: d.day,
-      label: date.toLocaleDateString('en-GB', { weekday: 'short' }),
+      label: date.toLocaleDateString('en-GB', { day: 'numeric', month: 'short' }),
       full: date.toLocaleDateString('en-GB', { day: 'numeric', month: 'long', weekday: 'long' }),
       amount: d.amount,
       count: d.count,
     }
   })
+}
+
+/** Свод by_day в месяцы: сервер по месяцам не группирует, делаем на клиенте. */
+export function monthBars(report) {
+  const acc = new Map()
+  for (const d of report?.by_day || []) {
+    const key = d.day.slice(0, 7) // YYYY-MM
+    const cur = acc.get(key) || { amount: 0, count: 0 }
+    cur.amount += d.amount
+    cur.count += d.count
+    acc.set(key, cur)
+  }
+  return [...acc.entries()].sort().map(([key, v]) => {
+    const date = new Date(`${key}-01T00:00:00`)
+    return {
+      key,
+      label: date.toLocaleDateString('en-GB', { month: 'short' }),
+      full: date.toLocaleDateString('en-GB', { month: 'long', year: 'numeric' }),
+      amount: v.amount,
+      count: v.count,
+    }
+  })
+}
+
+/** Выбор набора столбиков под режим графика. */
+export function barsFor(mode, report) {
+  if (mode === 'hour') return hourBars(report)
+  if (mode === 'month') return monthBars(report)
+  return dayBars(report)
 }
