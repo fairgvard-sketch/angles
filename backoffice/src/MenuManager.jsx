@@ -1,135 +1,296 @@
-import { useEffect, useState } from 'react'
-import { Check, Pencil, X } from 'lucide-react'
-import { agorotToShekels, fetchMenu, saveMenuItem, shekelsToAgorot } from './menu'
+import { useEffect, useMemo, useState } from 'react'
+import { Plus, Trash2, X } from 'lucide-react'
+import {
+  agorotToShekels, shekelsToAgorot,
+  fetchCategories, fetchItems, fetchModifierGroups, fetchStations,
+  createCategory, updateCategory, deleteCategory,
+  saveItem, deleteItem, uploadItemImage,
+  createModifierGroup, updateModifierGroup, deleteModifierGroup,
+  createModifier, updateModifier, deleteModifier,
+  createStation, updateStation, deleteStation,
+} from './menu'
+import ItemEditor from './ItemEditor'
 
 /**
- * Меню в бэкофисе. Список категорий с товарами, инлайн-правка имени, цены и
- * доступности. Пишем через save_menu_item (092) — PIN не нужен. Правка одного
- * товара за раз: сохраняет варианты/группы без изменений (см. menu.js).
+ * Меню в бэкофисе — паритет с POS: товары (создание/правка/удаление, варианты,
+ * модификаторы, фото, станция), категории, группы модификаторов, станции.
+ * Три вкладки, как в кассе.
  */
 
-function ItemRow({ item, onSaved }) {
-  const [editing, setEditing] = useState(false)
-  const [name, setName] = useState(item.name)
-  const [price, setPrice] = useState(String(agorotToShekels(item.price)))
-  const [available, setAvailable] = useState(item.is_available)
-  const [saving, setSaving] = useState(false)
+const TABS = [
+  { key: 'items', label: 'Items' },
+  { key: 'modifiers', label: 'Modifiers' },
+  { key: 'stations', label: 'Stations' },
+]
+
+function money(agorot) {
+  return `${agorotToShekels(agorot).toLocaleString('he-IL', { minimumFractionDigits: agorot % 100 ? 2 : 0 })} ₪`
+}
+
+// ── Вкладка «Товары» ─────────────────────────────────────────
+function ItemsTab({ context, data, reload }) {
+  const [editorItem, setEditorItem] = useState(null) // {} = новый, {id...} = правка
+  const [addingCat, setAddingCat] = useState(false)
+  const [catName, setCatName] = useState('')
+  const [catLoc, setCatLoc] = useState(context.locations?.[0]?.id || '')
   const [error, setError] = useState('')
 
-  function cancel() {
-    setName(item.name)
-    setPrice(String(agorotToShekels(item.price)))
-    setAvailable(item.is_available)
-    setError('')
-    setEditing(false)
-  }
+  const byCat = useMemo(() => {
+    const map = new Map(data.categories.map((c) => [c.id, { ...c, items: [] }]))
+    const orphans = []
+    for (const it of data.items) {
+      const bucket = map.get(it.category_id)
+      if (bucket) bucket.items.push(it); else orphans.push(it)
+    }
+    return { list: [...map.values()], orphans }
+  }, [data])
 
-  async function save() {
-    const agorot = shekelsToAgorot(price)
-    if (!name.trim()) { setError('Name required'); return }
-    if (agorot === null) { setError('Invalid price'); return }
-    setSaving(true)
+  async function addCategory() {
+    if (!catName.trim()) return
     setError('')
     try {
-      await saveMenuItem({
-        id: item.id,
-        category_id: item.category_id,
-        name: name.trim(),
-        price: agorot,
-        is_available: available,
-      })
-      setEditing(false)
-      onSaved()
-    } catch (saveError) {
-      setError(saveError.message)
-    } finally {
-      setSaving(false)
-    }
+      await createCategory(context, catLoc, catName.trim(), data.categories.length)
+      setCatName(''); setAddingCat(false); reload()
+    } catch (e) { setError(e.message) }
   }
 
-  if (!editing) {
-    return (
-      <div className={`menu-row ${item.is_available ? '' : 'is-off'}`}>
-        <span className="menu-name">{item.name}{!item.is_available && <small> · hidden</small>}</span>
-        <span className="menu-price">{agorotToShekels(item.price).toLocaleString('he-IL', { minimumFractionDigits: item.price % 100 ? 2 : 0 })} ₪</span>
-        <button className="icon-button" onClick={() => setEditing(true)} aria-label="Edit"><Pencil /></button>
-      </div>
-    )
+  async function removeCategory(id) {
+    if (!confirm('Delete this category? Items keep existing but lose their category.')) return
+    try { await deleteCategory(id); reload() } catch (e) { setError(e.message) }
   }
 
   return (
-    <div className="menu-row is-editing">
-      <input className="menu-edit-name" value={name} onChange={(e) => setName(e.target.value)} />
-      <input className="menu-edit-price" value={price} onChange={(e) => setPrice(e.target.value)} inputMode="decimal" />
-      <label className="menu-avail">
-        <input type="checkbox" checked={available} onChange={(e) => setAvailable(e.target.checked)} />
-        <span>Available</span>
-      </label>
-      {error && <span className="menu-edit-error">{error}</span>}
-      <div className="menu-edit-actions">
-        <button className="icon-button" onClick={save} disabled={saving} aria-label="Save"><Check /></button>
-        <button className="icon-button" onClick={cancel} disabled={saving} aria-label="Cancel"><X /></button>
+    <>
+      <div className="menu-toolbar">
+        <button className="primary-button narrow" onClick={() => setEditorItem({})}>
+          <Plus /> New item
+        </button>
+        {!addingCat ? (
+          <button className="secondary-button" onClick={() => setAddingCat(true)}>
+            <Plus /> New category
+          </button>
+        ) : (
+          <div className="inline-add">
+            <input placeholder="Category name" value={catName} onChange={(e) => setCatName(e.target.value)} autoFocus />
+            {context.locations?.length > 1 && (
+              <select value={catLoc} onChange={(e) => setCatLoc(e.target.value)}>
+                {context.locations.map((l) => <option key={l.id} value={l.id}>{l.name}</option>)}
+              </select>
+            )}
+            <button className="icon-button" onClick={addCategory} aria-label="Add"><Plus /></button>
+            <button className="icon-button" onClick={() => { setAddingCat(false); setCatName('') }} aria-label="Cancel"><X /></button>
+          </div>
+        )}
       </div>
-    </div>
+
+      {error && <p className="form-error" role="alert">{error}</p>}
+
+      <div className="menu-groups">
+        {byCat.list.map((cat) => (
+          <section className="panel menu-category" key={cat.id}>
+            <div className="panel-heading">
+              <div><h2>{cat.name}</h2><p>{cat.items.length} item{cat.items.length === 1 ? '' : 's'}</p></div>
+              <button className="icon-button" onClick={() => removeCategory(cat.id)} aria-label="Delete category"><Trash2 /></button>
+            </div>
+            <div className="menu-list">
+              {cat.items.length === 0
+                ? <p className="empty-state">No items.</p>
+                : cat.items.map((it) => (
+                  <button className={`menu-row as-button ${it.is_available ? '' : 'is-off'}`} key={it.id} onClick={() => setEditorItem(it)}>
+                    <span className="menu-name">{it.name}{!it.is_available && <small> · hidden</small>}</span>
+                    <span className="menu-price">{money(it.price)}</span>
+                  </button>
+                ))}
+            </div>
+          </section>
+        ))}
+        {byCat.orphans.length > 0 && (
+          <section className="panel menu-category">
+            <div className="panel-heading"><div><h2>Uncategorised</h2><p>{byCat.orphans.length} items</p></div></div>
+            <div className="menu-list">
+              {byCat.orphans.map((it) => (
+                <button className="menu-row as-button" key={it.id} onClick={() => setEditorItem(it)}>
+                  <span className="menu-name">{it.name}</span>
+                  <span className="menu-price">{money(it.price)}</span>
+                </button>
+              ))}
+            </div>
+          </section>
+        )}
+      </div>
+
+      {editorItem && (
+        <ItemEditor
+          context={context}
+          item={editorItem}
+          categories={data.categories}
+          stations={data.stations}
+          modifierGroups={data.modifierGroups}
+          onClose={() => setEditorItem(null)}
+          onSaved={() => { setEditorItem(null); reload() }}
+          api={{ saveItem, deleteItem, uploadItemImage }}
+        />
+      )}
+    </>
+  )
+}
+
+// ── Вкладка «Модификаторы» ───────────────────────────────────
+function ModifiersTab({ context, data, reload }) {
+  const [error, setError] = useState('')
+  const [newGroup, setNewGroup] = useState('')
+
+  async function addGroup() {
+    if (!newGroup.trim()) return
+    try {
+      await createModifierGroup(context, newGroup.trim(), 0, 1, data.modifierGroups.length)
+      setNewGroup(''); reload()
+    } catch (e) { setError(e.message) }
+  }
+
+  async function addModifier(groupId, count) {
+    const name = prompt('Modifier name')
+    if (!name?.trim()) return
+    const priceStr = prompt('Extra price in ₪ (0 for none)', '0') ?? '0'
+    const delta = shekelsToAgorot(priceStr)
+    if (delta === null) { setError('Invalid price'); return }
+    try { await createModifier(context, groupId, name.trim(), delta, false, count); reload() }
+    catch (e) { setError(e.message) }
+  }
+
+  return (
+    <>
+      <div className="menu-toolbar">
+        <div className="inline-add">
+          <input placeholder="Group name (e.g. Milk, Syrup)" value={newGroup} onChange={(e) => setNewGroup(e.target.value)} />
+          <button className="icon-button" onClick={addGroup} aria-label="Add group"><Plus /></button>
+        </div>
+      </div>
+      {error && <p className="form-error" role="alert">{error}</p>}
+
+      <div className="menu-groups">
+        {data.modifierGroups.length === 0 && <p className="empty-state">No modifier groups yet.</p>}
+        {data.modifierGroups.map((g) => (
+          <section className="panel menu-category" key={g.id}>
+            <div className="panel-heading">
+              <div>
+                <h2>{g.name}</h2>
+                <p>Choose {g.min_select}–{g.max_select}</p>
+              </div>
+              <button className="icon-button" onClick={async () => {
+                if (!confirm(`Delete group "${g.name}" and its modifiers?`)) return
+                try { await deleteModifierGroup(g.id); reload() } catch (e) { setError(e.message) }
+              }} aria-label="Delete group"><Trash2 /></button>
+            </div>
+            <div className="menu-list">
+              {(g.modifiers || []).map((m) => (
+                <div className="menu-row" key={m.id}>
+                  <span className="menu-name">{m.name}</span>
+                  <span className="menu-price">{m.price_delta ? `+${money(m.price_delta)}` : '—'}</span>
+                  <button className="icon-button" onClick={async () => {
+                    try { await deleteModifier(m.id); reload() } catch (e) { setError(e.message) }
+                  }} aria-label="Delete"><Trash2 /></button>
+                </div>
+              ))}
+              <button className="menu-add-row" onClick={() => addModifier(g.id, (g.modifiers || []).length)}>
+                <Plus /> Add modifier
+              </button>
+            </div>
+          </section>
+        ))}
+      </div>
+    </>
+  )
+}
+
+// ── Вкладка «Станции» ────────────────────────────────────────
+function StationsTab({ context, data, reload }) {
+  const [error, setError] = useState('')
+  const [newName, setNewName] = useState('')
+
+  async function add() {
+    if (!newName.trim()) return
+    try { await createStation(context, context.locations?.[0]?.id, newName.trim(), data.stations.length); setNewName(''); reload() }
+    catch (e) { setError(e.message) }
+  }
+
+  return (
+    <>
+      <div className="menu-toolbar">
+        <div className="inline-add">
+          <input placeholder="Station name (e.g. Kitchen, Bar)" value={newName} onChange={(e) => setNewName(e.target.value)} />
+          <button className="icon-button" onClick={add} aria-label="Add"><Plus /></button>
+        </div>
+      </div>
+      {error && <p className="form-error" role="alert">{error}</p>}
+      <section className="panel">
+        <div className="menu-list">
+          {data.stations.length === 0 && <p className="empty-state">No stations yet.</p>}
+          {data.stations.map((s) => (
+            <div className="menu-row" key={s.id}>
+              <span className="menu-name">{s.name}</span>
+              <button className="icon-button" onClick={async () => {
+                if (!confirm(`Delete station "${s.name}"?`)) return
+                try { await deleteStation(s.id); reload() } catch (e) { setError(e.message) }
+              }} aria-label="Delete"><Trash2 /></button>
+            </div>
+          ))}
+        </div>
+      </section>
+    </>
   )
 }
 
 export default function MenuManager({ context }) {
-  const [menu, setMenu] = useState(null)
+  const [tab, setTab] = useState('items')
+  const [data, setData] = useState(null)
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState('')
 
-  async function load() {
+  async function reload() {
     setLoading(true)
     setError('')
     try {
-      setMenu(await fetchMenu())
-    } catch (loadError) {
-      setError(loadError.message)
+      const [categories, items, modifierGroups, stations] = await Promise.all([
+        fetchCategories(), fetchItems(), fetchModifierGroups(), fetchStations(),
+      ])
+      setData({ categories, items, modifierGroups, stations })
+    } catch (e) {
+      setError(e.message)
     } finally {
       setLoading(false)
     }
   }
 
-  useEffect(() => { load() }, [])
+  useEffect(() => { reload() }, [])
 
   return (
     <>
       <section className="page-heading compact-heading">
         <p className="eyebrow">{context.organization?.name}</p>
         <h1>Menu & catalogue</h1>
-        <p>Items and prices used by every connected register. Changes apply immediately.</p>
+        <p>Everything the register sells. Changes apply immediately.</p>
       </section>
+
+      <div className="period-switch menu-tabs" role="tablist" aria-label="Menu section">
+        {TABS.map((t) => (
+          <button key={t.key} role="tab" aria-selected={tab === t.key}
+            className={tab === t.key ? 'is-active' : ''} onClick={() => setTab(t.key)}>
+            {t.label}
+          </button>
+        ))}
+      </div>
 
       {error && <p className="form-error" role="alert">{error}</p>}
 
-      {loading || !menu ? (
+      {loading || !data ? (
         <p className="empty-state">Loading…</p>
-      ) : menu.categories.length === 0 ? (
-        <p className="empty-state">No categories yet.</p>
       ) : (
-        <div className="menu-groups">
-          {menu.categories.map((cat) => (
-            <section className="panel menu-category" key={cat.id}>
-              <div className="panel-heading">
-                <div><h2>{cat.name}</h2><p>{cat.items.length} item{cat.items.length === 1 ? '' : 's'}</p></div>
-              </div>
-              <div className="menu-list">
-                {cat.items.length === 0
-                  ? <p className="empty-state">No items.</p>
-                  : cat.items.map((item) => <ItemRow key={item.id} item={item} onSaved={load} />)}
-              </div>
-            </section>
-          ))}
-          {menu.orphans.length > 0 && (
-            <section className="panel menu-category">
-              <div className="panel-heading"><div><h2>Uncategorised</h2><p>{menu.orphans.length} items</p></div></div>
-              <div className="menu-list">
-                {menu.orphans.map((item) => <ItemRow key={item.id} item={item} onSaved={load} />)}
-              </div>
-            </section>
-          )}
-        </div>
+        <>
+          {tab === 'items' && <ItemsTab context={context} data={data} reload={reload} />}
+          {tab === 'modifiers' && <ModifiersTab context={context} data={data} reload={reload} />}
+          {tab === 'stations' && <StationsTab context={context} data={data} reload={reload} />}
+        </>
       )}
     </>
   )
