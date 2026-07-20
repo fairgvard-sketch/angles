@@ -4,9 +4,11 @@ import { fileURLToPath } from "node:url";
 
 const projectRoot = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
 const sourcePath = path.join(projectRoot, "ANGLE Landing Page.dc.html");
+const loginSourcePath = path.join(projectRoot, "login.html");
 const outputRoot = path.join(projectRoot, "dist");
 
 const source = await readFile(sourcePath, "utf8");
+const loginSource = await readFile(loginSourcePath, "utf8");
 const helmetMatch = source.match(/<helmet>\s*([\s\S]*?)\s*<\/helmet>/);
 
 if (!helmetMatch) {
@@ -49,6 +51,8 @@ const assetPaths = new Set([
 await rm(outputRoot, { recursive: true, force: true });
 await mkdir(outputRoot, { recursive: true });
 await writeFile(path.join(outputRoot, "index.html"), html, "utf8");
+await mkdir(path.join(outputRoot, "login"), { recursive: true });
+await writeFile(path.join(outputRoot, "login", "index.html"), loginSource, "utf8");
 
 for (const relativePath of assetPaths) {
   const from = path.join(projectRoot, relativePath);
