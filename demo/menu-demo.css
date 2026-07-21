@@ -29,6 +29,7 @@
   background: #ffffff;
 }
 
+
 .angle-menu-screen {
   position: absolute;
   inset: 0;
@@ -39,6 +40,9 @@
 .angle-menu-scroll {
   position: absolute;
   inset: 0;
+  /* Отступа сверху нет: экраны с липким хедером получают его через
+     header top: 45px, стартовый — своим padding'ом ниже. Общий padding
+     здесь складывался бы с обоими и ронял контент вдвое ниже. */
   overflow-x: hidden;
   overflow-y: auto;
   overscroll-behavior: contain;
@@ -52,14 +56,13 @@
 .angle-menu-start .angle-menu-scroll {
   display: flex;
   flex-direction: column;
+  /* 45px = высота статус-бара макета (замерено: 42.2px) + зазор.
+     У стартового экрана нет липкого хедера, поэтому отступ задаётся здесь. */
+  padding-top: 45px;
   /* Стартовый экран не скроллится: категории и подвал делят фиксированную
      высоту по долям. С overflow: auto проценты считались бы от содержимого,
      а не от экрана, и доли не работали бы. */
   overflow-y: hidden;
-  /* Отступ под статус-бар задаётся здесь, а не смещением слоя (inset: 38px):
-     смещённый слой давал видимую кромку на белом фоне под ним. Padding
-     границы не создаёт — фон непрерывный. */
-  padding-top: 38px;
   background: #ffffff;
 }
 
@@ -79,7 +82,9 @@
 
 .angle-menu-header {
   position: sticky;
-  top: 0;
+  /* 45px: sticky липнет к границе контейнера, а статус-бар занимает
+     42.2px — с top: 0 хедер уезжал бы под него при прокрутке. */
+  top: 45px;
   z-index: 8;
   min-height: 45px;
   padding: 8px 10px;
@@ -140,7 +145,11 @@
    наш продукт, а не конкретную кофейню. */
 .angle-menu-brand {
   flex: 0 0 auto;
-  padding: 9px 12px 11px;
+  /* Высота как у .angle-menu-header (45px) — стартовый экран начинается
+     на том же уровне, что и остальные. */
+  min-height: 45px;
+  padding: 0 12px;
+  box-sizing: border-box;
   display: flex;
   align-items: center;
   justify-content: center;
@@ -281,7 +290,8 @@
 
 .angle-menu-chips {
   position: sticky;
-  top: 45px;
+  /* 45 (статус-бар) + 45 (высота хедера): липнут прямо под ним */
+  top: 90px;
   z-index: 7;
   padding: 7px 8px;
   display: flex;
