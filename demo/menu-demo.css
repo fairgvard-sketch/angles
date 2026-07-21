@@ -5,10 +5,12 @@
 
 .angle-menu-demo {
   position: absolute;
-  inset: 38px 0 0;
+  /* Тянемся под статус-бар (он сверху, z-index: 4) и компенсируем его
+     высоту паддингом: при inset: 38px кромка демо совпадала с нижним краем
+     статус-бара и читалась серой линией на всех кадрах. */
+  inset: 0;
+  padding-top: 38px;
   overflow: hidden;
-  /* Белый: отступ категорий сверху — это фон контейнера, и он должен
-     сливаться со статус-баром, а не темнеть полоской под Dynamic Island. */
   background: #ffffff;
   color: #101827;
   font-family: "Helvetica Neue", Helvetica, Arial, sans-serif;
