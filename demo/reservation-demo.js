@@ -162,10 +162,12 @@ class AngleReservationDemo {
   }
 
   summary() {
+    // Подписи «אורחים / תאריך / שעה» убраны: значения говорят сами за себя
+    // («2 אורחים», «היום», «19:30»), а мелкий текст над ними только шумел.
     return `<div class="angle-reserve-summary">
-      <span><small>אורחים</small><strong>2 אורחים</strong></span>
-      <span><small>תאריך</small><strong>היום</strong></span>
-      <span><small>שעה</small><strong>19:30</strong></span>
+      <span><strong>2 אורחים</strong></span>
+      <span><strong>היום</strong></span>
+      <span><strong>19:30</strong></span>
     </div>`;
   }
 
@@ -176,7 +178,6 @@ class AngleReservationDemo {
           <img src="uploads/reservation-step-1.png" alt="">
         </div>
         <div class="angle-reserve-start-content">
-          <div class="angle-reserve-intro"><small>הזמנת מקום</small><h4>לחמנייה</h4><p>כתובת העסק</p></div>
           ${this.summary()}
           <button class="angle-reserve-primary" type="button" data-reserve-action="search" data-reserve-target="reservation-search">להזמין עכשיו</button>
           <p class="angle-reserve-hint">בחרו תאריך, שעה וכמות אורחים</p>

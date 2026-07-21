@@ -136,33 +136,10 @@
   object-position: initial;
 }
 
-.angle-reserve-intro {
-  padding: 14px 13px 15px;
-  text-align: center;
-}
-
-.angle-reserve-intro > small {
-  display: block;
-  color: #818794;
-  font-size: 8px;
-  font-weight: 650;
-}
-
-.angle-reserve-intro > h4 {
-  margin: 4px 0 2px;
-  font-size: 20px;
-  line-height: 1.05;
-  font-weight: 850;
-}
-
-.angle-reserve-intro > p {
-  margin: 0;
-  color: #878d99;
-  font-size: 8px;
-}
-
 .angle-reserve-summary {
-  margin: 13px 12px 0;
+  /* Верхний отступ раньше давал блок с названием заведения (убран):
+     без компенсации селекторы прилипали бы к фото. */
+  margin: 16px 12px 0;
   display: grid;
   grid-template-columns: repeat(3, 1fr);
   overflow: hidden;
@@ -192,14 +169,10 @@
   border-left: 0;
 }
 
-.angle-reserve-summary small {
-  color: #8b919c;
-  font-size: 6px;
-  font-weight: 650;
-}
-
+/* Подписи убраны — значение осталось единственным содержимым ячейки,
+   поэтому чуть крупнее: 10px читались как подпись, а не как выбор. */
 .angle-reserve-summary strong {
-  font-size: 10px;
+  font-size: 11px;
   font-weight: 850;
 }
 
