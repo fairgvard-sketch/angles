@@ -131,10 +131,39 @@
   font-size: 15px;
 }
 
+/* Шапка демо: бренд ANGLE на месте названия заведения — демо показывает
+   наш продукт, а не конкретную кофейню. */
+.angle-menu-brand {
+  flex: 0 0 auto;
+  padding: 9px 12px 11px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  direction: ltr;
+}
+
+/* Логотип занимает центральную треть холста 1024x1536 — вырезаем его
+   object-fit/position, а не transform: сдвиг в пикселях ломался бы при
+   любом изменении размера. */
+.angle-menu-brand img {
+  width: 17px;
+  height: 17px;
+  display: block;
+  object-fit: cover;
+  object-position: center 47%;
+}
+
+.angle-menu-brand span {
+  font-size: 15px;
+  font-weight: 850;
+  letter-spacing: 0.06em;
+  color: #101827;
+}
+
 .angle-menu-categories {
-  /* Красная зона на разметке владельца: до подвала, без пустоты снизу.
-     Верхнее выравнивание задаёт padding-top контейнера (высота статус-бара),
-     здесь свой отступ не нужен. Три ряда делят высоту поровну. */
+  /* Три ряда делят остаток высоты поровну (до подвала, без пустоты снизу).
+     Верхний отступ задаёт .angle-menu-brand, свой здесь не нужен. */
   flex: 1 1 auto;
   min-height: 0;
   padding: 0 10px 10px;

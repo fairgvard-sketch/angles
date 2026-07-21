@@ -326,6 +326,10 @@ class AngleMenuDemo {
       <section class="angle-menu-screen angle-menu-start">
         <div class="angle-menu-scroll">
           <div class="angle-menu-start-content">
+            <div class="angle-menu-brand">
+              <img src="anglelogo.png" alt="ANGLE">
+              <span>ANGLE</span>
+            </div>
             <div class="angle-menu-categories">${this.categoryCards()}</div>
           </div>
           <footer class="angle-menu-footer">
