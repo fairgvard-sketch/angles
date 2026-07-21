@@ -52,10 +52,11 @@
 }
 
 .angle-menu-start-content {
-  /* Забирает остаток высоты, чтобы подвал (теперь по содержимому) прижался
-     к низу, а не висел сразу под категориями. */
+  /* Забирает остаток высоты и отдаёт его сетке категорий: иначе под нижним
+     рядом оставалась белая пустота до подвала. */
   flex: 1 0 auto;
-  padding-bottom: 12px;
+  display: flex;
+  flex-direction: column;
   background: #ffffff;
 }
 
@@ -123,18 +124,23 @@
 }
 
 .angle-menu-categories {
-  /* Верхний воздух раньше давала шапка с названием заведения (убрана):
-     без него карточки упирались бы в статус-бар макета. */
-  padding: 18px 10px 0;
+  /* Без отступа сверху: категории начинаются сразу под статус-баром —
+     добавленный ранее padding-top читался как пустая белая полоска. */
+  padding: 0 10px 10px;
   display: grid;
   grid-template-columns: repeat(2, minmax(0, 1fr));
+  /* Три ряда делят высоту поровну и заполняют экран до подвала */
+  grid-auto-rows: 1fr;
+  flex: 1 0 auto;
   gap: 8px;
 }
 
 .angle-category-card {
   position: relative;
   min-width: 0;
-  height: 103px;
+  /* Высоту задаёт ряд сетки (grid-auto-rows: 1fr), а не карточка: с
+     фиксированными 103px сетка растягивалась, а карточки — нет. */
+  min-height: 103px;
   padding: 0;
   overflow: hidden;
   border: 1px solid #e3e4e7;
