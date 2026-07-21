@@ -404,18 +404,20 @@
       .product-click-inner { padding:0; }
       .product-click-layout { display:flex; flex-direction:column; min-height:0; }
       .product-click-copy { display:contents; }
-      .product-click-kicker { order:0; padding:0 16px; }
-      .product-click-title { order:1; padding:0 16px; font-size:40px; box-sizing:border-box; }
+      .product-click-kicker { order:0; padding:0 22px; }
+      .product-click-title { order:1; padding:0 22px; font-size:40px; box-sizing:border-box; }
       .product-stage { order:2; position:relative; z-index:2; top:0; width:100%; height:52svh; min-height:360px; max-height:480px; aspect-ratio:auto; }
-      .product-accordion { order:3; margin:36px 16px 64px; }
+      .product-accordion { order:3; margin:36px 22px 64px; }
       .product-accordion-item { padding:20px 0; }
       .product-accordion-button { font-size:23px; }
-      .product-accordion-content { padding-block:14px 0; padding-inline:0 8px; }
+      .product-accordion-content { padding-block:14px 0; padding-inline:0 16px; }
       .product-accordion-panel-inner { display:flex; flex-direction:column; }
-      .product-accordion-panel-inner .product-stage { order:0; height:auto; min-height:0; max-height:none; aspect-ratio:2630 / 1800; margin-top:16px; margin-inline:-16px; width:calc(100% + 32px); border-radius:0; }
+      .product-accordion-panel-inner .product-stage { order:0; height:auto; min-height:0; max-height:none; aspect-ratio:3 / 4; margin-top:18px; border-radius:2px; }
       .product-accordion-panel-inner .product-accordion-content { order:1; padding-block:16px 0; }
       .product-accordion-panel-inner .product-stage .product-stage-layer[data-animation-stage="payments"] { --photo-y-gap:0px; }
-      .product-accordion-panel-inner .payments-demo { width:min(96%, 100%); }
+      .product-accordion-panel-inner .payments-demo { width:88%; left:50%; top:50%; transform:translate(-50%, -50%); }
+      .product-accordion-panel-inner .product-stage-layer img[style*="contain"] { padding:16px; box-sizing:border-box; }
+      .product-accordion-panel-inner .product-stage-layer img[style*="cover"] { object-position:center; }
       .product-stage-layer[data-animation-stage="payments"] { --photo-y-gap:24px; }
       .payments-demo { left:50%; width:min(84%, calc((52svh - 48px) * 1.461111)); transform:translate(-50%, -50%); }
       .payments-demo-tap { width:16px; height:16px; aspect-ratio:auto; box-sizing:border-box; }
