@@ -402,3 +402,16 @@ a { color: inherit; }
   .data-row { padding: 8px 16px; }
   .hero-panel { padding: 20px 18px; }
 }
+
+/* ── Команда ──────────────────────────────────────────────── */
+.team-row-actions { display: inline-flex; align-items: center; gap: 4px; justify-self: end; }
+/* Уровень права — компактный сегмент, как .period-switch на «Обзоре» */
+.perm-switch { display: inline-flex; gap: 3px; padding: 3px; border-radius: 8px; background: #e7e9ed; }
+.perm-switch button { min-height: 32px; padding: 0 12px; border: 0; border-radius: 6px; background: transparent; color: #5c616a; font-size: 12px; font-weight: 750; white-space: nowrap; }
+.perm-switch button.is-active { background: #fff; color: #1b1e24; box-shadow: 0 1px 2px rgb(20 22 27 / 10%); }
+.perm-switch button:disabled { opacity: .6; }
+
+@media (max-width: 640px) {
+  .perm-switch button { padding: 0 10px; font-size: 11px; }
+  .menu-row:has(.perm-switch) { padding: 10px 16px; }
+}

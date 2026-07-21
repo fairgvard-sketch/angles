@@ -21,6 +21,7 @@ import { isSupabaseConfigured, supabase } from './supabase'
 import SalesOverview from './SalesOverview'
 import LocationSettings from './LocationSettings'
 import MenuManager from './MenuManager'
+import TeamManager from './TeamManager'
 
 const navigation = [
   { id: 'overview', label: 'Home', icon: LayoutDashboard },
@@ -244,7 +245,8 @@ function Dashboard({ session, context, refresh }) {
           {active === 'sales' && <SalesOverview organizationName={context.organization?.name} />}
           {active === 'locations' && <LocationSettings context={context} />}
           {active === 'menu' && <MenuManager context={context} />}
-          {!['overview', 'sales', 'locations', 'menu'].includes(active) && (
+          {active === 'team' && <TeamManager context={context} />}
+          {!['overview', 'sales', 'locations', 'menu', 'team'].includes(active) && (
             <SectionPage section={active} context={context} />
           )}
         </main>
