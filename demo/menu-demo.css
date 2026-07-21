@@ -20,10 +20,11 @@
 
 .angle-menu-app {
   position: absolute;
-  /* Сверху 38px — высота статус-бара: контент начинается ниже Dynamic
-     Island (он кончается на 29px). Смещаем именно этот слой, а не
-     .angle-menu-demo: его padding абсолютные дети игнорируют. */
-  inset: 38px 0 0;
+  /* inset: 0, а не 38px: смещённый слой давал видимую кромку на границе
+     со статус-баром (телефон повёрнут на 1deg, край сглаживается
+     субпикселями и читается серой линией). Отступ под статус-бар даёт
+     padding-top у самого экрана — он не создаёт границы. */
+  inset: 0;
   overflow: hidden;
   background: #ffffff;
 }
@@ -55,6 +56,10 @@
      высоту по долям. С overflow: auto проценты считались бы от содержимого,
      а не от экрана, и доли не работали бы. */
   overflow-y: hidden;
+  /* Отступ под статус-бар задаётся здесь, а не смещением слоя (inset: 38px):
+     смещённый слой давал видимую кромку на белом фоне под ним. Padding
+     границы не создаёт — фон непрерывный. */
+  padding-top: 38px;
   background: #ffffff;
 }
 
@@ -143,21 +148,10 @@
   direction: ltr;
 }
 
-/* Логотип занимает центральную треть холста 1024x1536 — вырезаем его
-   object-fit/position, а не transform: сдвиг в пикселях ломался бы при
-   любом изменении размера. */
-.angle-menu-brand img {
-  width: 17px;
-  height: 17px;
-  display: block;
-  object-fit: cover;
-  object-position: center 47%;
-}
-
 .angle-menu-brand span {
-  font-size: 15px;
-  font-weight: 850;
-  letter-spacing: 0.06em;
+  font-size: 18px;
+  font-weight: 900;
+  letter-spacing: 0.02em;
   color: #101827;
 }
 
