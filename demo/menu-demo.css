@@ -52,11 +52,8 @@
 }
 
 .angle-menu-start-content {
-  /* Забирает остаток высоты и отдаёт его сетке категорий: иначе под нижним
-     рядом оставалась белая пустота до подвала. */
+  /* Забирает остаток высоты, чтобы подвал прижимался к низу экрана. */
   flex: 1 0 auto;
-  display: flex;
-  flex-direction: column;
   background: #ffffff;
 }
 
@@ -129,18 +126,13 @@
   padding: 0 10px 10px;
   display: grid;
   grid-template-columns: repeat(2, minmax(0, 1fr));
-  /* Три ряда делят высоту поровну и заполняют экран до подвала */
-  grid-auto-rows: 1fr;
-  flex: 1 0 auto;
   gap: 8px;
 }
 
 .angle-category-card {
   position: relative;
   min-width: 0;
-  /* Высоту задаёт ряд сетки (grid-auto-rows: 1fr), а не карточка: с
-     фиксированными 103px сетка растягивалась, а карточки — нет. */
-  min-height: 103px;
+  height: 103px;
   padding: 0;
   overflow: hidden;
   border: 1px solid #e3e4e7;
@@ -181,13 +173,13 @@
 .angle-menu-footer {
   position: relative;
   z-index: 1;
-  /* flex: 1 0 86px растягивал подвал на весь свободный остаток — после
-     удаления шапки (82px) чёрная зона разрослась. Теперь подвал ровно по
-     содержимому и не тянется.
-     box-shadow давал 3px рамку поверх соседей — она наезжала на нижний
-     ряд категорий; фон и так сплошной, обводка не нужна. */
+  /* Высота задана явно, а не через flex-растяжение: прежний flex: 1 0 86px
+     забирал весь свободный остаток и раздувал чёрную зону непредсказуемо.
+     box-shadow: 0 0 0 3px убран — рамка рисовалась поверх соседей и
+     наезжала на нижний ряд категорий; фон и так сплошной. */
   flex: 0 0 auto;
-  padding: 12px 13px 14px;
+  min-height: 104px;
+  padding: 18px 13px 20px;
   display: flex;
   flex-direction: column;
   align-items: center;
