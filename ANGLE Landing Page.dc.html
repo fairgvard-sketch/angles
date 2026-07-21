@@ -351,11 +351,20 @@
     .product-accordion-button:hover { opacity:0.72; }
     .product-accordion-index { display:none; }
     .product-accordion-label { min-width:0; }
-    .product-accordion-indicator { flex:0 0 auto; width:34px; height:1px; border:0; border-radius:0; background:#8A8A84; transform:scaleX(0.38); transform-origin:right center; transition:background-color 300ms ease, transform 360ms cubic-bezier(0.22, 1, 0.36, 1); }
-    .product-accordion-item.is-active .product-accordion-indicator { background:#171717; transform:scaleX(1); }
-    .product-accordion-panel { display:block; }
-    .product-accordion-panel-inner { overflow:visible; }
-    .product-accordion-content { padding:20px 60px 0 0; }
+    .product-accordion-indicator { position:relative; flex:0 0 auto; width:18px; height:18px; border:0; border-radius:0; background:transparent; }
+    .product-accordion-indicator::before,
+    .product-accordion-indicator::after { content:""; position:absolute; inset-block-start:50%; inset-inline-start:0; width:100%; height:1px; margin-block-start:-0.5px; background:#8A8A84; transition:background-color 300ms ease, transform 420ms cubic-bezier(0.22, 1, 0.36, 1); }
+    .product-accordion-indicator::after { transform:rotate(90deg); }
+    .product-accordion-button:hover .product-accordion-indicator::before,
+    .product-accordion-button:hover .product-accordion-indicator::after { background:#171717; }
+    .product-accordion-item.is-active .product-accordion-indicator::before,
+    .product-accordion-item.is-active .product-accordion-indicator::after { background:#171717; }
+    .product-accordion-item.is-active .product-accordion-indicator::after { transform:rotate(0deg); }
+    .product-accordion-panel { display:grid; grid-template-rows:0fr; transition:grid-template-rows 420ms cubic-bezier(0.22, 1, 0.36, 1); }
+    .product-accordion-item.is-active .product-accordion-panel { grid-template-rows:1fr; }
+    .product-accordion-panel-inner { overflow:hidden; min-height:0; }
+    .product-accordion-content { padding-block:20px 0; padding-inline:0 60px; opacity:0; transition:opacity 300ms ease; }
+    .product-accordion-item.is-active .product-accordion-content { opacity:1; transition-delay:120ms; }
     .product-accordion-content p { margin:0; max-width:340px; color:#62625D; font-size:16px; line-height:1.62; }
     .product-stage { position:sticky; top:0; height:100svh; min-height:720px; overflow:hidden; background:#F5F5F2; }
     .product-stage-layer { position:absolute; inset:0; opacity:0; visibility:hidden; transform:scale(1.012); transition:opacity 420ms ease, transform 620ms cubic-bezier(0.22, 1, 0.36, 1), visibility 0s linear 420ms; }
@@ -397,13 +406,15 @@
       .product-accordion { order:3; margin:36px 22px 64px; }
       .product-accordion-item { min-height:36svh; padding:196px 0 38px; }
       .product-accordion-button { font-size:23px; }
-      .product-accordion-content { padding:18px 42px 0 0; }
+      .product-accordion-content { padding-block:18px 0; padding-inline:0 42px; }
       .product-stage-layer[data-animation-stage="payments"] { --photo-y-gap:24px; }
       .payments-demo { left:50%; width:min(84%, calc((52svh - 48px) * 1.461111)); transform:translate(-50%, -50%); }
       .payments-demo-tap { width:16px; height:16px; aspect-ratio:auto; box-sizing:border-box; }
     }
     @media (prefers-reduced-motion:reduce) {
       .product-accordion-panel, .product-stage-layer, .guest-copy-panel, .guest-preview-panel { transition:none; animation:none !important; }
+      .product-accordion-content { transition:none; }
+      .product-accordion-indicator::before, .product-accordion-indicator::after { transition:none; }
       .payments-demo-frame { transition:none; }
       .payments-demo-tap { display:none; }
       .reserve-demo-frame { animation:none !important; opacity:0; transform:none; }
@@ -612,7 +623,7 @@
 
           <div class="product-accordion" aria-label="Product capabilities">
             <div class="product-accordion-item is-active">
-              <button class="product-accordion-button" type="button" aria-current="step" aria-controls="product-panel-payments" data-stage="payments"><span class="product-accordion-index">01</span><span class="product-accordion-label">Payments</span><span class="product-accordion-indicator" aria-hidden="true"></span></button>
+              <button class="product-accordion-button" type="button" aria-current="step" aria-expanded="true" aria-controls="product-panel-payments" data-stage="payments"><span class="product-accordion-index">01</span><span class="product-accordion-label">Payments</span><span class="product-accordion-indicator" aria-hidden="true"></span></button>
               <div class="product-accordion-panel" id="product-panel-payments" role="region" aria-hidden="false">
                 <div class="product-accordion-panel-inner">
                   <div class="product-accordion-content">
@@ -623,8 +634,8 @@
             </div>
 
             <div class="product-accordion-item">
-              <button class="product-accordion-button" type="button" aria-controls="product-panel-orders" data-stage="orders"><span class="product-accordion-index">02</span><span class="product-accordion-label">Orders</span><span class="product-accordion-indicator" aria-hidden="true"></span></button>
-              <div class="product-accordion-panel" id="product-panel-orders" role="region" aria-hidden="false">
+              <button class="product-accordion-button" type="button" aria-expanded="false" aria-controls="product-panel-orders" data-stage="orders"><span class="product-accordion-index">02</span><span class="product-accordion-label">Orders</span><span class="product-accordion-indicator" aria-hidden="true"></span></button>
+              <div class="product-accordion-panel" id="product-panel-orders" role="region" aria-hidden="true">
                 <div class="product-accordion-panel-inner">
                   <div class="product-accordion-content">
                     <p>Take orders, add modifiers and send every ticket through one clear workflow.</p>
@@ -634,8 +645,8 @@
             </div>
 
             <div class="product-accordion-item">
-              <button class="product-accordion-button" type="button" aria-controls="product-panel-floor" data-stage="floor"><span class="product-accordion-index">03</span><span class="product-accordion-label">Floor</span><span class="product-accordion-indicator" aria-hidden="true"></span></button>
-              <div class="product-accordion-panel" id="product-panel-floor" role="region" aria-hidden="false">
+              <button class="product-accordion-button" type="button" aria-expanded="false" aria-controls="product-panel-floor" data-stage="floor"><span class="product-accordion-index">03</span><span class="product-accordion-label">Floor</span><span class="product-accordion-indicator" aria-hidden="true"></span></button>
+              <div class="product-accordion-panel" id="product-panel-floor" role="region" aria-hidden="true">
                 <div class="product-accordion-panel-inner">
                   <div class="product-accordion-content">
                     <p>Give your team a fast, intuitive system built for the pace of real service.</p>
@@ -645,8 +656,8 @@
             </div>
 
             <div class="product-accordion-item">
-              <button class="product-accordion-button" type="button" aria-controls="product-panel-control" data-stage="control"><span class="product-accordion-index">04</span><span class="product-accordion-label">Control</span><span class="product-accordion-indicator" aria-hidden="true"></span></button>
-              <div class="product-accordion-panel" id="product-panel-control" role="region" aria-hidden="false">
+              <button class="product-accordion-button" type="button" aria-expanded="false" aria-controls="product-panel-control" data-stage="control"><span class="product-accordion-index">04</span><span class="product-accordion-label">Control</span><span class="product-accordion-indicator" aria-hidden="true"></span></button>
+              <div class="product-accordion-panel" id="product-panel-control" role="region" aria-hidden="true">
                 <div class="product-accordion-panel-inner">
                   <div class="product-accordion-content">
                     <p>Keep menus, payments and daily operations visible from a single workspace.</p>
@@ -1001,9 +1012,10 @@ class Component extends DCLogic {
       buttons.forEach((item) => {
         const isActive = item === button;
         item.toggleAttribute('aria-current', isActive);
+        item.setAttribute('aria-expanded', String(isActive));
         item.closest('.product-accordion-item').classList.toggle('is-active', isActive);
         const panel = section.querySelector('#' + item.getAttribute('aria-controls'));
-        if (panel) panel.setAttribute('aria-hidden', 'false');
+        if (panel) panel.setAttribute('aria-hidden', String(!isActive));
       });
 
       section.querySelectorAll('[data-animation-stage]').forEach((stage) => {
@@ -1057,6 +1069,23 @@ class Component extends DCLogic {
 
       productStoryInitialized = true;
       activeStoryButton = section.querySelector('.product-accordion-item.is-active .product-accordion-button');
+
+      section.querySelectorAll('.product-accordion-button').forEach((button) => {
+        button.addEventListener('click', () => {
+          const item = button.closest('.product-accordion-item');
+          if (!item) return;
+          activateProductStory(button);
+          if (reduceMotion.matches) {
+            item.scrollIntoView({ block:'center' });
+            return;
+          }
+          const anchor = window.innerWidth <= 900 ? window.innerHeight * 0.78 : window.innerHeight * 0.5;
+          const rect = item.getBoundingClientRect();
+          const delta = (rect.top + rect.height / 2) - anchor;
+          window.scrollBy({ top:delta, behavior:'smooth' });
+        });
+      });
+
       productStoryObserver = new IntersectionObserver(scheduleProductStorySync, {
         root:null,
         threshold:[0, 0.25, 0.5, 0.75, 1]
