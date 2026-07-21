@@ -356,6 +356,13 @@ function ReserveTab({ locationId, settings, patch }) {
                   onBlur={(e) => patch({ address: e.target.value.trim() || null })}
                 />
               </Field>
+              <Field label="Google review link">
+                <input
+                  defaultValue={rsv.google_review || ''}
+                  placeholder="https://…"
+                  onBlur={(e) => patch({ google_review: e.target.value.trim() || null })}
+                />
+              </Field>
               <Field label="Instagram">
                 <input
                   defaultValue={rsv.instagram || ''}
@@ -363,9 +370,16 @@ function ReserveTab({ locationId, settings, patch }) {
                   onBlur={(e) => patch({ instagram: e.target.value.trim() || null })}
                 />
               </Field>
+              <Field label="Facebook">
+                <input
+                  defaultValue={rsv.facebook || ''}
+                  placeholder="https://facebook.com/…"
+                  onBlur={(e) => patch({ facebook: e.target.value.trim() || null })}
+                />
+              </Field>
             </div>
             <p className="form-hint">
-              Map pin and header image are set from the register, under
+              Header image and the map pin are set from the register, under
               Settings → Service → Reservations.
             </p>
           </section>
