@@ -7,7 +7,9 @@
   position: absolute;
   inset: 38px 0 0;
   overflow: hidden;
-  background: #252525;
+  /* Белый: отступ категорий сверху — это фон контейнера, и он должен
+     сливаться со статус-баром, а не темнеть полоской под Dynamic Island. */
+  background: #ffffff;
   color: #101827;
   font-family: "Helvetica Neue", Helvetica, Arial, sans-serif;
   line-height: 1.25;
@@ -48,7 +50,7 @@
      высоту по долям. С overflow: auto проценты считались бы от содержимого,
      а не от экрана, и доли не работали бы. */
   overflow-y: hidden;
-  background: #252525;
+  background: #ffffff;
 }
 
 .angle-menu-start-content {
@@ -125,11 +127,12 @@
 }
 
 .angle-menu-categories {
-  /* Красная зона на разметке владельца: от статус-бара до подвала, без
-     отступа сверху и без пустоты снизу. Три ряда делят высоту поровну. */
+  /* Красная зона на разметке владельца: до подвала, без пустоты снизу.
+     Сверху отступ — вплотную к статус-бару карточки читались полоской
+     под Dynamic Island. Три ряда делят высоту поровну. */
   flex: 1 1 auto;
   min-height: 0;
-  padding: 0 10px 10px;
+  padding: 10px 10px 10px;
   display: grid;
   grid-template-columns: repeat(2, minmax(0, 1fr));
   grid-template-rows: repeat(3, minmax(0, 1fr));
