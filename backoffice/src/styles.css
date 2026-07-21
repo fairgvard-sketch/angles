@@ -404,7 +404,19 @@ a { color: inherit; }
 }
 
 /* ── Команда ──────────────────────────────────────────────── */
-.team-row-actions { display: inline-flex; align-items: center; gap: 4px; justify-self: end; }
+/*
+ * Строка сотрудника — три ЯВНЫЕ колонки: имя, роль, действия. Правило
+ * .menu-row:has(.icon-button) (три колонки под меню, где иконка — прямой
+ * ребёнок) здесь ложно срабатывало из-за кнопки внутри .team-row-actions:
+ * появлялась лишняя пустая колонка, и роль наезжала на ключ. Переопределяем
+ * сетку явно, чтобы структура строки не зависела от вложенности иконок.
+ */
+.menu-row.team-row { grid-template-columns: minmax(0, 1fr) auto auto; }
+.team-row-actions { display: inline-flex; align-items: center; gap: 2px; justify-self: end; }
+/* Ключ и Edit — единая высота, ключ не съезжает относительно текста кнопки */
+.team-row-actions .icon-button { width: 34px; height: 34px; }
+.team-row-actions .icon-button svg { width: 17px; height: 17px; }
+.team-row .menu-price { color: #5f646c; font-weight: 650; }
 /* Уровень права — компактный сегмент, как .period-switch на «Обзоре» */
 .perm-switch { display: inline-flex; gap: 3px; padding: 3px; border-radius: 8px; background: #e7e9ed; }
 .perm-switch button { min-height: 32px; padding: 0 12px; border: 0; border-radius: 6px; background: transparent; color: #5c616a; font-size: 12px; font-weight: 750; white-space: nowrap; }

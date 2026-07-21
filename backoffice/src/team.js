@@ -36,7 +36,7 @@ export function isValidPin(pin) {
 export async function fetchStaff() {
   const { data, error } = await supabase
     .from('staff')
-    .select('id, name, role, is_active, location_id, created_at')
+    .select('id, name, role, is_active, location_id, created_at, role_id')
     .order('created_at')
   if (error) throw new Error(error.message)
   return data
@@ -133,4 +133,45 @@ export const PERM_LABELS = {
 
 export function permLevel(settings, key) {
   return settings?.perms?.[key] ?? PERM_DEFAULTS[key]
+}
+
+// ── Кастомные роли (094) ─────────────────────────────────────
+
+/**
+ * Роль — именованный набор прав поверх базового уровня, а не замена
+ * owner/manager/barista. У сотрудника без роли (`role_id: null`) права
+ * считаются по-старому: настройки точки + базовая роль.
+ *
+ * 'manage' (управление командой) в набор не входит — сервер его вырезает,
+ * иначе носитель роли выдал бы себе любые права.
+ */
+
+export async function fetchRoles() {
+  const { data, error } = await supabase
+    .from('roles')
+    .select('id, name, base, perms, created_at')
+    .order('created_at')
+  if (error) throw new Error(error.message)
+  return data
+}
+
+export async function saveRole({ id, name, base, perms }) {
+  const { data, error } = await supabase.rpc('save_role', {
+    p_name: name.trim(),
+    p_base: base,
+    p_perms: perms,
+    p_role_id: id ?? null,
+    p_staff_session: null,
+  })
+  if (error) throw new Error(error.message)
+  return data
+}
+
+/** Носители роли не теряют доступ: role_id обнуляется, база сохраняется. */
+export async function deleteRole(roleId) {
+  const { error } = await supabase.rpc('delete_role', {
+    p_role_id: roleId,
+    p_staff_session: null,
+  })
+  if (error) throw new Error(error.message)
 }
