@@ -22,6 +22,7 @@ import SalesOverview from './SalesOverview'
 import LocationSettings from './LocationSettings'
 import MenuManager from './MenuManager'
 import TeamManager from './TeamManager'
+import QrChannels from './QrChannels'
 
 const navigation = [
   { id: 'overview', label: 'Home', icon: LayoutDashboard },
@@ -246,7 +247,8 @@ function Dashboard({ session, context, refresh }) {
           {active === 'locations' && <LocationSettings context={context} />}
           {active === 'menu' && <MenuManager context={context} />}
           {active === 'team' && <TeamManager context={context} />}
-          {!['overview', 'sales', 'locations', 'menu', 'team'].includes(active) && (
+          {active === 'online' && <QrChannels context={context} />}
+          {!['overview', 'sales', 'locations', 'menu', 'team', 'online'].includes(active) && (
             <SectionPage section={active} context={context} />
           )}
         </main>

@@ -427,3 +427,43 @@ a { color: inherit; }
   .perm-switch button { padding: 0 10px; font-size: 11px; }
   .menu-row:has(.perm-switch) { padding: 10px 16px; }
 }
+
+/* ── QR-каналы: онлайн-заказы и бронирование ──────────────── */
+
+/* Тумблер раздела: текст слева, нативный чекбокс справа. Панель уже даёт
+   отступы, поэтому строка тянется на всю ширину без своих полей. */
+.toggle-row { display: flex; align-items: center; justify-content: space-between; gap: 16px; padding: 14px 0; cursor: pointer; }
+.toggle-row + .toggle-row { border-top: 1px solid #eef0f2; }
+.toggle-text { display: grid; gap: 3px; }
+.toggle-text strong { font-size: 14px; font-weight: 700; color: #1b1e24; }
+.toggle-text small { font-size: 12px; color: #777b83; }
+.toggle-row input { width: 20px; height: 20px; flex: 0 0 auto; accent-color: #1b1e24; cursor: pointer; }
+/* Последний включённый тип заказа выключить нельзя — гасим, но не прячем */
+.toggle-row.is-disabled { cursor: default; opacity: .55; }
+.toggle-row.is-disabled input { cursor: default; }
+
+/* Сетка полей раздела; на узком экране схлопывается в одну колонку */
+.qr-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 16px; margin-top: 16px; }
+.qr-field { display: grid; gap: 7px; min-width: 0; }
+.qr-field > span { font-size: 13px; font-weight: 700; color: #3c4148; }
+.qr-field input, .qr-field select { height: 44px; padding: 0 14px; border: 1px solid #cfd2d8; border-radius: 8px; font-size: 15px; background: #fff; min-width: 0; }
+.qr-field input:focus, .qr-field select:focus { outline: none; border-color: #1b1e24; }
+
+.form-hint { margin: 14px 0 0; color: #777b83; font-size: 12px; }
+.save-ok.inline { margin: 0 0 4px; }
+
+/* Ссылка + QR рядом: код фиксированный, текст занимает остаток */
+.qr-block { display: flex; align-items: flex-start; justify-content: space-between; gap: 24px; }
+.qr-block-text { flex: 1 1 auto; min-width: 0; }
+.qr-block-text h3 { margin: 0; font-size: 15px; }
+.qr-block-text p { margin: 5px 0 0; color: #777b83; font-size: 12px; }
+.qr-link-row { display: flex; gap: 8px; margin-top: 14px; }
+.qr-link-row input { flex: 1 1 auto; min-width: 0; height: 44px; padding: 0 14px; border: 1px solid #cfd2d8; border-radius: 8px; font-size: 14px; background: #f7f8f9; color: #3c4148; }
+.qr-canvas { flex: 0 0 auto; width: 176px; height: 176px; border: 1px solid #e8e9ec; border-radius: 10px; background: #fff; }
+
+@media (max-width: 640px) {
+  .qr-grid { grid-template-columns: minmax(0, 1fr); }
+  /* QR под текстом и по центру — рядом он не помещается */
+  .qr-block { flex-direction: column; align-items: center; }
+  .qr-block-text { width: 100%; }
+}
