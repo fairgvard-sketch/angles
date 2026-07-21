@@ -326,7 +326,6 @@ class AngleMenuDemo {
       <section class="angle-menu-screen angle-menu-start">
         <div class="angle-menu-scroll">
           <div class="angle-menu-start-content">
-            <div class="angle-menu-hero"><span>תפריט דיגיטלי</span><strong>לחמנייה</strong></div>
             <div class="angle-menu-categories">${this.categoryCards()}</div>
           </div>
           <footer class="angle-menu-footer">
