@@ -411,7 +411,9 @@
       .product-accordion-item { padding:22px 0 4px; }
       .product-accordion-button { font-size:23px; }
       .product-accordion-content { padding-block:14px 0; padding-inline:0 42px; }
-      .product-accordion-panel-inner .product-stage { order:0; height:auto; min-height:0; max-height:none; aspect-ratio:2630 / 1800; margin-top:18px; border-radius:10px; }
+      .product-accordion-panel-inner { display:flex; flex-direction:column; }
+      .product-accordion-panel-inner .product-stage { order:0; height:auto; min-height:0; max-height:none; aspect-ratio:2630 / 1800; margin-top:16px; border-radius:10px; }
+      .product-accordion-panel-inner .product-accordion-content { order:1; padding-block:16px 0; }
       .product-accordion-panel-inner .product-stage .product-stage-layer[data-animation-stage="payments"] { --photo-y-gap:0px; }
       .product-accordion-panel-inner .payments-demo { width:min(92%, 100%); }
       .product-stage-layer[data-animation-stage="payments"] { --photo-y-gap:24px; }
