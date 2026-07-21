@@ -5,11 +5,11 @@
 
 .angle-reserve-demo {
   position: absolute;
-  /* Блок тянется на весь экран (кромка при inset: 38px совпадала с нижним
-     краем статус-бара и читалась серой линией), а контент отступает на его
-     высоту: начинается ниже Dynamic Island (остров кончается на 29px). */
+  /* Тянемся на весь экран: при inset: 38px кромка блока совпадала с нижним
+     краем статус-бара и читалась серой линией.
+     Отступ под статус-бар задаёт .angle-reserve-app — padding здесь
+     бесполезен, дочерний слой абсолютный и padding родителя игнорирует. */
   inset: 0;
-  padding-top: 38px;
   overflow: hidden;
   background: #ffffff;
   color: #101827;
@@ -35,7 +35,11 @@
 }
 
 .angle-reserve-app {
-  background: #252525;
+  /* Сверху 38px — высота статус-бара: контент начинается ниже Dynamic
+     Island. Смещаем этот слой, а не .angle-reserve-demo: его padding
+     абсолютные дети игнорируют. Экраны внутри остаются inset: 0. */
+  inset: 38px 0 0;
+  background: #ffffff;
 }
 
 .angle-reserve-scroll {

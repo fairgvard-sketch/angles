@@ -5,11 +5,11 @@
 
 .angle-menu-demo {
   position: absolute;
-  /* Тянемся под статус-бар (он сверху, z-index: 4) и компенсируем его
-     высоту паддингом: при inset: 38px кромка демо совпадала с нижним краем
-     статус-бара и читалась серой линией на всех кадрах. */
+  /* Тянемся на весь экран: при inset: 38px кромка блока совпадала с нижним
+     краем статус-бара и читалась серой линией на всех кадрах.
+     Отступ под статус-бар задаёт .angle-menu-app — padding здесь бесполезен,
+     дочерний слой абсолютный (inset: 0) и padding родителя игнорирует. */
   inset: 0;
-  padding-top: 38px;
   overflow: hidden;
   background: #ffffff;
   color: #101827;
@@ -20,9 +20,12 @@
 
 .angle-menu-app {
   position: absolute;
-  inset: 0;
+  /* Сверху 38px — высота статус-бара: контент начинается ниже Dynamic
+     Island (он кончается на 29px). Смещаем именно этот слой, а не
+     .angle-menu-demo: его padding абсолютные дети игнорируют. */
+  inset: 38px 0 0;
   overflow: hidden;
-  background: #252525;
+  background: #ffffff;
 }
 
 .angle-menu-screen {
