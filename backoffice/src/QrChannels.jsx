@@ -343,10 +343,14 @@ function ReserveTab({ locationId, settings, patch }) {
                   onBlur={(e) => patch({ display_name: e.target.value.trim() || null })}
                 />
               </Field>
-              <Field label="Opening hours (free text)">
-                <input
+              {/* Одна строка на день, день и время разделены «·» — так их
+                  парсит HoursRows на гостевой странице (PublicReservePage).
+                  Однострочный input не дал бы ввести перевод строки. */}
+              <Field label="Opening hours">
+                <textarea
+                  rows={4}
                   defaultValue={rsv.hours || ''}
-                  placeholder="Sun–Thu 08:00–22:00"
+                  placeholder={'Sun–Thu · 8:00–22:00\nFri · 8:00–14:00\nSat · closed'}
                   onBlur={(e) => patch({ hours: e.target.value.trim() || null })}
                 />
               </Field>

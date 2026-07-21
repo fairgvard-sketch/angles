@@ -447,7 +447,10 @@ a { color: inherit; }
 .qr-field { display: grid; gap: 7px; min-width: 0; }
 .qr-field > span { font-size: 13px; font-weight: 700; color: #3c4148; }
 .qr-field input, .qr-field select { height: 44px; padding: 0 14px; border: 1px solid #cfd2d8; border-radius: 8px; font-size: 15px; background: #fff; min-width: 0; }
-.qr-field input:focus, .qr-field select:focus { outline: none; border-color: #1b1e24; }
+/* Часы работы — многострочные (строка на день), поэтому без фиксированной
+   высоты и с вертикальным ресайзом. */
+.qr-field textarea { padding: 11px 14px; border: 1px solid #cfd2d8; border-radius: 8px; font: inherit; font-size: 15px; background: #fff; min-width: 0; resize: vertical; }
+.qr-field input:focus, .qr-field select:focus, .qr-field textarea:focus { outline: none; border-color: #1b1e24; }
 
 .form-hint { margin: 14px 0 0; color: #777b83; font-size: 12px; }
 .save-ok.inline { margin: 0 0 4px; }
