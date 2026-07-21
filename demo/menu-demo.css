@@ -44,16 +44,20 @@
 .angle-menu-start .angle-menu-scroll {
   display: flex;
   flex-direction: column;
+  /* Стартовый экран не скроллится: категории и подвал делят фиксированную
+     высоту по долям. С overflow: auto проценты считались бы от содержимого,
+     а не от экрана, и доли не работали бы. */
+  overflow-y: hidden;
   background: #252525;
 }
 
-.angle-menu-start .angle-menu-scroll > * {
-  flex-shrink: 0;
-}
-
 .angle-menu-start-content {
-  /* Забирает остаток высоты, чтобы подвал прижимался к низу экрана. */
-  flex: 1 0 auto;
+  /* Занимает всё до подвала — пустоты между последним рядом карточек и
+     подвалом быть не должно (сетка внутри растягивается). */
+  flex: 1 1 auto;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
   background: #ffffff;
 }
 
@@ -121,18 +125,22 @@
 }
 
 .angle-menu-categories {
-  /* Без отступа сверху: категории начинаются сразу под статус-баром —
-     добавленный ранее padding-top читался как пустая белая полоска. */
+  /* Красная зона на разметке владельца: от статус-бара до подвала, без
+     отступа сверху и без пустоты снизу. Три ряда делят высоту поровну. */
+  flex: 1 1 auto;
+  min-height: 0;
   padding: 0 10px 10px;
   display: grid;
   grid-template-columns: repeat(2, minmax(0, 1fr));
+  grid-template-rows: repeat(3, minmax(0, 1fr));
   gap: 8px;
 }
 
 .angle-category-card {
   position: relative;
   min-width: 0;
-  height: 103px;
+  /* Высоту задаёт ряд сетки, а не карточка */
+  min-height: 0;
   padding: 0;
   overflow: hidden;
   border: 1px solid #e3e4e7;
@@ -173,13 +181,12 @@
 .angle-menu-footer {
   position: relative;
   z-index: 1;
-  /* Высота задана явно, а не через flex-растяжение: прежний flex: 1 0 86px
-     забирал весь свободный остаток и раздувал чёрную зону непредсказуемо.
+  /* Синяя зона на разметке владельца: примерно четверть экрана, высота
+     задана долей, а не содержимым.
      box-shadow: 0 0 0 3px убран — рамка рисовалась поверх соседей и
      наезжала на нижний ряд категорий; фон и так сплошной. */
-  flex: 0 0 auto;
-  min-height: 104px;
-  padding: 18px 13px 20px;
+  flex: 0 0 24%;
+  padding: 13px;
   display: flex;
   flex-direction: column;
   align-items: center;
