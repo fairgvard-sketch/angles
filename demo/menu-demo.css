@@ -130,11 +130,11 @@
 
 .angle-menu-categories {
   /* Красная зона на разметке владельца: до подвала, без пустоты снизу.
-     Сверху отступ — вплотную к статус-бару карточки читались полоской
-     под Dynamic Island. Три ряда делят высоту поровну. */
+     Верхнее выравнивание задаёт padding-top контейнера (высота статус-бара),
+     здесь свой отступ не нужен. Три ряда делят высоту поровну. */
   flex: 1 1 auto;
   min-height: 0;
-  padding: 10px 10px 10px;
+  padding: 0 10px 10px;
   display: grid;
   grid-template-columns: repeat(2, minmax(0, 1fr));
   grid-template-rows: repeat(3, minmax(0, 1fr));
