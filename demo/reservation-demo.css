@@ -35,10 +35,11 @@
 }
 
 .angle-reserve-app {
-  /* Сверху 38px — высота статус-бара: контент начинается ниже Dynamic
-     Island. Смещаем этот слой, а не .angle-reserve-demo: его padding
-     абсолютные дети игнорируют. Экраны внутри остаются inset: 0. */
-  inset: 38px 0 0;
+  /* inset: 0, а НЕ 38px: смещённый слой давал видимую кромку на границе
+     со статус-баром — ту самую полоску (та же причина, что была в меню).
+     Фото уходит под статус-бар (он непрозрачный, перекрывает верх), как
+     в реальном iOS. */
+  inset: 0;
   background: #ffffff;
 }
 
@@ -139,19 +140,24 @@
 
 .angle-reserve-hero {
   position: relative;
-  height: 118px;
+  /* +38px: фото уходит под статус-бар (.angle-reserve-app inset:0),
+     без добавки видимая часть съезжала бы вверх. */
+  height: 156px;
   overflow: hidden;
   background: #20242c;
 }
 
 .angle-reserve-hero img {
-  width: 105%;
-  max-width: none;
-  height: auto;
-  margin-left: -2.5%;
+  /* Абсолютно на весь hero + cover: даёт object-fit опору по высоте
+     (в потоке cover ломал рендер). Фокус на центр кадра — солнечная сцена
+     со столиком, тёмные края витрины уходят за границы. */
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
   display: block;
-  object-fit: initial;
-  object-position: initial;
+  object-fit: cover;
+  object-position: center 40%;
 }
 
 /* Название под фото на главном экране брони — тот же бренд ANGLE, что в

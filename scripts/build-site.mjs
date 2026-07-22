@@ -45,6 +45,9 @@ if (/<x-dc|<x-import|text\/x-dc|support\.js|image-slot\.js/.test(html)) {
 const assetPaths = new Set([
   "anglelogo.png",
   "favicon.png",
+  // Фото hero демо-брони — подключается из demo/reservation-demo.js, а не из
+  // HTML, поэтому regex ниже его не находит; копируем явно.
+  "uploads/ver.webp",
   ...Array.from(html.matchAll(/(?:src=["']|url\(["']?)(uploads\/[A-Za-z0-9_./-]+)/g), (match) => match[1])
 ]);
 

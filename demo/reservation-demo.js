@@ -175,7 +175,7 @@ class AngleReservationDemo {
     return `<section class="angle-reserve-screen angle-reserve-start">
       <div class="angle-reserve-scroll">
         <div class="angle-reserve-hero">
-          <img src="uploads/reservation-step-1.png" alt="">
+          <img src="uploads/ver.webp" alt="">
         </div>
         <div class="angle-reserve-start-content">
           <div class="angle-reserve-brand"><span>ANGLE</span></div>
