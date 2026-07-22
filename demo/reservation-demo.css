@@ -230,7 +230,8 @@
 .angle-reserve-hint {
   margin: 8px 0 0;
   color: #858b96;
-  font-size: 7px;
+  /* 11px — как текст на кнопке (.angle-reserve-primary), 7px читалось мелко */
+  font-size: 11px;
   text-align: center;
 }
 
@@ -384,17 +385,8 @@
 
 .angle-reserve-zone h5 {
   margin: 0 0 7px;
-  display: flex;
-  align-items: center;
-  gap: 5px;
   font-size: 12px;
   font-weight: 850;
-}
-
-.angle-reserve-zone h5::before {
-  content: "▤";
-  color: #818896;
-  font-size: 11px;
 }
 
 .angle-reserve-times {
@@ -426,7 +418,8 @@
 .angle-reserve-time small {
   margin-top: 3px;
   color: #7b8492;
-  font-size: 7px;
+  /* +1px по просьбе владельца: «אישור מיידי» читалось мелко */
+  font-size: 8px;
   white-space: nowrap;
 }
 
@@ -461,7 +454,8 @@
 .angle-reserve-area {
   margin: 8px 0 12px;
   color: #69717f;
-  font-size: 8px;
+  /* 11px — как текст на кнопке (.angle-reserve-primary) */
+  font-size: 11px;
   text-align: center;
 }
 
