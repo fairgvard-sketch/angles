@@ -402,9 +402,13 @@
 .angle-cart-dock {
   position: absolute;
   z-index: 10;
-  right: 9px;
-  bottom: 9px;
-  left: 9px;
+  /* Отступы больше 9px: экран заходит под скруглённые углы рамки телефона
+     (border-radius 39px), и при bottom/right/left: 9 прямоугольные углы
+     панели вылезали за скругление. bottom: 26 выводит панель выше зоны
+     сильного загиба рамки, боковые 16px держат углы внутри. */
+  right: 16px;
+  bottom: 26px;
+  left: 16px;
   min-height: 50px;
   padding: 5px 8px;
   display: grid;
@@ -412,7 +416,8 @@
   gap: 9px;
   align-items: center;
   border: 0;
-  border-radius: 8px;
+  /* 16px как в боевом меню (rounded-2xl) — там CTA скруглены сильнее */
+  border-radius: 16px;
   background: #101827;
   color: #ffffff;
   box-shadow: 0 10px 24px rgba(16,24,39,0.24);
@@ -533,12 +538,15 @@
 .angle-product-add {
   position: absolute;
   z-index: 13;
-  right: 10px;
-  bottom: 9px;
-  left: 10px;
+  /* Отступы как у cart-dock: экран под скруглённой рамкой (39px), углы
+     кнопки вылезали за скругление. */
+  right: 16px;
+  bottom: 26px;
+  left: 16px;
   min-height: 49px;
   border: 0;
-  border-radius: 8px;
+  /* 16px как в боевом меню (rounded-2xl) */
+  border-radius: 16px;
   background: #101827;
   color: #ffffff;
   font: 850 13px/1 "Helvetica Neue", Helvetica, Arial, sans-serif;
