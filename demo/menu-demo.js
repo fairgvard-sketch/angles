@@ -415,7 +415,7 @@ class AngleMenuDemo {
             <input class="angle-field" value="05X-XXX-XXXX" aria-label="טלפון" readonly dir="ltr">
             <div class="angle-time-types" style="margin-top:7px">
               <button class="angle-time-type is-active" type="button">בהקדם האפשרי · ~20–45</button>
-              <button class="angle-time-type" type="button">לשעה</button>
+              <button class="angle-time-type" type="button">הזמנה עתידית</button>
             </div>
             <input class="angle-field" placeholder="הערה להזמנה" aria-label="הערה להזמנה" readonly>
             <button class="angle-submit-order" type="button" data-demo-action="submit" data-demo-target="submit-order">לשלוח הזמנה · ${money(this.cartTotal())}</button>
