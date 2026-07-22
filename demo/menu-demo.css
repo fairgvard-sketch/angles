@@ -399,6 +399,13 @@
   text-align: right;
 }
 
+/* Пульс корзины при добавлении товара — как cart-bump в боевом /order */
+@keyframes angleCartBump {
+  0%, 100% { transform: scale(1); }
+  40%      { transform: scale(1.06); }
+}
+.angle-cart-dock.is-bump { animation: angleCartBump 0.28s ease-out; }
+
 .angle-cart-dock {
   position: absolute;
   z-index: 10;

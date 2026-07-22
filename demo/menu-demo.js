@@ -224,10 +224,12 @@ class AngleMenuDemo {
       this.state.view = "list";
       this.state.category = "hot";
       this.state.product = null;
+      this.bump = true;
     }
     if (action === "add-simple") {
       const item = this.findItem(value);
       if (item) this.addCartItem(item, item.price, null);
+      this.bump = true;
     }
     if (action === "open-cart") this.state.view = "checkout";
     if (action === "submit") this.state.view = "waiting";
@@ -456,6 +458,18 @@ class AngleMenuDemo {
     if (this.state.view === "checkout") this.app.innerHTML = this.renderCheckout();
     if (this.state.view === "waiting") this.app.innerHTML = this.renderWaiting();
     if (this.state.view === "success") this.app.innerHTML = this.renderSuccess();
+
+    // Пульс корзины при добавлении товара (как cart-bump в боевом /order).
+    // innerHTML пересоздаётся выше, поэтому класс вешаем на новый узел после
+    // рендера; снимаем по окончании анимации, чтобы её можно было повторить.
+    if (this.bump) {
+      this.bump = false;
+      const dock = this.app.querySelector(".angle-cart-dock");
+      if (dock) {
+        dock.classList.add("is-bump");
+        dock.addEventListener("animationend", () => dock.classList.remove("is-bump"), { once: true });
+      }
+    }
   }
 }
 
