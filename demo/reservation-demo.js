@@ -153,10 +153,10 @@ class AngleReservationDemo {
     }, 1450);
   }
 
-  header({ back = false, reset = true } = {}) {
+  header({ back = false } = {}) {
     return `<header class="angle-reserve-header">
-      ${reset ? '<button class="angle-reserve-reset" type="button" data-reserve-action="reset" aria-label="Restart reservation demo">↻</button>' : '<span></span>'}
-      <h3>לחמנייה</h3>
+      <span></span>
+      <h3>ANGLE</h3>
       ${back ? '<button class="angle-reserve-back" type="button" data-reserve-action="back">חזרה</button>' : '<span></span>'}
     </header>`;
   }
@@ -178,6 +178,7 @@ class AngleReservationDemo {
           <img src="uploads/reservation-step-1.png" alt="">
         </div>
         <div class="angle-reserve-start-content">
+          <div class="angle-reserve-brand"><span>ANGLE</span></div>
           ${this.summary()}
           <button class="angle-reserve-primary" type="button" data-reserve-action="search" data-reserve-target="reservation-search">להזמין עכשיו</button>
           <p class="angle-reserve-hint">בחרו תאריך, שעה וכמות אורחים</p>
@@ -226,11 +227,11 @@ class AngleReservationDemo {
   }
 
   renderWaiting() {
-    return `<section class="angle-reserve-screen">${this.header({ reset: false })}<div class="angle-reserve-status"><div class="angle-reserve-spinner"></div><h4>מאשרים את ההזמנה</h4><p>זה ייקח רק רגע.</p></div></section>`;
+    return `<section class="angle-reserve-screen">${this.header()}<div class="angle-reserve-status"><div class="angle-reserve-spinner"></div><h4>מאשרים את ההזמנה</h4><p>זה ייקח רק רגע.</p></div></section>`;
   }
 
   renderSuccess() {
-    return `<section class="angle-reserve-screen">${this.header({ reset: false })}<div class="angle-reserve-status"><div class="angle-reserve-success-icon">✓</div><h4>ההזמנה אושרה!</h4><p>מחכים לכם. אם התכניות משתנות, אפשר לבטל את ההזמנה.</p><div class="angle-reserve-confirm-card"><strong>יום ג׳, 17 ביולי, 19:30</strong><span>אבי כהן · 2 אורחים · פרגולה · שולחן 1</span></div><button class="angle-reserve-new" type="button" data-reserve-action="new">הזמנה חדשה</button></div></section>`;
+    return `<section class="angle-reserve-screen">${this.header()}<div class="angle-reserve-status"><div class="angle-reserve-success-icon">✓</div><h4>ההזמנה אושרה!</h4><p>מחכים לכם. אם התכניות משתנות, אפשר לבטל את ההזמנה.</p><div class="angle-reserve-confirm-card"><strong>יום ג׳, 17 ביולי, 19:30</strong><span>אבי כהן · 2 אורחים · פרגולה · שולחן 1</span></div><button class="angle-reserve-new" type="button" data-reserve-action="new">הזמנה חדשה</button></div></section>`;
   }
 
   render() {

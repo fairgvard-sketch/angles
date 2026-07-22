@@ -99,10 +99,13 @@
 .angle-menu-header h3 {
   grid-column: 2;
   margin: 0;
-  font-size: 14px;
+  /* Бренд ANGLE: крупнее и жирнее прочего текста, LTR и разрядка —
+     читается как название, а не как заголовок раздела. */
+  font-size: 17px;
   line-height: 1;
-  font-weight: 800;
-  letter-spacing: 0;
+  font-weight: 900;
+  letter-spacing: 0.04em;
+  direction: ltr;
 }
 
 .angle-menu-back,
@@ -160,7 +163,7 @@
 .angle-menu-brand span {
   font-size: 18px;
   font-weight: 900;
-  letter-spacing: 0.02em;
+  letter-spacing: 0.04em;
   color: #101827;
 }
 

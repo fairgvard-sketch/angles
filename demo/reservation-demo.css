@@ -98,10 +98,12 @@
 .angle-reserve-header h3 {
   grid-column: 2;
   margin: 0;
-  font-size: 14px;
+  /* Бренд ANGLE — как в демо меню (.angle-menu-header h3) */
+  font-size: 17px;
   line-height: 1;
-  font-weight: 850;
-  letter-spacing: 0;
+  font-weight: 900;
+  letter-spacing: 0.04em;
+  direction: ltr;
 }
 
 .angle-reserve-back,
@@ -152,10 +154,24 @@
   object-position: initial;
 }
 
+/* Название под фото на главном экране брони — тот же бренд ANGLE, что в
+   хедере и в демо меню. */
+.angle-reserve-brand {
+  margin: 14px 12px 0;
+  text-align: center;
+}
+
+.angle-reserve-brand span {
+  font-size: 18px;
+  font-weight: 900;
+  letter-spacing: 0.04em;
+  color: #101827;
+}
+
 .angle-reserve-summary {
-  /* Верхний отступ раньше давал блок с названием заведения (убран):
-     без компенсации селекторы прилипали бы к фото. */
-  margin: 16px 12px 0;
+  /* Название заведения вернулось (.angle-reserve-brand выше), меньший
+     верхний отступ — иначе он удвоился бы. */
+  margin: 12px 12px 0;
   display: grid;
   grid-template-columns: repeat(3, 1fr);
   overflow: hidden;

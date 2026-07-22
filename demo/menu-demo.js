@@ -271,11 +271,11 @@ class AngleMenuDemo {
     return this.state.cart.reduce((sum, item) => sum + item.price * item.qty, 0);
   }
 
-  header({ back = false, reset = true } = {}) {
+  header({ back = false } = {}) {
     return `
       <header class="angle-menu-header">
-        ${reset ? '<button class="angle-menu-reset" type="button" data-demo-action="reset" title="Restart demo" aria-label="Restart demo">↻</button>' : '<span></span>'}
-        <h3>לחמנייה</h3>
+        <span></span>
+        <h3>ANGLE</h3>
         ${back ? '<button class="angle-menu-back" type="button" data-demo-action="back">חזרה</button>' : '<span></span>'}
       </header>`;
   }
@@ -425,7 +425,7 @@ class AngleMenuDemo {
   renderWaiting() {
     return `
       <section class="angle-menu-screen">
-        ${this.header({ reset: false })}
+        ${this.header()}
         <div class="angle-status-screen">
           <div class="angle-status-spinner"></div>
           <h4>ממתינים לאישור בית הקפה</h4>
@@ -437,7 +437,7 @@ class AngleMenuDemo {
   renderSuccess() {
     return `
       <section class="angle-menu-screen">
-        ${this.header({ reset: false })}
+        ${this.header()}
         <div class="angle-status-screen">
           <span class="angle-order-number-label">המספר שלך</span>
           <strong class="angle-order-number">#${this.state.orderNumber}</strong>
