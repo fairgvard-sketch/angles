@@ -130,7 +130,11 @@
     .guest-qr-code { display:block; width:112px; height:auto; aspect-ratio:1; margin:16px auto; background:#FFFFFF; }
     .guest-qr-placard strong { display:block; font-size:14px; }
     .guest-qr-placard small { display:block; margin-top:5px; color:#777268; font-size:9px; }
-    .guest-flow-stack { position:absolute; left:6%; bottom:42px; z-index:2; width:205px; display:grid; gap:8px; }
+    /* Ширина/позиция ограничены так, чтобы правый край плашек-шагов не
+       заходил под телефон (right:6%, 300px): при width:205px + left:6% они
+       налезали на ~35px и просвечивали белыми полосами по бокам подвала.
+       max-width не даёт нахлёста на узком контейнере. */
+    .guest-flow-stack { position:absolute; left:5%; bottom:42px; z-index:2; width:min(205px, 22%); display:grid; gap:8px; }
     .guest-flow-step { padding:12px 14px; display:grid; align-items:center; border:1px solid rgba(17,17,17,0.13); border-radius:5px; background:rgba(255,255,255,0.72); color:#1A1A1A; box-shadow:0 8px 20px rgba(38,45,66,0.08); }
     .guest-flow-step span { font-size:9px; line-height:1.25; font-weight:700; }
     .iphone17 { position:absolute; top:50%; right:6%; width:300px; aspect-ratio:78 / 158; padding:8px; box-sizing:border-box; transform:translateY(-50%) rotate(1deg); border:2px solid #74809C; border-radius:52px; background:#1F2940; box-shadow:0 30px 70px rgba(20,28,48,0.3), inset 0 0 0 1px rgba(255,255,255,0.2); }
