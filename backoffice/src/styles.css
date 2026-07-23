@@ -341,12 +341,17 @@ a { color: inherit; }
     position: fixed; z-index: 30; inset: 0; width: 100%; height: 100svh;
     padding: max(18px, env(safe-area-inset-top)) 18px calc(18px + env(safe-area-inset-bottom));
     border-right: 0; visibility: hidden;
+    overflow: hidden;
     transform: translateX(-100%);
     transition: transform .24s ease, visibility .24s;
   }
   .sidebar.is-open { visibility: visible; transform: translateX(0); }
+  .sidebar-top, .sidebar-bottom { flex: 0 0 auto; }
   .sidebar-top { min-height: 52px; }
-  .side-nav { margin-top: 22px; gap: 4px; }
+  .side-nav {
+    flex: 1 1 auto; min-height: 0; margin-top: 22px; gap: 4px;
+    overflow-y: auto; overscroll-behavior-y: contain; scrollbar-width: thin;
+  }
   .side-nav button, .sidebar-bottom > button { min-height: 52px; font-size: 16px; }
   .sidebar-close, .mobile-menu { display: inline-flex !important; }
   /* Полноэкранное меню само себе подложка — затемнение не нужно */
