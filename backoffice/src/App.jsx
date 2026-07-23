@@ -11,7 +11,6 @@ import {
   MonitorSmartphone,
   MoreHorizontal,
   QrCode,
-  RefreshCw,
   Settings,
   Store,
   Users,
@@ -90,13 +89,22 @@ function SignIn() {
 }
 
 function Sidebar({ active, onNavigate, open, onClose, email }) {
+  function openSettings() {
+    onNavigate('settings')
+    onClose()
+  }
+
   return (
     <>
       {open && <button className="drawer-scrim" aria-label="Close navigation" onClick={onClose} />}
       <aside className={`sidebar ${open ? 'is-open' : ''}`}>
         <div className="sidebar-top">
           <Brand />
-          <button className="icon-button sidebar-close" onClick={onClose} aria-label="Close navigation"><X /></button>
+          <div className="sidebar-top-actions">
+            <button className="icon-button sidebar-mobile-action" aria-label="Help"><CircleHelp /></button>
+            <button className="icon-button sidebar-mobile-action" aria-label="Settings" onClick={openSettings}><Settings /></button>
+            <button className="icon-button sidebar-close" onClick={onClose} aria-label="Close navigation"><X /></button>
+          </div>
         </div>
         <nav className="side-nav" aria-label="Back office">
           {navigation.map(({ id, label, icon: Icon }) => (
@@ -108,7 +116,7 @@ function Sidebar({ active, onNavigate, open, onClose, email }) {
         </nav>
         <div className="sidebar-bottom">
           <button><CircleHelp /><span>Help</span></button>
-          <button><Settings /><span>Settings</span></button>
+          <button className={active === 'settings' ? 'active' : ''} onClick={openSettings}><Settings /><span>Settings</span></button>
           <div className="account-chip">
             <span className="avatar">{email?.slice(0, 1).toUpperCase() || 'A'}</span>
             <span className="account-email">{email}</span>
@@ -213,7 +221,26 @@ function SectionPage({ section, context }) {
   )
 }
 
-function Dashboard({ session, context, refresh }) {
+function AccountSettingsPage({ email, onSignOut }) {
+  return (
+    <>
+      <section className="page-heading compact-heading">
+        <p className="eyebrow">ACCOUNT</p>
+        <h1>Settings</h1>
+        <p>Manage your back-office account and session.</p>
+      </section>
+      <section className="panel account-settings-panel">
+        <div className="account-settings-copy">
+          <h2>Account</h2>
+          <p>{email}</p>
+        </div>
+        <button className="secondary-button" onClick={onSignOut}><LogOut /> Sign out</button>
+      </section>
+    </>
+  )
+}
+
+function Dashboard({ session, context }) {
   const [active, setActive] = useState('overview')
   const [drawer, setDrawer] = useState(false)
 
@@ -236,10 +263,6 @@ function Dashboard({ session, context, refresh }) {
         <header className="topbar">
           <button className="icon-button mobile-menu" onClick={() => setDrawer(true)} aria-label="Open navigation"><MenuIcon /></button>
           <div className="topbar-context"><span>{context.organization?.name}</span><small>{context.member?.role}</small></div>
-          <div className="topbar-actions">
-            <button className="icon-button" onClick={refresh} title="Refresh"><RefreshCw /></button>
-            <button className="secondary-button" onClick={signOut}><LogOut /> Sign out</button>
-          </div>
         </header>
         <main className="content">
           {active === 'overview' && <Overview context={context} onNavigate={setActive} />}
@@ -248,8 +271,9 @@ function Dashboard({ session, context, refresh }) {
           {active === 'menu' && <MenuManager context={context} />}
           {active === 'team' && <TeamManager context={context} />}
           {active === 'online' && <QrChannels context={context} />}
+          {active === 'settings' && <AccountSettingsPage email={session.user.email} onSignOut={signOut} />}
           {!['overview', 'sales', 'locations', 'menu', 'team', 'online'].includes(active) && (
-            <SectionPage section={active} context={context} />
+            active !== 'settings' && <SectionPage section={active} context={context} />
           )}
         </main>
       </div>
@@ -327,7 +351,7 @@ export default function App() {
     if (loading) return <Loading />
     if (!session) return <SignIn />
     if (!context) return <AccessDenied message={contextError} />
-    return <Dashboard session={session} context={context} refresh={() => loadContext(session)} />
+    return <Dashboard session={session} context={context} />
   }, [session, context, loading, contextError])
 
   return content
