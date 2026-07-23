@@ -66,5 +66,10 @@ for (const relativePath of assetPaths) {
 
 await cp(path.join(projectRoot, "demo"), path.join(outputRoot, "demo"), { recursive: true });
 await cp(path.join(projectRoot, "uploads", "qr-demo"), path.join(outputRoot, "uploads", "qr-demo"), { recursive: true });
+await cp(
+  path.join(projectRoot, "uploads", "menu-backgrounds"),
+  path.join(outputRoot, "uploads", "menu-backgrounds"),
+  { recursive: true }
+);
 
 console.log(`Built dist/index.html with ${assetPaths.size} production assets.`);
