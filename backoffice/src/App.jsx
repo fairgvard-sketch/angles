@@ -1,5 +1,6 @@
 import { useEffect, useMemo, useState } from 'react'
 import {
+  Activity,
   BarChart3,
   Building2,
   ChevronRight,
@@ -23,10 +24,12 @@ import MenuManager from './MenuManager'
 import TeamManager from './TeamManager'
 import QrChannels from './QrChannels'
 import DevicesManager from './DevicesManager'
+import ActivityManager, { ActivityCard } from './ActivityManager'
 
 const navigation = [
   { id: 'overview', label: 'Home', icon: LayoutDashboard },
   { id: 'sales', label: 'Overview', icon: BarChart3 },
+  { id: 'activity', label: 'Activity', icon: Activity },
   { id: 'locations', label: 'Locations', icon: Store },
   { id: 'menu', label: 'Menu & catalogue', icon: MenuIcon },
   { id: 'team', label: 'Team', icon: Users },
@@ -188,6 +191,8 @@ function Overview({ context, onNavigate }) {
           </div>
         </section>
       </div>
+
+      <ActivityCard onNavigate={onNavigate} />
     </>
   )
 }
@@ -268,13 +273,14 @@ function Dashboard({ session, context }) {
         <main className="content">
           {active === 'overview' && <Overview context={context} onNavigate={setActive} />}
           {active === 'sales' && <SalesOverview organizationName={context.organization?.name} />}
+          {active === 'activity' && <ActivityManager context={context} />}
           {active === 'locations' && <LocationSettings context={context} />}
           {active === 'menu' && <MenuManager context={context} />}
           {active === 'team' && <TeamManager context={context} />}
           {active === 'online' && <QrChannels context={context} />}
           {active === 'devices' && <DevicesManager context={context} />}
           {active === 'settings' && <AccountSettingsPage email={session.user.email} onSignOut={signOut} />}
-          {!['overview', 'sales', 'locations', 'menu', 'team', 'online', 'devices'].includes(active) && (
+          {!['overview', 'sales', 'activity', 'locations', 'menu', 'team', 'online', 'devices'].includes(active) && (
             active !== 'settings' && <SectionPage section={active} context={context} />
           )}
         </main>

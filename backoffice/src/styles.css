@@ -239,6 +239,27 @@ a { color: inherit; }
   .device-name small { white-space: normal; }
 }
 
+/* ── Лента активности ─────────────────────────────────────── */
+.activity-panel { margin-top: 20px; }
+.activity-list { display: grid; padding: 6px 0; }
+.activity-row { display: flex; align-items: center; gap: 13px; min-height: 56px; padding: 9px 22px; }
+.activity-mark { width: 34px; height: 34px; flex-shrink: 0; border-radius: 10px; display: flex; align-items: center; justify-content: center; }
+.activity-mark svg { width: 17px; height: 17px; }
+.activity-mark.is-open   { background: #e7f3ec; color: #34734c; }
+.activity-mark.is-close  { background: #eef1f6; color: #445064; }
+.activity-mark.is-refund { background: #fbeceb; color: #b4453c; }
+
+.activity-body { min-width: 0; flex: 1; }
+.activity-body strong { display: block; font-size: 13px; font-weight: 700; color: #25282d; }
+.activity-body small { display: block; margin-top: 3px; color: #8a8f97; font-size: 11px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+
+.activity-meta { display: flex; flex-direction: column; align-items: flex-end; gap: 3px; flex-shrink: 0; }
+.activity-amount { font-size: 13px; font-weight: 750; font-variant-numeric: tabular-nums; color: #25282d; }
+.activity-amount.is-refund { color: #b4453c; }
+.activity-time { font-size: 11px; color: #9ba0a8; font-variant-numeric: tabular-nums; }
+
+.activity-more { display: flex; justify-content: center; padding: 14px 22px 6px; }
+
 /* ── Настройки точки ──────────────────────────────────────── */
 .location-tabs { display: flex; flex-wrap: wrap; gap: 8px; margin-bottom: 16px; }
 .location-tabs button { display: inline-flex; align-items: center; gap: 7px; min-height: 40px; padding: 0 16px; border: 1px solid #dcdee3; border-radius: 8px; background: #fff; color: #5c616a; font-size: 13px; font-weight: 700; }
