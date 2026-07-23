@@ -21,6 +21,52 @@ import { patchLocationSettings } from './settings'
  * Прод-домен из docs/deployment.md; переопределяется через env для превью.
  */
 const POS_ORIGIN = import.meta.env.VITE_POS_ORIGIN || 'https://pos-self-sigma.vercel.app'
+const SITE_ORIGIN = import.meta.env.VITE_SITE_ORIGIN || 'https://angle.co.il'
+
+/**
+ * Отобранные фоны витрины. В настройках храним не blob и не служебный id,
+ * а уже поддерживаемый кассой background_url — публичное меню применяет его
+ * без новой миграции и дополнительного API. preview остаётся относительным,
+ * чтобы карточки работали и на локальной сборке сайта.
+ */
+export const ONLINE_BACKGROUND_PRESETS = [
+  {
+    id: 'clean',
+    label: 'Clean',
+    preview: null,
+    value: null,
+  },
+  {
+    id: 'restaurant',
+    label: 'Dining room',
+    preview: '/uploads/solution-restaurant-v2.jpg',
+    value: `${SITE_ORIGIN}/uploads/solution-restaurant-v2.jpg`,
+  },
+  {
+    id: 'cafe',
+    label: 'Morning café',
+    preview: '/uploads/solution-cafe-v2.jpg',
+    value: `${SITE_ORIGIN}/uploads/solution-cafe-v2.jpg`,
+  },
+  {
+    id: 'bar',
+    label: 'After dark',
+    preview: '/uploads/solution-bar-v2.jpg',
+    value: `${SITE_ORIGIN}/uploads/solution-bar-v2.jpg`,
+  },
+  {
+    id: 'pizzeria',
+    label: 'Wood oven',
+    preview: '/uploads/solution-pizzeria-v2.jpg',
+    value: `${SITE_ORIGIN}/uploads/solution-pizzeria-v2.jpg`,
+  },
+  {
+    id: 'bakery',
+    label: 'Fresh bakery',
+    preview: '/uploads/solution-bakery-v2.jpg',
+    value: `${SITE_ORIGIN}/uploads/solution-bakery-v2.jpg`,
+  },
+]
 
 export function orderUrl(locationId) {
   return `${POS_ORIGIN}/order/${locationId}`

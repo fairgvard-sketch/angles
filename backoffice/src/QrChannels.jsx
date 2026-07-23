@@ -4,6 +4,7 @@ import QRCode from 'qrcode'
 import { fetchLocation } from './settings'
 import {
   ORDER_TYPES, ORDER_TYPE_LABELS,
+  ONLINE_BACKGROUND_PRESETS,
   onlineEnabled, orderTypes, toggleOrderType, saveOnlineOrders,
   reservationsEnabled, saveReservations,
   orderUrl, reserveUrl,
@@ -99,6 +100,49 @@ function NumberSelect({ value, fallback, options, onChange }) {
   )
 }
 
+function BackgroundPresets({ value, onChange }) {
+  const normalizedValue = value || null
+  const hasCustomBackground = normalizedValue !== null
+    && !ONLINE_BACKGROUND_PRESETS.some((preset) => preset.value === normalizedValue)
+
+  return (
+    <div className="background-picker">
+      <div className="background-picker-heading">
+        <div>
+          <h3>Menu background</h3>
+          <p>Applied to this location’s guest menu.</p>
+        </div>
+        {hasCustomBackground && <span className="background-custom-note">Custom image active</span>}
+      </div>
+      <div className="background-presets" role="group" aria-label="Menu background">
+        {ONLINE_BACKGROUND_PRESETS.map((preset) => {
+          const selected = preset.value === normalizedValue
+          return (
+            <button
+              key={preset.id}
+              type="button"
+              className={`background-preset${selected ? ' is-selected' : ''}`}
+              aria-pressed={selected}
+              onClick={() => onChange(preset.value)}
+            >
+              <span className={`background-preset-preview${preset.preview ? '' : ' is-clean'}`}>
+                {preset.preview && <img src={preset.preview} alt="" />}
+                {preset.preview && <span className="background-preset-scrim" />}
+                {selected && (
+                  <span className="background-preset-check" title="Selected">
+                    <Check aria-hidden="true" />
+                  </span>
+                )}
+              </span>
+              <span>{preset.label}</span>
+            </button>
+          )
+        })}
+      </div>
+    </div>
+  )
+}
+
 // ── Онлайн-заказы ────────────────────────────────────────────
 
 function OnlineTab({ locationId, settings, patch }) {
@@ -175,8 +219,12 @@ function OnlineTab({ locationId, settings, patch }) {
                 />
               </Field>
             </div>
+            <BackgroundPresets
+              value={online.background_url}
+              onChange={(backgroundUrl) => patch({ background_url: backgroundUrl })}
+            />
             <p className="form-hint">
-              Header and background images are uploaded from the register, under
+              The header image is managed from the register under
               Settings → Service → Online orders.
             </p>
           </section>

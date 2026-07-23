@@ -479,6 +479,27 @@ a { color: inherit; }
 .form-hint { margin: 14px 0 0; color: #777b83; font-size: 12px; }
 .save-ok.inline { margin: 0 0 4px; }
 
+/* Фоны публичного QR-меню: компактная галерея фиксированных пресетов.
+   Кнопка — один цельный вариант, превью имеет стабильные пропорции и не
+   меняет высоту панели при выборе. */
+.background-picker { margin-top: 24px; padding-top: 20px; border-top: 1px solid #eef0f2; }
+.background-picker-heading { display: flex; align-items: flex-start; justify-content: space-between; gap: 16px; }
+.background-picker-heading h3 { margin: 0; color: #1b1e24; font-size: 15px; }
+.background-picker-heading p { margin: 4px 0 0; color: #777b83; font-size: 12px; }
+.background-custom-note { flex: 0 0 auto; padding: 5px 8px; border-radius: 6px; background: #f0f1f3; color: #646971; font-size: 11px; font-weight: 700; }
+.background-presets { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 12px; margin-top: 14px; }
+.background-preset { display: grid; gap: 8px; min-width: 0; padding: 0; border: 0; background: transparent; color: #4d525a; font: inherit; font-size: 12px; font-weight: 700; text-align: left; cursor: pointer; }
+.background-preset-preview { position: relative; display: block; width: 100%; aspect-ratio: 16 / 10; overflow: hidden; border: 2px solid transparent; border-radius: 8px; background: #e7e8ea; transition: border-color .16s ease, box-shadow .16s ease; }
+.background-preset-preview img { width: 100%; height: 100%; display: block; object-fit: cover; }
+.background-preset-scrim { position: absolute; inset: 0; background: rgb(0 0 0 / 34%); }
+.background-preset-preview.is-clean { border-color: #d8dbe0; background-color: #fff; background-image: linear-gradient(#eef0f2 1px, transparent 1px), linear-gradient(90deg, #eef0f2 1px, transparent 1px); background-size: 16px 16px; }
+.background-preset:hover .background-preset-preview { border-color: #8b9098; }
+.background-preset:focus-visible { outline: 2px solid #1b1e24; outline-offset: 4px; border-radius: 4px; }
+.background-preset.is-selected { color: #1b1e24; }
+.background-preset.is-selected .background-preset-preview { border-color: #1b1e24; box-shadow: 0 0 0 1px #1b1e24; }
+.background-preset-check { position: absolute; top: 7px; right: 7px; display: grid; place-items: center; width: 26px; height: 26px; border-radius: 50%; background: #fff; color: #111318; box-shadow: 0 2px 8px rgb(0 0 0 / 24%); }
+.background-preset-check svg { width: 15px; height: 15px; stroke-width: 3; }
+
 /* Ссылка + QR рядом: код фиксированный, текст занимает остаток */
 .qr-block { display: flex; align-items: flex-start; justify-content: space-between; gap: 24px; }
 .qr-block-text { flex: 1 1 auto; min-width: 0; }
@@ -490,6 +511,8 @@ a { color: inherit; }
 
 @media (max-width: 640px) {
   .qr-grid { grid-template-columns: minmax(0, 1fr); }
+  .background-picker-heading { align-items: center; }
+  .background-presets { grid-template-columns: repeat(2, minmax(0, 1fr)); }
   /* QR под текстом и по центру — рядом он не помещается */
   .qr-block { flex-direction: column; align-items: center; }
   .qr-block-text { width: 100%; }
