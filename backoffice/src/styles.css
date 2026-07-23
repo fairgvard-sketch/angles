@@ -206,6 +206,39 @@ a { color: inherit; }
 .truncate { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .updated-at { margin: 18px 0 0; text-align: center; color: #9ba0a8; font-size: 11px; font-variant-numeric: tabular-nums; }
 
+/* ── Девайсы (парк касс) ──────────────────────────────────── */
+.device-summary { display: flex; align-items: center; gap: 16px; font-size: 13px; font-weight: 650; color: #5f646c; }
+.device-summary span { display: inline-flex; align-items: center; gap: 7px; }
+.device-summary svg { width: 15px; height: 15px; color: #9ba0a8; }
+.device-summary .is-negative { color: #b4453c; }
+.device-summary .is-negative svg { color: #b4453c; }
+
+.device-row { align-items: center; }
+.device-main { display: flex; align-items: center; gap: 14px; min-width: 0; }
+.device-name { min-width: 0; }
+.device-name strong { display: block; font-size: 13px; font-weight: 700; color: #25282d; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.device-name small { display: block; margin-top: 3px; color: #9ba0a8; font-size: 11px; font-variant-numeric: tabular-nums; }
+
+/* Статус: точка + подпись, цвет по состоянию (online/stale/offline/error/never) */
+.device-status { display: inline-flex; align-items: center; gap: 6px; flex-shrink: 0; width: 84px; font-size: 11px; font-weight: 750; }
+.device-status i { width: 8px; height: 8px; border-radius: 50%; flex-shrink: 0; }
+.device-status.is-online { color: #34734c; } .device-status.is-online i { background: #3ba464; }
+.device-status.is-stale  { color: #8a6d1e; } .device-status.is-stale i  { background: #d3a536; }
+.device-status.is-offline{ color: #6b7078; } .device-status.is-offline i{ background: #b3b7bd; }
+.device-status.is-error  { color: #b4453c; } .device-status.is-error i  { background: #d15048; }
+.device-status.is-never  { color: #6b7078; } .device-status.is-never i  { background: #cfd2d6; }
+
+.device-meta { display: flex; align-items: center; gap: 14px; flex-shrink: 0; }
+.device-queue { display: inline-flex; align-items: center; gap: 5px; font-size: 11px; font-weight: 700; color: #8a6d1e; font-variant-numeric: tabular-nums; }
+.device-queue.is-negative { color: #b4453c; }
+.device-queue svg { width: 13px; height: 13px; }
+.device-seen { font-size: 12px; color: #7c8087; font-variant-numeric: tabular-nums; white-space: nowrap; }
+
+@media (max-width: 640px) {
+  .device-status { width: auto; }
+  .device-name small { white-space: normal; }
+}
+
 /* ── Настройки точки ──────────────────────────────────────── */
 .location-tabs { display: flex; flex-wrap: wrap; gap: 8px; margin-bottom: 16px; }
 .location-tabs button { display: inline-flex; align-items: center; gap: 7px; min-height: 40px; padding: 0 16px; border: 1px solid #dcdee3; border-radius: 8px; background: #fff; color: #5c616a; font-size: 13px; font-weight: 700; }

@@ -22,6 +22,7 @@ import LocationSettings from './LocationSettings'
 import MenuManager from './MenuManager'
 import TeamManager from './TeamManager'
 import QrChannels from './QrChannels'
+import DevicesManager from './DevicesManager'
 
 const navigation = [
   { id: 'overview', label: 'Home', icon: LayoutDashboard },
@@ -271,8 +272,9 @@ function Dashboard({ session, context }) {
           {active === 'menu' && <MenuManager context={context} />}
           {active === 'team' && <TeamManager context={context} />}
           {active === 'online' && <QrChannels context={context} />}
+          {active === 'devices' && <DevicesManager context={context} />}
           {active === 'settings' && <AccountSettingsPage email={session.user.email} onSignOut={signOut} />}
-          {!['overview', 'sales', 'locations', 'menu', 'team', 'online'].includes(active) && (
+          {!['overview', 'sales', 'locations', 'menu', 'team', 'online', 'devices'].includes(active) && (
             active !== 'settings' && <SectionPage section={active} context={context} />
           )}
         </main>
