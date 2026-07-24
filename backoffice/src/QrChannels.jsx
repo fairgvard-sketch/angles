@@ -102,8 +102,13 @@ function NumberSelect({ value, fallback, options, onChange }) {
 
 function BackgroundPresets({ value, onChange }) {
   const normalizedValue = value || null
+  const activePreset = normalizedValue === null
+    ? ONLINE_BACKGROUND_PRESETS.find((preset) => preset.value === null)
+    : ONLINE_BACKGROUND_PRESETS.find((preset) => (
+        preset.marker && normalizedValue.includes(preset.marker)
+      ))
   const hasCustomBackground = normalizedValue !== null
-    && !ONLINE_BACKGROUND_PRESETS.some((preset) => preset.value === normalizedValue)
+    && !activePreset
 
   return (
     <div className="background-picker">
@@ -116,7 +121,7 @@ function BackgroundPresets({ value, onChange }) {
       </div>
       <div className="background-presets" role="group" aria-label="Menu background">
         {ONLINE_BACKGROUND_PRESETS.map((preset) => {
-          const selected = preset.value === normalizedValue
+          const selected = preset.id === activePreset?.id
           return (
             <button
               key={preset.id}
@@ -162,74 +167,72 @@ function OnlineTab({ locationId, settings, patch }) {
       </section>
 
       {enabled && (
-        <>
-          <section className="panel form-panel">
-            <div className="panel-heading">
-              <div>
-                <h2>Order types</h2>
-                <p>What the guest can choose. At least one stays on.</p>
-              </div>
+        <section className="panel form-panel">
+          <div className="panel-heading">
+            <div>
+              <h2>Order types</h2>
+              <p>What the guest can choose. At least one stays on.</p>
             </div>
-            {ORDER_TYPES.map((type) => (
-              <Toggle
-                key={type}
-                label={ORDER_TYPE_LABELS[type]}
-                checked={types.includes(type)}
-                // Последний включённый тип не выключаем — гостю нужен способ заказа
-                disabled={types.length === 1 && types.includes(type)}
-                onChange={() => patch({ order_types: toggleOrderType(types, type) })}
-              />
-            ))}
-          </section>
-
-          <section className="panel form-panel">
-            <div className="panel-heading">
-              <div>
-                <h2>Guest page</h2>
-                <p>How the ordering page introduces the place.</p>
-              </div>
-            </div>
-            <div className="qr-grid">
-              <Field label="Display name">
-                <input
-                  defaultValue={online.display_name || ''}
-                  placeholder="Shown as the page title"
-                  onBlur={(e) => patch({ display_name: e.target.value.trim() || null })}
-                />
-              </Field>
-              <Field label="Google review link">
-                <input
-                  defaultValue={online.google_review || ''}
-                  placeholder="https://…"
-                  onBlur={(e) => patch({ google_review: e.target.value.trim() || null })}
-                />
-              </Field>
-              <Field label="Instagram">
-                <input
-                  defaultValue={online.instagram || ''}
-                  placeholder="https://instagram.com/…"
-                  onBlur={(e) => patch({ instagram: e.target.value.trim() || null })}
-                />
-              </Field>
-              <Field label="Facebook">
-                <input
-                  defaultValue={online.facebook || ''}
-                  placeholder="https://facebook.com/…"
-                  onBlur={(e) => patch({ facebook: e.target.value.trim() || null })}
-                />
-              </Field>
-            </div>
-            <BackgroundPresets
-              value={online.background_url}
-              onChange={(backgroundUrl) => patch({ background_url: backgroundUrl })}
+          </div>
+          {ORDER_TYPES.map((type) => (
+            <Toggle
+              key={type}
+              label={ORDER_TYPE_LABELS[type]}
+              checked={types.includes(type)}
+              // Последний включённый тип не выключаем — гостю нужен способ заказа
+              disabled={types.length === 1 && types.includes(type)}
+              onChange={() => patch({ order_types: toggleOrderType(types, type) })}
             />
-            <p className="form-hint">
-              The header image is managed from the register under
-              Settings → Service → Online orders.
-            </p>
-          </section>
-        </>
+          ))}
+        </section>
       )}
+
+      <section className="panel form-panel">
+        <div className="panel-heading">
+          <div>
+            <h2>Guest page</h2>
+            <p>How the ordering page introduces the place.</p>
+          </div>
+        </div>
+        <div className="qr-grid">
+          <Field label="Display name">
+            <input
+              defaultValue={online.display_name || ''}
+              placeholder="Shown as the page title"
+              onBlur={(e) => patch({ display_name: e.target.value.trim() || null })}
+            />
+          </Field>
+          <Field label="Google review link">
+            <input
+              defaultValue={online.google_review || ''}
+              placeholder="https://…"
+              onBlur={(e) => patch({ google_review: e.target.value.trim() || null })}
+            />
+          </Field>
+          <Field label="Instagram">
+            <input
+              defaultValue={online.instagram || ''}
+              placeholder="https://instagram.com/…"
+              onBlur={(e) => patch({ instagram: e.target.value.trim() || null })}
+            />
+          </Field>
+          <Field label="Facebook">
+            <input
+              defaultValue={online.facebook || ''}
+              placeholder="https://facebook.com/…"
+              onBlur={(e) => patch({ facebook: e.target.value.trim() || null })}
+            />
+          </Field>
+        </div>
+        <BackgroundPresets
+          value={online.background_url}
+          onChange={(backgroundUrl) => patch({ background_url: backgroundUrl })}
+        />
+        <p className="form-hint">
+          The header image is managed from the register under
+          Settings → Service → Online orders.
+        </p>
+      </section>
 
       <section className="panel form-panel">
         <LinkBlock
