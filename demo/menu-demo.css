@@ -11,7 +11,16 @@
      дочерний слой абсолютный (inset: 0) и padding родителя игнорирует. */
   inset: 0;
   overflow: hidden;
-  background: #ffffff;
+  /* Единый фон-фото под всем сценарием — как html.public-menu-themed
+     в боевом меню: фон живёт на корне демо и проходит под категориями,
+     списком, товаром, корзиной и статусом. Пресет «слоновая кость»
+     (светлый), поэтому UI адаптируется по светлой схеме (карточки/поля
+     белые). */
+  background-color: #eee4cf;
+  background-image: url("../uploads/menu-backgrounds/ivory-food.webp");
+  background-position: center top;
+  background-size: 100% auto;
+  background-repeat: repeat-y;
   color: #101827;
   font-family: "Helvetica Neue", Helvetica, Arial, sans-serif;
   line-height: 1.25;
@@ -26,7 +35,9 @@
      padding-top у самого экрана — он не создаёт границы. */
   inset: 0;
   overflow: hidden;
-  background: #ffffff;
+  /* Прозрачно: фон-фото демо (.angle-menu-demo) должен просвечивать сквозь
+     весь сценарий, как единое полотно в боевом меню. */
+  background: transparent;
 }
 
 
@@ -34,7 +45,7 @@
   position: absolute;
   inset: 0;
   overflow: hidden;
-  background: #ffffff;
+  background: transparent;
 }
 
 .angle-menu-scroll {
@@ -63,7 +74,7 @@
      высоту по долям. С overflow: auto проценты считались бы от содержимого,
      а не от экрана, и доли не работали бы. */
   overflow-y: hidden;
-  background: #ffffff;
+  background: transparent;
 }
 
 .angle-menu-start-content {
@@ -73,11 +84,11 @@
   min-height: 0;
   display: flex;
   flex-direction: column;
-  background: #ffffff;
+  background: transparent;
 }
 
 .angle-menu-start {
-  background: #252525;
+  background: transparent;
 }
 
 .angle-menu-header {
@@ -91,8 +102,12 @@
   display: grid;
   grid-template-columns: 72px 1fr 72px;
   align-items: center;
-  border-bottom: 1px solid #e7e8eb;
-  background: rgba(255,255,255,0.96);
+  /* Светлая адаптация нового меню: полупрозрачно-белая шапка с blur поверх
+     фона-фото — не сплошная белая полоса «отдельного сайта». */
+  border-bottom: 1px solid rgba(17,24,39,0.06);
+  background: rgba(255,255,255,0.82);
+  -webkit-backdrop-filter: blur(12px);
+  backdrop-filter: blur(12px);
   text-align: center;
 }
 
@@ -144,14 +159,14 @@
   font-size: 15px;
 }
 
-/* Шапка демо: бренд ANGLE на месте названия заведения — демо показывает
-   наш продукт, а не конкретную кофейню. */
+/* Hero-заголовок стартового экрана: бренд ANGLE крупной типографикой белым
+   поверх фона-фото (как hero в боевом меню — text-white с тенью), а не
+   тёмным текстом на белой шапке. Демо показывает наш продукт, а не
+   конкретную кофейню. */
 .angle-menu-brand {
   flex: 0 0 auto;
-  /* Высота как у .angle-menu-header (45px) — стартовый экран начинается
-     на том же уровне, что и остальные. */
-  min-height: 45px;
-  padding: 0 12px;
+  min-height: 56px;
+  padding: 14px 12px 8px;
   box-sizing: border-box;
   display: flex;
   align-items: center;
@@ -161,10 +176,11 @@
 }
 
 .angle-menu-brand span {
-  font-size: 18px;
+  font-size: 28px;
   font-weight: 900;
-  letter-spacing: 0.04em;
-  color: #101827;
+  letter-spacing: -0.01em;
+  color: #ffffff;
+  text-shadow: 0 2px 12px rgba(0,0,0,0.5), 0 1px 2px rgba(0,0,0,0.5);
 }
 
 .angle-menu-categories {
@@ -186,19 +202,27 @@
   min-height: 0;
   padding: 0;
   overflow: hidden;
-  border: 1px solid #e3e4e7;
-  border-radius: 8px;
-  background: #f4f4f5;
+  appearance: none;
+  -webkit-appearance: none;
+  border: 0;
+  /* Плитки лежат прямо на фоне-фото: только мягкая тень, без рамки —
+     как rounded-2xl shadow-sm в боевом меню. */
+  box-shadow: 0 1px 3px rgba(16,24,39,0.12);
+  border-radius: 14px;
+  background: #e5e7eb;
   color: #ffffff;
   cursor: pointer;
 }
 
 .angle-category-card img {
+  /* object-fit: cover без scale — фото товара (на своём светло-сером
+     градиенте) заполняет карточку целиком, поэтому тёмных краёв за
+     скруглением нет. Раньше object-fit: contain + scale(1.05) выпячивал
+     градиентный фон картинки и по периметру читался как тёмная рамка. */
   width: 100%;
   height: 100%;
   display: block;
-  object-fit: contain;
-  transform: scale(1.05);
+  object-fit: cover;
 }
 
 .angle-category-card::after {
@@ -224,24 +248,18 @@
 .angle-menu-footer {
   position: relative;
   z-index: 1;
-  /* Подвал доходит до скруглённой маски экрана с небольшим запасом.
-     Односторонние тени закрывают субпиксельные белые каёмки по бокам и
-     снизу, не заходя сверху на последний ряд карточек. */
-  flex: 0 0 24%;
-  padding: 13px;
+  /* Новый подвал: действия стоят прямо на общем фоне-фото, без отдельной
+     тёмной полосы. Контраст даёт собственная подложка каждой кнопки
+     (bg-black/75). */
+  flex: 0 0 auto;
+  padding: 16px 13px 20px;
   display: flex;
   flex-direction: column;
   align-items: center;
   justify-content: center;
-  gap: 9px;
-  background: #252525;
+  gap: 10px;
+  background: transparent;
   color: #ffffff;
-  box-shadow:
-    -4px 0 0 #252525,
-    4px 0 0 #252525,
-    -4px 4px 0 #252525,
-    0 4px 0 #252525,
-    4px 4px 0 #252525;
 }
 
 .angle-menu-socials {
@@ -252,13 +270,16 @@
 
 .angle-menu-socials > span {
   position: relative;
-  width: 27px;
-  height: 27px;
+  width: 32px;
+  height: 32px;
   display: flex;
   align-items: center;
   justify-content: center;
   border-radius: 50%;
-  background: #3c3c3c;
+  /* Собственная тёмная подложка кнопки поверх фона — как iconBtn
+     (bg-black/75 ring-white/15) в боевом SocialFooter. */
+  background: rgba(0,0,0,0.75);
+  box-shadow: inset 0 0 0 1px rgba(255,255,255,0.15), 0 6px 16px rgba(0,0,0,0.25);
   color: #ffffff;
 }
 
@@ -285,14 +306,18 @@
 }
 
 .angle-menu-review {
-  min-height: 25px;
-  padding: 0 13px;
+  min-height: 30px;
+  padding: 0 15px;
   display: inline-flex;
   align-items: center;
   justify-content: center;
   border-radius: 999px;
-  background: #3c3c3c;
-  font-size: 7px;
+  /* Та же тёмная подложка на фоне, что у кнопок соцсетей (google_review
+     в боевом SocialFooter — bg-black/75 ring-white/15). */
+  background: rgba(0,0,0,0.75);
+  box-shadow: inset 0 0 0 1px rgba(255,255,255,0.15), 0 6px 16px rgba(0,0,0,0.25);
+  color: #ffffff;
+  font-size: 8px;
   font-weight: 750;
 }
 
@@ -305,8 +330,10 @@
   display: flex;
   gap: 6px;
   overflow-x: auto;
-  border-bottom: 1px solid #ececef;
-  background: rgba(255,255,255,0.97);
+  border-bottom: 1px solid rgba(17,24,39,0.06);
+  background: rgba(255,255,255,0.82);
+  -webkit-backdrop-filter: blur(12px);
+  backdrop-filter: blur(12px);
   scrollbar-width: none;
 }
 
@@ -713,7 +740,9 @@
   flex-direction: column;
   align-items: center;
   justify-content: center;
-  background: #ffffff;
+  /* Экран статуса живёт на общем фоне-фото, как в боевом меню (CenterCard
+     без своей заливки) — не белой плашкой поверх фона. */
+  background: transparent;
   text-align: center;
 }
 

@@ -142,6 +142,10 @@
     .iphone17-screen { position:relative; height:100%; overflow:hidden; border-radius:39px; background:#252525; color:#171717; }
     .iphone17-island { position:absolute; z-index:15; top:9px; left:50%; width:72px; height:20px; transform:translateX(-50%); border-radius:999px; background:#080808; }
     .iphone17-status { position:relative; z-index:14; background:#FFFFFF; height:38px; padding:0 8px; box-sizing:border-box; display:grid; grid-template-columns:minmax(0,1fr) 72px minmax(0,1fr); direction:ltr; align-items:center; color:#10131A; font-size:10px; font-weight:700; line-height:1; }
+    /* QR-меню: единый фон-фото проходит под статус-баром и Dynamic Island,
+       как на canvas документа в боевом меню. Статус-бар прозрачный, его текст
+       остаётся тёмным — читается на светлом пресете. */
+    .iphone17.is-menu .iphone17-status { background:transparent; }
     .iphone17-status-left, .iphone17-status-right { display:flex; align-items:center; }
     .iphone17-status-left { grid-column:1; justify-self:center; gap:4px; font-size:12px; font-weight:750; font-variant-numeric:tabular-nums; }
     .iphone17-status-right { grid-column:3; justify-self:center; gap:5px; }
