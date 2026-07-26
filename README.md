@@ -26,12 +26,20 @@ VITE_SUPABASE_ANON_KEY=your-public-anon-key
 ```
 
 Before publishing `/account/`, deploy Kassa migrations
-`088_backoffice_memberships.sql` and `089_sales_report_backoffice.sql`. The
-Kassa frontend must keep `MIN_SCHEMA_VERSION = 91`. The release order is:
+`088_backoffice_memberships.sql` and `089_sales_report_backoffice.sql`.
+The capability-driven navigation and product cards additionally require
+migrations through `105` (product registry, secure provisioning and
+capability gates; see `docs/standalone-products.md` in the Kassa repo).
+The release order is:
 
-1. Supabase migrations through `091`.
-2. Kassa frontend built against schema `91`.
+1. Supabase migrations through `105`.
+2. Kassa frontend built against the same schema version.
 3. ANGLE website and owner back office.
+
+Products are activated manually by the operator (`grant_org_product` under
+service_role); the back office only files activation requests. An
+organisation without active products lands on the Pending activation
+screen instead of the operational sections.
 
 The Settings screen writes via `patch_location_settings_web` (migration `091`):
 the owner picks a location explicitly and membership stands in for the POS PIN.
