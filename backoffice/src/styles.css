@@ -542,6 +542,22 @@ a { color: inherit; }
 .form-hint { margin: 14px 0 0; color: #777b83; font-size: 12px; }
 .save-ok.inline { margin: 0 0 4px; }
 
+/* Hero-видео витрины: загрузка файла первым экраном, ссылка — под спойлером.
+   Превью в пропорции 9:16, как реальная гостевая страница на телефоне. */
+.hero-video-field { margin-top: 24px; padding-top: 20px; border-top: 1px solid #eef0f2; }
+.hero-video-head h3 { margin: 0; color: #1b1e24; font-size: 15px; }
+.hero-video-head p { margin: 4px 0 0; color: #777b83; font-size: 12px; }
+.hero-video-preview {
+  display: block; width: 100%; max-width: 200px; aspect-ratio: 9 / 16;
+  margin: 14px 0 0; border-radius: 12px; border: 1px solid #e0e2e6;
+  background: #14161a; object-fit: cover;
+}
+.hero-video-field .photo-row { margin-top: 14px; }
+.file-button.is-busy { opacity: 0.6; cursor: progress; }
+.hero-video-error { margin: 10px 0 0; color: #b42318; font-size: 12px; }
+.hero-video-link-toggle { margin-top: 10px; }
+.hero-video-link { margin-top: 4px; max-width: 420px; }
+
 /* Фоны публичного QR-меню: компактная галерея фиксированных пресетов.
    Кнопка — один цельный вариант, превью имеет стабильные пропорции и не
    меняет высоту панели при выборе. */

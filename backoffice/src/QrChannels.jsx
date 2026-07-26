@@ -7,6 +7,7 @@ import {
   ONLINE_BACKGROUND_PRESETS,
   onlineEnabled, orderTypes, toggleOrderType, saveOnlineOrders,
   reservationsEnabled, saveReservations,
+  uploadHeroVideo,
   orderUrl, tableOrderUrl, reserveUrl,
   embedButtonSnippet, embedIframeSnippet,
   agorotToInput, inputToAgorot,
@@ -288,6 +289,102 @@ function BackgroundPresets({ value, onChange }) {
   )
 }
 
+/**
+ * Hero-видео витрины: загрузка файла с компьютера — основной сценарий,
+ * прямая ссылка остаётся дополнительным (ролик уже лежит на своём CDN).
+ *
+ * Паритет с кассой (Настройки → Обслуживание → Онлайн-заказы): те же
+ * форматы, тот же лимит и тот же бакет, поэтому владельцу неважно, откуда
+ * он загрузил ролик — на витрине результат одинаковый.
+ */
+function HeroVideoField({ context, url, onChange }) {
+  const [uploading, setUploading] = useState(false)
+  const [error, setError] = useState('')
+  const [linkOpen, setLinkOpen] = useState(false)
+
+  async function onFile(event) {
+    const file = event.target.files?.[0]
+    event.target.value = ''          // тот же файл можно выбрать повторно
+    if (!file) return
+    setUploading(true)
+    setError('')
+    try {
+      onChange(await uploadHeroVideo(context, file))
+    } catch (e) {
+      setError(e.message)
+    } finally {
+      setUploading(false)
+    }
+  }
+
+  return (
+    <div className="hero-video-field">
+      <div className="hero-video-head">
+        <div>
+          <h3>Hero video</h3>
+          <p>Plays muted and loops at the top of the guest menu.</p>
+        </div>
+      </div>
+
+      {url && (
+        <video
+          key={url}
+          className="hero-video-preview"
+          src={url}
+          muted
+          loop
+          playsInline
+          controls
+          preload="metadata"
+        />
+      )}
+
+      <div className="photo-row">
+        <label className={`file-button${uploading ? ' is-busy' : ''}`}>
+          {uploading ? 'Uploading…' : url ? 'Replace video' : 'Upload video'}
+          <input
+            type="file"
+            accept="video/mp4,video/webm"
+            onChange={onFile}
+            hidden
+            disabled={uploading}
+          />
+        </label>
+        {url && !uploading && (
+          <button type="button" className="secondary-button" onClick={() => onChange(null)}>
+            Remove
+          </button>
+        )}
+        <span className="hint">MP4 · WebM · up to 30 MB</span>
+      </div>
+
+      {error && <p className="hero-video-error">{error}</p>}
+
+      <button
+        type="button"
+        className="text-button hero-video-link-toggle"
+        onClick={() => setLinkOpen((open) => !open)}
+      >
+        {linkOpen ? 'Hide link option' : 'Use a link instead'}
+      </button>
+      {linkOpen && (
+        <label className="qr-field hero-video-link">
+          <span>Video URL</span>
+          {/* key по url: поле неуправляемое, иначе после загрузки файла
+              в нём осталась бы прежняя ссылка. */}
+          <input
+            key={url || ''}
+            defaultValue={url || ''}
+            placeholder="https://cdn.example.com/hero.mp4"
+            onBlur={(e) => onChange(e.target.value.trim() || null)}
+          />
+          <small>Direct MP4 or WebM URL. The register header image is used as its poster.</small>
+        </label>
+      )}
+    </div>
+  )
+}
+
 function GuestPreview({ url }) {
   const [previewKey, setPreviewKey] = useState(0)
 
@@ -323,7 +420,7 @@ function GuestPreview({ url }) {
 
 // ── Онлайн-заказы ────────────────────────────────────────────
 
-function OnlineTab({ locationId, settings, tables, patch, slug, onSlugSaved }) {
+function OnlineTab({ context, locationId, settings, tables, patch, slug, onSlugSaved }) {
   const enabled = onlineEnabled(settings)
   const types = orderTypes(settings)
   const online = settings.online_orders || {}
@@ -398,15 +495,12 @@ function OnlineTab({ locationId, settings, tables, patch, slug, onSlugSaved }) {
               onBlur={(e) => patch({ facebook: e.target.value.trim() || null })}
             />
           </Field>
-          <Field label="Hero video URL">
-            <input
-              defaultValue={online.hero_video_url || ''}
-              placeholder="https://cdn.example.com/hero.mp4"
-              onBlur={(e) => patch({ hero_video_url: e.target.value.trim() || null })}
-            />
-            <small>Direct MP4 or WebM URL. It plays muted and loops; the register header image is used as its poster.</small>
-          </Field>
         </div>
+        <HeroVideoField
+          context={context}
+          url={online.hero_video_url || null}
+          onChange={(videoUrl) => patch({ hero_video_url: videoUrl })}
+        />
         <BackgroundPresets
           value={online.background_url}
           onChange={(backgroundUrl) => patch({ background_url: backgroundUrl })}
@@ -830,6 +924,7 @@ export default function QrChannels({ context }) {
         // пересоздания они сохранили бы значения предыдущей точки.
         <OnlineTab
           key={activeId}
+          context={context}
           locationId={activeId}
           settings={settings}
           tables={tables}

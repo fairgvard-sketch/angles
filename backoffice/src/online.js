@@ -1,3 +1,4 @@
+import { supabase } from './supabase'
 import { patchLocationSettings } from './settings'
 
 /**
@@ -183,6 +184,40 @@ export function toggleOrderType(current, type) {
 
 export async function saveOnlineOrders(locationId, patch) {
   return patchLocationSettings(locationId, { online_orders: patch })
+}
+
+// ── Hero-видео витрины ───────────────────────────────────────
+
+/**
+ * Ограничения совпадают с кассой (OnlineOrdersDetail): браузер ничего не
+ * перекодирует, поэтому принимаем только форматы, которые одинаково играют
+ * на iOS и Android. MOV с камеры сначала экспортируют в MP4.
+ */
+export const HERO_VIDEO_TYPES = { 'video/mp4': 'mp4', 'video/webm': 'webm' }
+export const HERO_VIDEO_MAX_BYTES = 30 * 1024 * 1024
+
+/**
+ * Загрузка ролика в тот же бакет menu-images, что и фото товара (007):
+ * политика insert проверяет папку {org_id}, которая берётся из JWT, поэтому
+ * веб-кабинету не нужны ни новая миграция, ни отдельные права. Имя файла
+ * уникально → кэшируем на год.
+ */
+export async function uploadHeroVideo(context, file) {
+  const org = context?.organization?.id
+  if (!org) throw new Error('No organization in session')
+
+  const ext = HERO_VIDEO_TYPES[file.type]
+  if (!ext) throw new Error('Only MP4 and WebM videos are supported')
+  if (file.size > HERO_VIDEO_MAX_BYTES) throw new Error('Video must be 30 MB or smaller')
+
+  const path = `${org}/hero-videos/${crypto.randomUUID()}.${ext}`
+  const { error } = await supabase.storage.from('menu-images').upload(path, file, {
+    cacheControl: '31536000',
+    contentType: file.type,
+    upsert: false,
+  })
+  if (error) throw new Error(error.message)
+  return supabase.storage.from('menu-images').getPublicUrl(path).data.publicUrl
 }
 
 // ── Бронирование ─────────────────────────────────────────────
