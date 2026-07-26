@@ -46,32 +46,58 @@ const navigation = [
   { id: 'integrations', label: 'Integrations', icon: CreditCard },
 ]
 
-// ── Продуктовые модули (100) ─────────────────────────────────
+// ── Продукты и capabilities (100/103/105) ────────────────────
 /**
- * Навигация отражает купленные модули: menu-only клиент не видит смены,
- * кассу, PIN-ы и девайсы (продуктовое требование standalone-модулей).
- * Это только видимость — авторизация остаётся на сервере (RLS + RPC).
- * Контекст без поля products (функция до миграции 100) = показать всё.
+ * Навигация строится из ЭФФЕКТИВНЫХ capabilities контекста (105), а не из
+ * сырого ключа продукта: ANGLE Orders даёт публичное меню без покупки Menu,
+ * поэтому раздел каталога виден по catalog_manage, а не по products.
+ * Это только видимость — авторизация остаётся на сервере (RLS + RPC-гейты,
+ * module_disabled). Контекст без поля capabilities (функция до 105) —
+ * фолбэк на прежнюю продуктовую логику.
  */
 export function hasProduct(products, product) {
   return !Array.isArray(products) || products.includes(product)
 }
 
-export function visibleNavigation(products) {
-  if (!Array.isArray(products)) return navigation
-  const has = (p) => products.includes(p)
-  const pos = has('pos')
+export function hasCapability(context, capability) {
+  const caps = context?.capabilities
+  if (!Array.isArray(caps)) {
+    // Старый контекст: приближение по продуктам (как до 105)
+    const products = context?.products
+    if (!Array.isArray(products)) return true
+    const has = (p) => products.includes(p)
+    switch (capability) {
+      case 'catalog_manage': return has('pos') || has('menu') || has('online_orders')
+      case 'public_menu': return has('menu') || has('online_orders')
+      case 'online_orders':
+      case 'orders_desk': return has('online_orders')
+      case 'public_reservations':
+      case 'reservations_desk': return has('reservations')
+      default: return has('pos')
+    }
+  }
+  return caps.includes(capability)
+}
+
+export function visibleNavigation(context) {
+  const products = context?.products
+  if (!Array.isArray(products) && !Array.isArray(context?.capabilities)) return navigation
+  const can = (c) => hasCapability(context, c)
   return navigation.filter(({ id }) => {
     if (id === 'overview' || id === 'locations') return true
-    if (id === 'menu') return pos || has('menu')
-    if (id === 'online') return pos || has('menu') || has('online_orders') || has('reservations')
-    // Инбокс заказов (101): любой организации с модулем online_orders —
-    // pos-точки видят его read-only, их цикл живёт на кассе.
-    if (id === 'orders') return has('online_orders')
-    // Веб-стол хостес (102): модуль reservations, работает и у POS-точек
-    if (id === 'reservations') return has('reservations')
-    // sales/activity/team/devices/reports/integrations — POS-контур
-    return pos
+    if (id === 'menu') return can('catalog_manage')
+    if (id === 'online') {
+      return can('public_menu') || can('online_orders')
+        || can('public_reservations') || can('reservations_desk')
+    }
+    // Инбокс заказов (101): capability orders_desk — pos-точки видят его
+    // read-only, их цикл живёт на кассе.
+    if (id === 'orders') return can('orders_desk')
+    // Веб-стол хостес (102): reservations_desk, работает и у POS-точек
+    if (id === 'reservations') return can('reservations_desk')
+    if (id === 'sales') return can('pos_reports')
+    // activity/team/devices/reports/integrations — POS-контур
+    return can('pos_operate')
   })
 }
 
@@ -332,9 +358,12 @@ function Stat({ label, value, detail, icon: Icon }) {
 }
 
 /**
- * Карточка модулей (100): активные продукты организации и доступные
- * add-on'ы. Биллинга нет — включение через оператора (MVP ручного
- * провижионинга); карточка информирует, но ничего не блокирует.
+ * Карточка продуктов (100/104/105): жизненный цикл каждой карточки —
+ * Active / Developer / Included with ANGLE Orders / Pending activation /
+ * Available as add-on. Биллинга нет: «запросить» создаёт заявку
+ * (request_product_activation), активирует оператор ANGLE. Карточка —
+ * маркетинг/UX-состояние; настоящие запреты живут на сервере
+ * (module_disabled).
  */
 const PRODUCT_META = [
   { id: 'menu', label: 'ANGLE Menu', detail: 'QR menu for phones and your website' },
@@ -343,35 +372,105 @@ const PRODUCT_META = [
   { id: 'pos', label: 'ANGLE POS', detail: 'The register, shifts and receipts' },
 ]
 
-function ProductsCard({ products }) {
-  if (!Array.isArray(products)) return null
+export function productState(context, productId) {
+  const products = Array.isArray(context?.products) ? context.products : []
+  const requests = Array.isArray(context?.product_requests) ? context.product_requests : []
+  const sources = context?.product_sources || {}
+  if (products.includes(productId)) {
+    return sources[productId] === 'developer' ? 'developer' : 'active'
+  }
+  // Orders включает публичное меню технически — вторая покупка не нужна
+  if (productId === 'menu' && products.includes('online_orders')) return 'included'
+  if (requests.includes(productId)) return 'pending'
+  return 'addon'
+}
+
+function ProductRow({ context, product, onReloadContext }) {
+  const [busy, setBusy] = useState(false)
+  const [error, setError] = useState('')
+  const state = productState(context, product.id)
+
+  async function requestActivation() {
+    setBusy(true)
+    setError('')
+    const { error: rpcError } = await supabase.rpc('request_product_activation', {
+      p_product: product.id,
+    })
+    if (rpcError) {
+      setError(rpcError.message)
+      setBusy(false)
+      return
+    }
+    await onReloadContext?.()
+    setBusy(false)
+  }
+
+  const isOn = state === 'active' || state === 'developer' || state === 'included'
+  return (
+    <div className={`product-row ${isOn ? 'is-active' : ''}`}>
+      <span>
+        <strong>{product.label}</strong>
+        <small>{product.detail}</small>
+        {error && <small className="form-error">{error}</small>}
+      </span>
+      {state === 'active' && <span className="status"><i /> Active</span>}
+      {state === 'developer' && <span className="status status-developer"><i /> Developer</span>}
+      {state === 'included' && <span className="status">Included with ANGLE Orders</span>}
+      {state === 'pending' && <span className="status status-pending"><i /> Pending activation</span>}
+      {state === 'addon' && (
+        <button className="text-button" onClick={requestActivation} disabled={busy}>
+          {busy ? 'Requesting…' : 'Available as add-on — request'}
+        </button>
+      )}
+    </div>
+  )
+}
+
+function ProductsCard({ context, onReloadContext }) {
+  if (!Array.isArray(context?.products)) return null
   return (
     <section className="panel form-panel">
       <div className="panel-heading">
         <div><h2>Your products</h2><p>Modules enabled for this organisation. Everything shares one catalogue and account.</p></div>
       </div>
       <div className="product-list">
-        {PRODUCT_META.map((product) => {
-          const active = products.includes(product.id)
-          return (
-            <div className={`product-row ${active ? 'is-active' : ''}`} key={product.id}>
-              <span><strong>{product.label}</strong><small>{product.detail}</small></span>
-              {active
-                ? <span className="status"><i /> Active</span>
-                : <a className="text-button" href="/#contact">Enable</a>}
-            </div>
-          )
-        })}
+        {PRODUCT_META.map((product) => (
+          <ProductRow key={product.id} context={context} product={product} onReloadContext={onReloadContext} />
+        ))}
       </div>
     </section>
   )
 }
 
-function Overview({ context, onNavigate }) {
+/**
+ * Стабильный экран «Choose a product / Pending activation» (104):
+ * организация без активного продукта — валидное состояние (заявка ждёт
+ * оператора), а не сломанный кабинет. Операционные разделы не рендерим.
+ */
+function ActivationHome({ context, onReloadContext }) {
+  const requests = Array.isArray(context?.product_requests) ? context.product_requests : []
+  return (
+    <>
+      <section className="page-heading">
+        <p className="eyebrow">YOUR BUSINESS</p>
+        <h1>{context.organization?.name || 'ANGLE business'}</h1>
+        <p>
+          {requests.length > 0
+            ? 'Your workspace is ready. The ANGLE team is activating your products — this usually takes less than a business day.'
+            : 'Your workspace is ready. Choose a product to get started.'}
+        </p>
+      </section>
+      <ProductsCard context={context} onReloadContext={onReloadContext} />
+    </>
+  )
+}
+
+function Overview({ context, onNavigate, onReloadContext }) {
   const counts = context.counts || {}
   const locations = context.locations || []
-  // Модули (100): menu-only клиенту не показываем staff/девайсы/кассу.
-  const pos = hasProduct(context.products, 'pos')
+  // Capabilities (105): menu-only клиенту не показываем staff/девайсы/кассу.
+  const pos = hasCapability(context, 'pos_operate')
+  const catalog = hasCapability(context, 'catalog_manage')
   return (
     <>
       <section className="page-heading">
@@ -410,15 +509,15 @@ function Overview({ context, onNavigate }) {
         <section className="panel quick-panel">
           <div className="panel-heading"><div><h2>Quick access</h2><p>Common owner tasks.</p></div></div>
           <div className="quick-list">
-            {pos && <button onClick={() => onNavigate('sales')}><BarChart3 /><span><strong>Sales overview</strong><small>Revenue, orders and top items</small></span><ChevronRight /></button>}
-            <button onClick={() => onNavigate('menu')}><MenuIcon /><span><strong>Menu & catalogue</strong><small>Prices, items and modifiers</small></span><ChevronRight /></button>
+            {hasCapability(context, 'pos_reports') && <button onClick={() => onNavigate('sales')}><BarChart3 /><span><strong>Sales overview</strong><small>Revenue, orders and top items</small></span><ChevronRight /></button>}
+            {catalog && <button onClick={() => onNavigate('menu')}><MenuIcon /><span><strong>Menu & catalogue</strong><small>Prices, items and modifiers</small></span><ChevronRight /></button>}
             <button onClick={() => onNavigate('online')}><QrCode /><span><strong>Online channels</strong><small>QR menu and reservations</small></span><ChevronRight /></button>
             {pos && <button onClick={() => onNavigate('team')}><Users /><span><strong>Team access</strong><small>Roles, PINs and permissions</small></span><ChevronRight /></button>}
           </div>
         </section>
       </div>
 
-      <ProductsCard products={context.products} />
+      <ProductsCard context={context} onReloadContext={onReloadContext} />
 
       {pos && <ActivityCard onNavigate={onNavigate} />}
     </>
@@ -474,13 +573,19 @@ function AccountSettingsPage({ email, onSignOut }) {
   )
 }
 
-function Dashboard({ session, context }) {
+function Dashboard({ session, context, onReloadContext }) {
   const [active, setActive] = useState('overview')
   const [drawer, setDrawer] = useState(false)
-  // Модули (100): скрытая секция недостижима и из state (например, после
-  // перезагрузки контекста) — молча возвращаем на Home.
-  const nav = visibleNavigation(context.products)
+  // Организация без активного продукта (104): стабильный экран выбора/
+  // ожидания активации вместо пустых операционных разделов.
+  const noProducts = Array.isArray(context.products) && context.products.length === 0
+  // Capabilities (105): скрытая секция недостижима и из state (например,
+  // после перезагрузки контекста) — молча возвращаем на Home.
+  const nav = noProducts
+    ? navigation.filter(({ id }) => id === 'overview')
+    : visibleNavigation(context)
   const activeSection = active === 'settings' || nav.some((item) => item.id === active) ? active : 'overview'
+  const isDeveloper = context.account_type === 'developer'
 
   // Полноэкранное меню открыто — фон под ним не скроллится
   useEffect(() => {
@@ -500,10 +605,16 @@ function Dashboard({ session, context }) {
       <div className="app-main">
         <header className="topbar">
           <button className="icon-button mobile-menu" onClick={() => setDrawer(true)} aria-label="Open navigation"><MenuIcon /></button>
-          <div className="topbar-context"><span>{context.organization?.name}</span><small>{context.member?.role}</small></div>
+          <div className="topbar-context">
+            <span>{context.organization?.name}</span>
+            <small>{context.member?.role}</small>
+            {isDeveloper && <span className="developer-badge">Developer workspace</span>}
+          </div>
         </header>
         <main className="content">
-          {activeSection === 'overview' && <Overview context={context} onNavigate={setActive} />}
+          {activeSection === 'overview' && (noProducts
+            ? <ActivationHome context={context} onReloadContext={onReloadContext} />
+            : <Overview context={context} onNavigate={setActive} onReloadContext={onReloadContext} />)}
           {activeSection === 'orders' && <OrdersInbox context={context} />}
           {activeSection === 'reservations' && <ReservationsDesk context={context} />}
           {activeSection === 'sales' && <SalesOverview organizationName={context.organization?.name} />}
@@ -603,7 +714,7 @@ export default function App() {
     // Без организации в JWT — digital-only онбординг (100), не AccessDenied.
     if (!session.user?.app_metadata?.org_id) return <Onboarding email={session.user.email} />
     if (!context) return <AccessDenied message={contextError} />
-    return <Dashboard session={session} context={context} />
+    return <Dashboard session={session} context={context} onReloadContext={() => loadContext(session)} />
   }, [session, context, loading, contextError])
 
   return content
