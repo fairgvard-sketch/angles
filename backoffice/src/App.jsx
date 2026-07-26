@@ -331,6 +331,42 @@ function Stat({ label, value, detail, icon: Icon }) {
   )
 }
 
+/**
+ * Карточка модулей (100): активные продукты организации и доступные
+ * add-on'ы. Биллинга нет — включение через оператора (MVP ручного
+ * провижионинга); карточка информирует, но ничего не блокирует.
+ */
+const PRODUCT_META = [
+  { id: 'menu', label: 'ANGLE Menu', detail: 'QR menu for phones and your website' },
+  { id: 'online_orders', label: 'ANGLE Orders', detail: 'Online orders without a register' },
+  { id: 'reservations', label: 'ANGLE Reserve', detail: 'Table bookings and host desk' },
+  { id: 'pos', label: 'ANGLE POS', detail: 'The register, shifts and receipts' },
+]
+
+function ProductsCard({ products }) {
+  if (!Array.isArray(products)) return null
+  return (
+    <section className="panel form-panel">
+      <div className="panel-heading">
+        <div><h2>Your products</h2><p>Modules enabled for this organisation. Everything shares one catalogue and account.</p></div>
+      </div>
+      <div className="product-list">
+        {PRODUCT_META.map((product) => {
+          const active = products.includes(product.id)
+          return (
+            <div className={`product-row ${active ? 'is-active' : ''}`} key={product.id}>
+              <span><strong>{product.label}</strong><small>{product.detail}</small></span>
+              {active
+                ? <span className="status"><i /> Active</span>
+                : <a className="text-button" href="/#contact">Enable</a>}
+            </div>
+          )
+        })}
+      </div>
+    </section>
+  )
+}
+
 function Overview({ context, onNavigate }) {
   const counts = context.counts || {}
   const locations = context.locations || []
@@ -381,6 +417,8 @@ function Overview({ context, onNavigate }) {
           </div>
         </section>
       </div>
+
+      <ProductsCard products={context.products} />
 
       {pos && <ActivityCard onNavigate={onNavigate} />}
     </>
