@@ -8,6 +8,7 @@ import {
   onlineEnabled, orderTypes, toggleOrderType, saveOnlineOrders,
   reservationsEnabled, saveReservations,
   orderUrl, tableOrderUrl, reserveUrl,
+  embedButtonSnippet, embedIframeSnippet,
   agorotToInput, inputToAgorot,
 } from './online'
 
@@ -26,6 +27,48 @@ const TABS = [
   { key: 'online', label: 'Online orders' },
   { key: 'reserve', label: 'Reservations' },
 ]
+
+/**
+ * Готовый HTML-сниппет для сайта ресторана: readonly-код + копирование.
+ * Тот же паттерн копирования, что LinkBlock; QR здесь не нужен.
+ */
+function SnippetBlock({ title, hint, code }) {
+  const [copyState, setCopyState] = useState('idle')
+
+  async function copy() {
+    try {
+      await navigator.clipboard.writeText(code)
+      setCopyState('copied')
+      setTimeout(() => setCopyState('idle'), 2000)
+    } catch {
+      setCopyState('failed')
+    }
+  }
+
+  return (
+    <div className="qr-block-text snippet-block">
+      <h3>{title}</h3>
+      <p>{hint}</p>
+      <div className="qr-field">
+        <textarea
+          value={code}
+          readOnly
+          rows={code.split('\n').length}
+          spellCheck={false}
+          onFocus={(e) => e.target.select()}
+        />
+      </div>
+      <div className="qr-actions">
+        <button type="button" className="secondary-button" onClick={copy}>
+          {copyState === 'copied' ? <><Check /> Copied</> : <><Copy /> Copy code</>}
+        </button>
+      </div>
+      {copyState === 'failed' && (
+        <p className="qr-copy-error" role="alert">Copy was blocked. Select the code above and copy it manually.</p>
+      )}
+    </div>
+  )
+}
 
 /** QR + ссылка с копированием, открытием и скачиванием PNG. */
 function LinkBlock({ url, hint, title = 'Guest link' }) {
@@ -312,6 +355,25 @@ function OnlineTab({ locationId, settings, tables, patch }) {
           url={orderUrl(locationId)}
           title="Counter QR"
           hint="Put this on a QR code at the counter or behind the till."
+        />
+      </section>
+
+      <section className="panel form-panel">
+        <div className="panel-heading">
+          <div>
+            <h2>Website embed</h2>
+            <p>Put the live menu on your own website — a button or the menu itself.</p>
+          </div>
+        </div>
+        <SnippetBlock
+          title="Menu button"
+          hint="A plain link styled as a button. Works in any site builder — paste it into an HTML block."
+          code={embedButtonSnippet(locationId)}
+        />
+        <SnippetBlock
+          title="Embedded menu (iframe)"
+          hint="The menu inside your page. Responsive up to 480px wide; menu edits appear automatically."
+          code={embedIframeSnippet(locationId)}
         />
       </section>
 

@@ -591,3 +591,38 @@ a { color: inherit; }
   .guest-preview-actions .secondary-button { flex: 1 1 0; }
   .guest-phone-frame { height: 620px; border-width: 7px; border-radius: 25px; }
 }
+
+/* Website embed: HTML-сниппеты для сайта ресторана (QrChannels).
+   Код — моноширинный, без переноса строк; скролл вместо резайза. */
+.snippet-block { margin-top: 18px; }
+.snippet-block textarea {
+  width: 100%;
+  font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+  font-size: 13px;
+  line-height: 1.5;
+  white-space: pre;
+  overflow-x: auto;
+  resize: none;
+  background: #f7f8f9;
+  color: #3c4148;
+}
+
+/* Онбординг digital-only аккаунта: карточки цели + форма названий. */
+.goal-grid { display: grid; gap: 12px; margin: 20px 0; }
+.goal-card {
+  display: flex; align-items: flex-start; gap: 14px; text-align: start;
+  padding: 16px; border: 1px solid #c7cad0; border-radius: 10px;
+  background: #fff; cursor: pointer; font: inherit;
+}
+.goal-card.is-selected { border-color: #16181d; box-shadow: 0 0 0 2px rgb(22 24 29 / 12%); }
+.goal-card:disabled { cursor: default; opacity: 0.65; }
+.goal-card strong { display: block; font-size: 16px; color: #111317; }
+.goal-card small { display: block; margin-top: 4px; color: #5d626b; font-size: 13px; line-height: 1.45; }
+.goal-check {
+  flex: 0 0 auto; width: 22px; height: 22px; margin-top: 2px;
+  border: 2px solid #c7cad0; border-radius: 6px;
+  display: inline-flex; align-items: center; justify-content: center;
+  color: #fff; background: #fff;
+}
+.goal-card.is-selected .goal-check { background: #16181d; border-color: #16181d; }
+.goal-check svg { width: 14px; height: 14px; }

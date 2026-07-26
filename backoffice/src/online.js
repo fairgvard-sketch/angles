@@ -108,6 +108,38 @@ export function reserveUrl(locationId) {
   return `${POS_ORIGIN}/reserve/${locationId}`
 }
 
+// ── Встраивание меню в сайт ресторана ────────────────────────
+/**
+ * source=website — канал заказа «сайт» (касса различает каналы в
+ * orderContext). Гостевые маршруты /order/* отдают
+ * Content-Security-Policy: frame-ancestors * (vercel.json кассы),
+ * поэтому iframe работает на любом домене ресторана.
+ */
+export function websiteMenuUrl(locationId) {
+  return `${POS_ORIGIN}/order/${locationId}?source=website`
+}
+
+/** Кнопка «Открыть меню» для сайта ресторана: обычная ссылка, без JS. */
+export function embedButtonSnippet(locationId) {
+  return [
+    `<a href="${websiteMenuUrl(locationId)}" target="_blank" rel="noopener"`,
+    '   style="display:inline-block;padding:14px 28px;border-radius:12px;',
+    '          background:#16181d;color:#fff;font:600 16px/1 sans-serif;',
+    '          text-decoration:none">Open menu</a>',
+  ].join('\n')
+}
+
+/** Адаптивный iframe: меню внутри страницы ресторана, высота под мобильный сценарий. */
+export function embedIframeSnippet(locationId) {
+  return [
+    `<iframe src="${websiteMenuUrl(locationId)}"`,
+    '        title="Menu"',
+    '        style="width:100%;max-width:480px;height:720px;border:0;',
+    '               border-radius:16px;box-shadow:0 4px 24px rgb(0 0 0 / 12%)"',
+    '        loading="lazy"></iframe>',
+  ].join('\n')
+}
+
 // ── Онлайн-заказы ────────────────────────────────────────────
 
 export const ORDER_TYPES = ['here', 'takeaway', 'delivery']
