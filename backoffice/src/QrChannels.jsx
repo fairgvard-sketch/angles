@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from 'react'
-import { Check, Copy, Store } from 'lucide-react'
+import { Check, Copy, Download, ExternalLink, RefreshCw, Smartphone, Store } from 'lucide-react'
 import QRCode from 'qrcode'
 import { fetchLocation, fetchTables } from './settings'
 import {
@@ -14,9 +14,9 @@ import {
 /**
  * QR-каналы гостя: онлайн-заказы и бронирование столов.
  *
- * Паритет с кассовыми разделами Настройки → Обслуживание, но БЕЗ печати:
- * QR здесь только показывается на экране — флаер печатается на 80мм принтере
- * кассы, у веб-кабинета такого принтера нет.
+ * Паритет с кассовыми разделами Настройки → Обслуживание. Кабинет показывает
+ * QR, даёт скачать PNG для типографии и открыть гостевую страницу. Печать на
+ * встроенном 80мм-принтере остаётся в кассе.
  *
  * Ссылка ведёт на домен КАССЫ, не на кабинет (см. online.js): публичные
  * страницы /order и /reserve обслуживает POS-приложение.
@@ -27,10 +27,10 @@ const TABS = [
   { key: 'reserve', label: 'Reservations' },
 ]
 
-/** QR + ссылка с копированием. Только просмотр — печать остаётся в кассе. */
+/** QR + ссылка с копированием, открытием и скачиванием PNG. */
 function LinkBlock({ url, hint, title = 'Guest link' }) {
   const canvasRef = useRef(null)
-  const [copied, setCopied] = useState(false)
+  const [copyState, setCopyState] = useState('idle')
 
   useEffect(() => {
     if (canvasRef.current && url) {
@@ -41,10 +41,27 @@ function LinkBlock({ url, hint, title = 'Guest link' }) {
   async function copy() {
     try {
       await navigator.clipboard.writeText(url)
-      setCopied(true)
-      setTimeout(() => setCopied(false), 2000)
+      setCopyState('copied')
+      setTimeout(() => setCopyState('idle'), 2000)
     } catch {
-      // Копирование не критично — ссылку видно и можно выделить руками
+      setCopyState('failed')
+    }
+  }
+
+  async function download() {
+    try {
+      const dataUrl = await QRCode.toDataURL(url, {
+        width: 1024,
+        margin: 4,
+        errorCorrectionLevel: 'H',
+      })
+      const safeName = title.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '') || 'guest'
+      const anchor = document.createElement('a')
+      anchor.href = dataUrl
+      anchor.download = `${safeName}-qr.png`
+      anchor.click()
+    } catch {
+      // Экранный QR остаётся доступен, даже если браузер запретил скачивание.
     }
   }
 
@@ -55,10 +72,21 @@ function LinkBlock({ url, hint, title = 'Guest link' }) {
         <p>{hint}</p>
         <div className="qr-link-row">
           <input value={url} readOnly onFocus={(e) => e.target.select()} />
-          <button type="button" className="secondary-button narrow" onClick={copy}>
-            {copied ? <><Check /> Copied</> : <><Copy /> Copy</>}
-          </button>
         </div>
+        <div className="qr-actions">
+          <button type="button" className="secondary-button" onClick={copy}>
+            {copyState === 'copied' ? <><Check /> Copied</> : <><Copy /> Copy link</>}
+          </button>
+          <button type="button" className="secondary-button" onClick={download}>
+            <Download /> Download PNG
+          </button>
+          <a className="secondary-button" href={url} target="_blank" rel="noreferrer">
+            <ExternalLink /> Open menu
+          </a>
+        </div>
+        {copyState === 'failed' && (
+          <p className="qr-copy-error" role="alert">Copy was blocked. Select the link above and copy it manually.</p>
+        )}
       </div>
       <canvas ref={canvasRef} className="qr-canvas" aria-label="QR code for the guest link" />
     </div>
@@ -145,6 +173,39 @@ function BackgroundPresets({ value, onChange }) {
         })}
       </div>
     </div>
+  )
+}
+
+function GuestPreview({ url }) {
+  const [previewKey, setPreviewKey] = useState(0)
+
+  return (
+    <section className="panel guest-preview-panel">
+      <div className="guest-preview-copy">
+        <span className="guest-preview-icon" aria-hidden><Smartphone /></span>
+        <div>
+          <h2>Guest menu preview</h2>
+          <p>This is the same mobile page guests open from the counter QR.</p>
+        </div>
+        <div className="guest-preview-actions">
+          <button type="button" className="secondary-button" onClick={() => setPreviewKey((key) => key + 1)}>
+            <RefreshCw /> Refresh
+          </button>
+          <a className="secondary-button" href={url} target="_blank" rel="noreferrer">
+            <ExternalLink /> Open full page
+          </a>
+        </div>
+      </div>
+      <div className="guest-phone-frame">
+        <iframe
+          key={previewKey}
+          src={url}
+          title="Guest ordering menu preview"
+          loading="lazy"
+          tabIndex={-1}
+        />
+      </div>
+    </section>
   )
 }
 
@@ -243,6 +304,8 @@ function OnlineTab({ locationId, settings, tables, patch }) {
           Settings → Service → Online orders.
         </p>
       </section>
+
+      <GuestPreview url={orderUrl(locationId)} />
 
       <section className="panel form-panel">
         <LinkBlock
