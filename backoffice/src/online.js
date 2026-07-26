@@ -96,7 +96,12 @@ export const ONLINE_BACKGROUND_PRESETS = [
 ]
 
 export function orderUrl(locationId) {
-  return `${POS_ORIGIN}/order/${locationId}`
+  return `${POS_ORIGIN}/order/${locationId}?source=counter_qr`
+}
+
+export function tableOrderUrl(locationId, tableToken) {
+  const params = new URLSearchParams({ table: tableToken, source: 'table_qr' })
+  return `${POS_ORIGIN}/order/${locationId}?${params}`
 }
 
 export function reserveUrl(locationId) {

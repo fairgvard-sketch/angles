@@ -28,3 +28,15 @@ export async function fetchLocation(locationId) {
   if (error) throw new Error(error.message)
   return data
 }
+
+/** Активные столы точки для генерации безопасных QR-ссылок (099). */
+export async function fetchTables(locationId) {
+  const { data, error } = await supabase
+    .from('tables')
+    .select('id, label, zone, public_token, sort_order')
+    .eq('location_id', locationId)
+    .eq('is_active', true)
+    .order('sort_order')
+  if (error) throw new Error(error.message)
+  return data || []
+}

@@ -1,13 +1,13 @@
 import { useEffect, useRef, useState } from 'react'
 import { Check, Copy, Store } from 'lucide-react'
 import QRCode from 'qrcode'
-import { fetchLocation } from './settings'
+import { fetchLocation, fetchTables } from './settings'
 import {
   ORDER_TYPES, ORDER_TYPE_LABELS,
   ONLINE_BACKGROUND_PRESETS,
   onlineEnabled, orderTypes, toggleOrderType, saveOnlineOrders,
   reservationsEnabled, saveReservations,
-  orderUrl, reserveUrl,
+  orderUrl, tableOrderUrl, reserveUrl,
   agorotToInput, inputToAgorot,
 } from './online'
 
@@ -28,7 +28,7 @@ const TABS = [
 ]
 
 /** QR + ссылка с копированием. Только просмотр — печать остаётся в кассе. */
-function LinkBlock({ url, hint }) {
+function LinkBlock({ url, hint, title = 'Guest link' }) {
   const canvasRef = useRef(null)
   const [copied, setCopied] = useState(false)
 
@@ -51,7 +51,7 @@ function LinkBlock({ url, hint }) {
   return (
     <div className="qr-block">
       <div className="qr-block-text">
-        <h3>Guest link</h3>
+        <h3>{title}</h3>
         <p>{hint}</p>
         <div className="qr-link-row">
           <input value={url} readOnly onFocus={(e) => e.target.select()} />
@@ -150,10 +150,12 @@ function BackgroundPresets({ value, onChange }) {
 
 // ── Онлайн-заказы ────────────────────────────────────────────
 
-function OnlineTab({ locationId, settings, patch }) {
+function OnlineTab({ locationId, settings, tables, patch }) {
   const enabled = onlineEnabled(settings)
   const types = orderTypes(settings)
   const online = settings.online_orders || {}
+  const [selectedTableId, setSelectedTableId] = useState(tables[0]?.id || '')
+  const selectedTable = tables.find((table) => table.id === selectedTableId) || tables[0] || null
 
   return (
     <>
@@ -223,6 +225,14 @@ function OnlineTab({ locationId, settings, patch }) {
               onBlur={(e) => patch({ facebook: e.target.value.trim() || null })}
             />
           </Field>
+          <Field label="Hero video URL">
+            <input
+              defaultValue={online.hero_video_url || ''}
+              placeholder="https://cdn.example.com/hero.mp4"
+              onBlur={(e) => patch({ hero_video_url: e.target.value.trim() || null })}
+            />
+            <small>Direct MP4 or WebM URL. It plays muted and loops; the register header image is used as its poster.</small>
+          </Field>
         </div>
         <BackgroundPresets
           value={online.background_url}
@@ -237,8 +247,43 @@ function OnlineTab({ locationId, settings, patch }) {
       <section className="panel form-panel">
         <LinkBlock
           url={orderUrl(locationId)}
+          title="Counter QR"
           hint="Put this on a QR code at the counter or behind the till."
         />
+      </section>
+
+      <section className="panel form-panel">
+        <div className="panel-heading">
+          <div>
+            <h2>Table QR codes</h2>
+            <p>The table is detected automatically. Guests skip contact and fulfilment questions.</p>
+          </div>
+        </div>
+        {selectedTable ? (
+          <>
+            <Field label="Table">
+              <select
+                value={selectedTable.id}
+                onChange={(event) => setSelectedTableId(event.target.value)}
+              >
+                {tables.map((table) => (
+                  <option key={table.id} value={table.id}>
+                    Table {table.label}{table.zone ? ` · ${table.zone}` : ''}
+                  </option>
+                ))}
+              </select>
+            </Field>
+            <div className="qr-table-link">
+              <LinkBlock
+                url={tableOrderUrl(locationId, selectedTable.public_token)}
+                title={`Table ${selectedTable.label}`}
+                hint="Print this specific code for the selected table. The public URL contains an opaque token, not the internal table ID."
+              />
+            </div>
+          </>
+        ) : (
+          <p className="empty-state compact">No active tables yet. Create tables in the register first.</p>
+        )}
       </section>
     </>
   )
@@ -469,6 +514,7 @@ export default function QrChannels({ context }) {
   const [activeId, setActiveId] = useState(locations[0]?.id || null)
   const [tab, setTab] = useState('online')
   const [settings, setSettings] = useState(null)
+  const [tables, setTables] = useState([])
   const [error, setError] = useState('')
   const [saved, setSaved] = useState(false)
 
@@ -476,9 +522,15 @@ export default function QrChannels({ context }) {
     if (!activeId) return undefined
     let cancelled = false
     setSettings(null)
+    setTables([])
     setError('')
-    fetchLocation(activeId)
-      .then((data) => { if (!cancelled) setSettings(data.settings || {}) })
+    Promise.all([fetchLocation(activeId), fetchTables(activeId)])
+      .then(([data, tableRows]) => {
+        if (!cancelled) {
+          setSettings(data.settings || {})
+          setTables(tableRows)
+        }
+      })
       .catch((loadError) => { if (!cancelled) setError(loadError.message) })
     return () => { cancelled = true }
   }, [activeId])
@@ -579,6 +631,7 @@ export default function QrChannels({ context }) {
           key={activeId}
           locationId={activeId}
           settings={settings}
+          tables={tables}
           patch={makePatcher('online_orders', saveOnlineOrders)}
         />
       ) : (

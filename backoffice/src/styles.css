@@ -562,6 +562,7 @@ a { color: inherit; }
 .qr-link-row { display: flex; gap: 8px; margin-top: 14px; }
 .qr-link-row input { flex: 1 1 auto; min-width: 0; height: 44px; padding: 0 14px; border: 1px solid #cfd2d8; border-radius: 8px; font-size: 14px; background: #f7f8f9; color: #3c4148; }
 .qr-canvas { flex: 0 0 auto; width: 176px; height: 176px; border: 1px solid #e8e9ec; border-radius: 10px; background: #fff; }
+.qr-table-link { margin-top: 18px; padding-top: 18px; border-top: 1px solid #eef0f2; }
 
 @media (max-width: 640px) {
   .qr-grid { grid-template-columns: minmax(0, 1fr); }
