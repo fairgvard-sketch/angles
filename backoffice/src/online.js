@@ -16,11 +16,12 @@ import { patchLocationSettings } from './settings'
 
 // ── Гостевые ссылки ──────────────────────────────────────────
 /**
- * Публичные страницы живут на домене КАССЫ, а кабинет — на angle.co.il,
- * поэтому origin отсюда брать нельзя (в кассе он берётся из window).
- * Прод-домен из docs/deployment.md; переопределяется через env для превью.
+ * Публичные страницы — отдельный продукт на menu.angle.co.il, а кабинет
+ * живёт на angle.co.il. Не используем origin кабинета и не связываем
+ * гостевые ссылки с доменом POS. Для отдельного стенда адрес можно
+ * переопределить через VITE_PUBLIC_MENU_ORIGIN.
  */
-const POS_ORIGIN = import.meta.env.VITE_POS_ORIGIN || 'https://pos-self-sigma.vercel.app'
+const PUBLIC_MENU_ORIGIN = import.meta.env.VITE_PUBLIC_MENU_ORIGIN || 'https://menu.angle.co.il'
 const SITE_ORIGIN = import.meta.env.VITE_SITE_ORIGIN || 'https://angle.co.il'
 
 /**
@@ -96,16 +97,16 @@ export const ONLINE_BACKGROUND_PRESETS = [
 ]
 
 export function orderUrl(locationId) {
-  return `${POS_ORIGIN}/order/${locationId}?source=counter_qr`
+  return `${PUBLIC_MENU_ORIGIN}/order/${locationId}?source=counter_qr`
 }
 
 export function tableOrderUrl(locationId, tableToken) {
   const params = new URLSearchParams({ table: tableToken, source: 'table_qr' })
-  return `${POS_ORIGIN}/order/${locationId}?${params}`
+  return `${PUBLIC_MENU_ORIGIN}/order/${locationId}?${params}`
 }
 
 export function reserveUrl(locationId) {
-  return `${POS_ORIGIN}/reserve/${locationId}`
+  return `${PUBLIC_MENU_ORIGIN}/reserve/${locationId}`
 }
 
 // ── Встраивание меню в сайт ресторана ────────────────────────
@@ -116,7 +117,7 @@ export function reserveUrl(locationId) {
  * поэтому iframe работает на любом домене ресторана.
  */
 export function websiteMenuUrl(locationId) {
-  return `${POS_ORIGIN}/order/${locationId}?source=website`
+  return `${PUBLIC_MENU_ORIGIN}/order/${locationId}?source=website`
 }
 
 /** Кнопка «Открыть меню» для сайта ресторана: обычная ссылка, без JS. */
