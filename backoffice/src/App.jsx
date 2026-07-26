@@ -3,6 +3,7 @@ import {
   Activity,
   BarChart3,
   Building2,
+  CalendarDays,
   Check,
   ChevronRight,
   CircleHelp,
@@ -26,12 +27,14 @@ import MenuManager from './MenuManager'
 import TeamManager from './TeamManager'
 import QrChannels from './QrChannels'
 import OrdersInbox from './OrdersInbox'
+import ReservationsDesk from './ReservationsDesk'
 import DevicesManager from './DevicesManager'
 import ActivityManager, { ActivityCard } from './ActivityManager'
 
 const navigation = [
   { id: 'overview', label: 'Home', icon: LayoutDashboard },
   { id: 'orders', label: 'Orders', icon: ShoppingBag },
+  { id: 'reservations', label: 'Reservations', icon: CalendarDays },
   { id: 'sales', label: 'Overview', icon: BarChart3 },
   { id: 'activity', label: 'Activity', icon: Activity },
   { id: 'locations', label: 'Locations', icon: Store },
@@ -65,6 +68,8 @@ export function visibleNavigation(products) {
     // Инбокс заказов (101): любой организации с модулем online_orders —
     // pos-точки видят его read-only, их цикл живёт на кассе.
     if (id === 'orders') return has('online_orders')
+    // Веб-стол хостес (102): модуль reservations, работает и у POS-точек
+    if (id === 'reservations') return has('reservations')
     // sales/activity/team/devices/reports/integrations — POS-контур
     return pos
   })
@@ -462,6 +467,7 @@ function Dashboard({ session, context }) {
         <main className="content">
           {activeSection === 'overview' && <Overview context={context} onNavigate={setActive} />}
           {activeSection === 'orders' && <OrdersInbox context={context} />}
+          {activeSection === 'reservations' && <ReservationsDesk context={context} />}
           {activeSection === 'sales' && <SalesOverview organizationName={context.organization?.name} />}
           {activeSection === 'activity' && <ActivityManager context={context} />}
           {activeSection === 'locations' && <LocationSettings context={context} />}
@@ -470,7 +476,7 @@ function Dashboard({ session, context }) {
           {activeSection === 'online' && <QrChannels context={context} />}
           {activeSection === 'devices' && <DevicesManager context={context} />}
           {activeSection === 'settings' && <AccountSettingsPage email={session.user.email} onSignOut={signOut} />}
-          {!['overview', 'orders', 'sales', 'activity', 'locations', 'menu', 'team', 'online', 'devices'].includes(activeSection) && (
+          {!['overview', 'orders', 'reservations', 'sales', 'activity', 'locations', 'menu', 'team', 'online', 'devices'].includes(activeSection) && (
             activeSection !== 'settings' && <SectionPage section={activeSection} context={context} />
           )}
         </main>
