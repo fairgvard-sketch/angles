@@ -626,3 +626,31 @@ a { color: inherit; }
 }
 .goal-card.is-selected .goal-check { background: #16181d; border-color: #16181d; }
 .goal-check svg { width: 14px; height: 14px; }
+
+/* Standalone-инбокс заказов (Kassa 101): карточки заявок. */
+.location-picker { max-width: 320px; margin-bottom: 16px; }
+.location-picker select { width: 100%; height: 44px; padding: 0 14px; border: 1px solid #cfd2d8; border-radius: 8px; font: inherit; background: #fff; }
+.order-grid { display: grid; gap: 12px; grid-template-columns: repeat(auto-fill, minmax(320px, 1fr)); }
+.order-grid.is-history { opacity: 0.75; }
+.order-card { border: 1px solid #e2e4e8; border-radius: 12px; padding: 16px; background: #fff; display: flex; flex-direction: column; gap: 10px; }
+.order-card.is-new { border-color: #16181d; box-shadow: 0 0 0 2px rgb(22 24 29 / 10%); }
+.order-card-head { display: flex; justify-content: space-between; align-items: flex-start; gap: 10px; }
+.order-card-head strong { font-size: 16px; color: #111317; }
+.order-card-head small { display: flex; align-items: center; flex-wrap: wrap; gap: 4px; margin-top: 4px; color: #5d626b; font-size: 13px; }
+.order-card-head small svg { width: 14px; height: 14px; }
+.order-status { flex: 0 0 auto; padding: 4px 10px; border-radius: 999px; font-size: 12px; font-weight: 700; background: #eef0f3; color: #33363c; }
+.order-status.is-new { background: #16181d; color: #fff; }
+.order-status.is-ready { background: #e7f3ec; color: #1e6b43; }
+.order-status.is-rejected, .order-status.is-cancelled { background: #fbebeb; color: #a02c2c; }
+.order-lines { list-style: none; margin: 0; padding: 0; display: grid; gap: 6px; }
+.order-lines li { display: flex; gap: 8px; align-items: baseline; font-size: 14px; color: #33363c; }
+.order-qty { flex: 0 0 auto; font-weight: 700; font-variant-numeric: tabular-nums; }
+.order-line-text { flex: 1 1 auto; min-width: 0; }
+.order-line-total { flex: 0 0 auto; font-variant-numeric: tabular-nums; color: #5d626b; }
+.order-note { display: flex; gap: 6px; align-items: flex-start; margin: 0; padding: 8px 10px; border-radius: 8px; background: #f7f8f9; color: #5d626b; font-size: 13px; }
+.order-note svg { width: 14px; height: 14px; flex: 0 0 auto; margin-top: 1px; }
+.order-card-foot { display: flex; justify-content: space-between; align-items: center; gap: 10px; margin-top: auto; }
+.order-total { font-size: 17px; font-weight: 750; font-variant-numeric: tabular-nums; color: #111317; }
+.order-actions { display: flex; gap: 8px; flex-wrap: wrap; }
+.order-actions .primary-button.compact { height: 40px; padding: 0 16px; }
+.order-actions .secondary-button[data-danger] { color: #a02c2c; border-color: #e5c6c6; }
