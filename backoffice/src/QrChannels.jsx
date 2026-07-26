@@ -1,7 +1,7 @@
 import { useEffect, useRef, useState } from 'react'
 import { Check, Copy, Download, ExternalLink, RefreshCw, Smartphone, Store } from 'lucide-react'
 import QRCode from 'qrcode'
-import { fetchLocation, fetchTables } from './settings'
+import { fetchLocation, fetchLocationSlug, fetchTables, saveLocationSlug } from './settings'
 import {
   ORDER_TYPES, ORDER_TYPE_LABELS,
   ONLINE_BACKGROUND_PRESETS,
@@ -163,6 +163,75 @@ function Field({ label, children }) {
   )
 }
 
+/**
+ * Короткий адрес точки (Kassa 106): menu.angle.co.il/order/<slug>.
+ *
+ * Сохраняем по кнопке, а не по каждому нажатию клавиши: адрес попадает на
+ * печатные флаеры, и промежуточные значения вроде «bul» не должны успевать
+ * занять имя. Формат и занятость проверяет set_location_slug — форма лишь
+ * показывает ответ сервера.
+ */
+function SlugBlock({ locationId, slug, onSaved }) {
+  const [value, setValue] = useState(slug)
+  const [state, setState] = useState('idle')
+  const [error, setError] = useState('')
+
+  useEffect(() => { setValue(slug); setError(''); setState('idle') }, [slug, locationId])
+
+  const trimmed = value.trim().toLowerCase()
+  const dirty = trimmed !== slug
+
+  async function save() {
+    setState('saving')
+    setError('')
+    try {
+      const next = await saveLocationSlug(locationId, trimmed)
+      onSaved(next)
+      setValue(next)
+      setState('saved')
+      setTimeout(() => setState('idle'), 2000)
+    } catch (saveError) {
+      setError(saveError.message)
+      setState('idle')
+    }
+  }
+
+  return (
+    <div className="qr-block-text">
+      <h3>Short address</h3>
+      <p>
+        A readable link for flyers and social profiles. The long link with the
+        location id keeps working, so printed QR codes stay valid.
+      </p>
+      <div className="qr-field">
+        <div className="slug-input">
+          <span className="slug-prefix">menu.angle.co.il/order/</span>
+          <input
+            value={value}
+            onChange={(e) => setValue(e.target.value)}
+            placeholder="bulochka"
+            spellCheck={false}
+            autoCapitalize="none"
+            autoCorrect="off"
+          />
+        </div>
+      </div>
+      <div className="qr-actions">
+        <button type="button" onClick={save} disabled={!dirty || state === 'saving'}>
+          {state === 'saving' ? 'Saving…' : state === 'saved' ? <><Check /> Saved</> : 'Save address'}
+        </button>
+      </div>
+      {error && <p className="form-error" role="alert">{error}</p>}
+      {!error && (
+        <p className="form-hint">
+          3–40 characters: lowercase latin letters, digits and dashes.
+          Leave empty to remove the short address.
+        </p>
+      )}
+    </div>
+  )
+}
+
 function NumberSelect({ value, fallback, options, onChange }) {
   return (
     <select value={value ?? fallback} onChange={(e) => onChange(Number(e.target.value))}>
@@ -254,7 +323,7 @@ function GuestPreview({ url }) {
 
 // ── Онлайн-заказы ────────────────────────────────────────────
 
-function OnlineTab({ locationId, settings, tables, patch }) {
+function OnlineTab({ locationId, settings, tables, patch, slug, onSlugSaved }) {
   const enabled = onlineEnabled(settings)
   const types = orderTypes(settings)
   const online = settings.online_orders || {}
@@ -348,11 +417,15 @@ function OnlineTab({ locationId, settings, tables, patch }) {
         </p>
       </section>
 
-      <GuestPreview url={orderUrl(locationId)} />
+      <GuestPreview url={orderUrl(locationId, slug)} />
+
+      <section className="panel form-panel">
+        <SlugBlock locationId={locationId} slug={slug} onSaved={onSlugSaved} />
+      </section>
 
       <section className="panel form-panel">
         <LinkBlock
-          url={orderUrl(locationId)}
+          url={orderUrl(locationId, slug)}
           title="Counter QR"
           hint="Put this on a QR code at the counter or behind the till."
         />
@@ -368,12 +441,12 @@ function OnlineTab({ locationId, settings, tables, patch }) {
         <SnippetBlock
           title="Menu button"
           hint="A plain link styled as a button. Works in any site builder — paste it into an HTML block."
-          code={embedButtonSnippet(locationId)}
+          code={embedButtonSnippet(locationId, slug)}
         />
         <SnippetBlock
           title="Embedded menu (iframe)"
           hint="The menu inside your page. Responsive up to 480px wide; menu edits appear automatically."
-          code={embedIframeSnippet(locationId)}
+          code={embedIframeSnippet(locationId, slug)}
         />
       </section>
 
@@ -400,7 +473,7 @@ function OnlineTab({ locationId, settings, tables, patch }) {
             </Field>
             <div className="qr-table-link">
               <LinkBlock
-                url={tableOrderUrl(locationId, selectedTable.public_token)}
+                url={tableOrderUrl(locationId, selectedTable.public_token, slug)}
                 title={`Table ${selectedTable.label}`}
                 hint="Print this specific code for the selected table. The public URL contains an opaque token, not the internal table ID."
               />
@@ -416,7 +489,7 @@ function OnlineTab({ locationId, settings, tables, patch }) {
 
 // ── Бронирование ─────────────────────────────────────────────
 
-function ReserveTab({ locationId, settings, patch }) {
+function ReserveTab({ locationId, settings, patch, slug }) {
   const enabled = reservationsEnabled(settings)
   const rsv = settings.reservations || {}
   const instant = rsv.instant === true
@@ -613,7 +686,7 @@ function ReserveTab({ locationId, settings, patch }) {
 
       <section className="panel form-panel">
         <LinkBlock
-          url={reserveUrl(locationId)}
+          url={reserveUrl(locationId, slug)}
           hint="Share this link on the site, in the bio, or as a QR code on the table."
         />
       </section>
@@ -640,6 +713,7 @@ export default function QrChannels({ context }) {
   const [tab, setTab] = useState('online')
   const [settings, setSettings] = useState(null)
   const [tables, setTables] = useState([])
+  const [slug, setSlug] = useState('')
   const [error, setError] = useState('')
   const [saved, setSaved] = useState(false)
 
@@ -648,12 +722,14 @@ export default function QrChannels({ context }) {
     let cancelled = false
     setSettings(null)
     setTables([])
+    setSlug('')
     setError('')
-    Promise.all([fetchLocation(activeId), fetchTables(activeId)])
-      .then(([data, tableRows]) => {
+    Promise.all([fetchLocation(activeId), fetchTables(activeId), fetchLocationSlug(activeId)])
+      .then(([data, tableRows, locationSlug]) => {
         if (!cancelled) {
           setSettings(data.settings || {})
           setTables(tableRows)
+          setSlug(locationSlug)
         }
       })
       .catch((loadError) => { if (!cancelled) setError(loadError.message) })
@@ -758,6 +834,8 @@ export default function QrChannels({ context }) {
           settings={settings}
           tables={tables}
           patch={makePatcher('online_orders', saveOnlineOrders)}
+          slug={slug}
+          onSlugSaved={setSlug}
         />
       ) : (
         <ReserveTab
@@ -765,6 +843,7 @@ export default function QrChannels({ context }) {
           locationId={activeId}
           settings={settings}
           patch={makePatcher('reservations', saveReservations)}
+          slug={slug}
         />
       )}
     </>

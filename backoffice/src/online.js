@@ -96,17 +96,26 @@ export const ONLINE_BACKGROUND_PRESETS = [
   },
 ]
 
-export function orderUrl(locationId) {
-  return `${PUBLIC_MENU_ORIGIN}/order/${locationId}?source=counter_qr`
+/**
+ * Публичные ссылки принимают слаг (Kassa 106) или location_id. Слаг
+ * читаем на флаере и в адресной строке, UUID остаётся рабочим входом —
+ * QR со старыми ссылками уже наклеены на столы.
+ */
+export function publicRef(locationId, slug) {
+  return slug || locationId
 }
 
-export function tableOrderUrl(locationId, tableToken) {
+export function orderUrl(locationId, slug) {
+  return `${PUBLIC_MENU_ORIGIN}/order/${publicRef(locationId, slug)}?source=counter_qr`
+}
+
+export function tableOrderUrl(locationId, tableToken, slug) {
   const params = new URLSearchParams({ table: tableToken, source: 'table_qr' })
-  return `${PUBLIC_MENU_ORIGIN}/order/${locationId}?${params}`
+  return `${PUBLIC_MENU_ORIGIN}/order/${publicRef(locationId, slug)}?${params}`
 }
 
-export function reserveUrl(locationId) {
-  return `${PUBLIC_MENU_ORIGIN}/reserve/${locationId}`
+export function reserveUrl(locationId, slug) {
+  return `${PUBLIC_MENU_ORIGIN}/reserve/${publicRef(locationId, slug)}`
 }
 
 // ── Встраивание меню в сайт ресторана ────────────────────────
@@ -116,14 +125,14 @@ export function reserveUrl(locationId) {
  * Content-Security-Policy: frame-ancestors * (vercel.json кассы),
  * поэтому iframe работает на любом домене ресторана.
  */
-export function websiteMenuUrl(locationId) {
-  return `${PUBLIC_MENU_ORIGIN}/order/${locationId}?source=website`
+export function websiteMenuUrl(locationId, slug) {
+  return `${PUBLIC_MENU_ORIGIN}/order/${publicRef(locationId, slug)}?source=website`
 }
 
 /** Кнопка «Открыть меню» для сайта ресторана: обычная ссылка, без JS. */
-export function embedButtonSnippet(locationId) {
+export function embedButtonSnippet(locationId, slug) {
   return [
-    `<a href="${websiteMenuUrl(locationId)}" target="_blank" rel="noopener"`,
+    `<a href="${websiteMenuUrl(locationId, slug)}" target="_blank" rel="noopener"`,
     '   style="display:inline-block;padding:14px 28px;border-radius:12px;',
     '          background:#16181d;color:#fff;font:600 16px/1 sans-serif;',
     '          text-decoration:none">Open menu</a>',
@@ -131,9 +140,9 @@ export function embedButtonSnippet(locationId) {
 }
 
 /** Адаптивный iframe: меню внутри страницы ресторана, высота под мобильный сценарий. */
-export function embedIframeSnippet(locationId) {
+export function embedIframeSnippet(locationId, slug) {
   return [
-    `<iframe src="${websiteMenuUrl(locationId)}"`,
+    `<iframe src="${websiteMenuUrl(locationId, slug)}"`,
     '        title="Menu"',
     '        style="width:100%;max-width:480px;height:720px;border:0;',
     '               border-radius:16px;box-shadow:0 4px 24px rgb(0 0 0 / 12%)"',
