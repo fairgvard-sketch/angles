@@ -22,10 +22,44 @@ export async function patchLocationSettings(locationId, patch) {
 export async function fetchLocation(locationId) {
   const { data, error } = await supabase
     .from('locations')
-    .select('id, name, currency, vat_rate, timezone, settings')
+    .select(
+      'id, name, currency, vat_rate, timezone, settings, service_mode, logo_url, ' +
+      'receipt_business_name, receipt_address, receipt_tax_id, receipt_phone, receipt_footer, ' +
+      'loyalty_mode, loyalty_stamps_goal, loyalty_points_percent, loyalty_points_min_redeem'
+    )
     .eq('id', locationId)
     .single()
   if (error) throw new Error(error.message)
+  return data
+}
+
+/**
+ * Колонки точки (имя, режим, НДС, реквизиты чека, лояльность) — через
+ * update_location_config_web (Kassa 107). Чек печатается кассой из этих
+ * колонок, поэтому реквизиты обязаны идти сюда, а не в settings JSONB.
+ */
+export async function updateLocationConfig(locationId, patch) {
+  const { error } = await supabase.rpc('update_location_config_web', {
+    p_location_id: locationId,
+    p_patch: patch,
+    p_staff_session: null,
+  })
+  if (error) throw new Error(error.message)
+}
+
+/**
+ * Единый формат 1.31 (מבנה אחיד) — формирование server-side.
+ * Возвращает { ini_base64, bkmvdata_zip_base64, control_report, ... };
+ * машинный код причины ошибки — в data.error (missing_tax_id и т.п.).
+ */
+export async function runUfExport(locationId, from, to) {
+  const { data, error } = await supabase.functions.invoke('uniform-format-export', {
+    body: { location_id: locationId, from, to },
+  })
+  if (error) {
+    const ctx = await error.context?.json?.().catch(() => null)
+    throw new Error(ctx?.error || 'export_failed')
+  }
   return data
 }
 

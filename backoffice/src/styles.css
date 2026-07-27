@@ -693,3 +693,13 @@ a { color: inherit; }
 .status-developer i { background: #6b7280; }
 .product-row .form-error { display: block; margin-top: 4px; font-size: 12px; }
 .developer-badge { flex: none; padding: 3px 8px; border: 1px solid #d7dade; border-radius: 999px; background: #f3f4f6; color: #3c4148; font-size: 10px; font-weight: 750; letter-spacing: 0.04em; text-transform: uppercase; white-space: nowrap; }
+
+/* ── Настройки точки: табы тем, отчёт УФ-экспорта ───────────── */
+.settings-topic-tabs { margin-top: -4px; }
+.settings-topic-tabs button { min-height: 34px; padding: 0 13px; font-size: 12px; border-radius: 999px; }
+.export-downloads { justify-content: flex-start; flex-wrap: wrap; }
+.export-report { width: 100%; border-collapse: collapse; font-size: 14px; }
+.export-report th { text-align: start; padding: 8px 10px; font-size: 11px; font-weight: 750; letter-spacing: 0.04em; text-transform: uppercase; color: #868b93; }
+.export-report td { padding: 10px; border-top: 1px solid #eef0f2; color: #1b1e24; font-variant-numeric: tabular-nums; }
+.export-report td:last-child, .export-report th:last-child,
+.export-report td:nth-child(2), .export-report th:nth-child(2) { text-align: end; }

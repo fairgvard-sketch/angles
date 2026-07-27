@@ -31,7 +31,7 @@ function orgId(context) {
 export async function fetchCategories() {
   const { data, error } = await supabase
     .from('menu_categories')
-    .select('id, location_id, name, sort_order, is_active, icon')
+    .select('id, location_id, name, sort_order, is_active, icon, loyalty_stamps')
     .order('sort_order')
   if (error) throw new Error(error.message)
   return data
