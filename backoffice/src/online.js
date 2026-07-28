@@ -250,3 +250,105 @@ export function inputToAgorot(value) {
   if (!Number.isFinite(shekels) || shekels < 0) return null
   return Math.round(shekels * 100)
 }
+
+// ── Часы работы (Kassa 112) ──────────────────────────────────
+/**
+ * settings.online_orders.hours — окно приёма заказов: ключ = день недели
+ * (0 = воскресенье) в таймзоне точки, значение = массив окон
+ * [["08:00","20:00"], ...]. Конец меньше начала = переход через полночь.
+ *
+ * Отсутствие ключа hours = приём в любое время (обратная совместимость:
+ * точки, которые расписание не настраивали, ничего не замечают). День
+ * без окон = закрыт. Те же правила проверяет online_hours_open_at в БД
+ * и повторяет построение слотов на гостевой странице.
+ *
+ * Не путать с reservations.hours — там свободный текст для показа гостю.
+ */
+
+/** Порядок дней в редакторе: неделя в Израиле начинается с воскресенья. */
+export const WEEK_DAYS = [
+  { key: '0', label: 'Sunday', short: 'Sun' },
+  { key: '1', label: 'Monday', short: 'Mon' },
+  { key: '2', label: 'Tuesday', short: 'Tue' },
+  { key: '3', label: 'Wednesday', short: 'Wed' },
+  { key: '4', label: 'Thursday', short: 'Thu' },
+  { key: '5', label: 'Friday', short: 'Fri' },
+  { key: '6', label: 'Saturday', short: 'Sat' },
+]
+
+const DEFAULT_WINDOW = ['08:00', '20:00']
+
+/** Первое окно дня или null, если день закрыт. Редактор ведёт одно окно. */
+export function dayWindow(hours, dayKey) {
+  const windows = hours?.[dayKey]
+  if (!Array.isArray(windows) || windows.length === 0) return null
+  const first = windows[0]
+  if (!Array.isArray(first) || first.length < 2) return null
+  return [String(first[0]), String(first[1])]
+}
+
+export function isDayOpen(hours, dayKey) {
+  return dayWindow(hours, dayKey) !== null
+}
+
+/**
+ * Расписание с изменённым днём. Окно null убирает день (закрыт).
+ *
+ * Возвращаем полный объект hours: patch_location_settings_web мержит
+ * ПОКЛЮЧЕВО на верхнем уровне раздела, а hours — один ключ, поэтому
+ * частичный объект затёр бы остальные дни.
+ */
+export function withDay(hours, dayKey, window) {
+  const next = { ...(hours || {}) }
+  if (window === null) {
+    next[dayKey] = []
+  } else {
+    next[dayKey] = [[window[0], window[1]]]
+  }
+  return next
+}
+
+/** Расписание «открыто всегда»: ключа hours нет. */
+export function clearHours() {
+  return null
+}
+
+/** Расписание по умолчанию при первом включении — будни 08:00–20:00. */
+export function defaultHours() {
+  const hours = {}
+  for (const day of WEEK_DAYS) hours[day.key] = [[...DEFAULT_WINDOW]]
+  return hours
+}
+
+/**
+ * Короткая сводка для свёрнутой строки: соседние дни с одинаковым окном
+ * схлопываются в диапазон («Sun–Thu 08:00–20:00»), закрытые пропускаются.
+ */
+export function hoursSummary(hours) {
+  if (!hours || typeof hours !== 'object' || Object.keys(hours).length === 0) {
+    return 'Always open'
+  }
+  const groups = []
+  for (const day of WEEK_DAYS) {
+    const window = dayWindow(hours, day.key)
+    const text = window ? `${window[0]}–${window[1]}` : null
+    const last = groups[groups.length - 1]
+    if (last && last.text === text) {
+      last.end = day.short
+    } else {
+      groups.push({ text, start: day.short, end: day.short })
+    }
+  }
+  const open = groups.filter((group) => group.text !== null)
+  if (open.length === 0) return 'Closed all week'
+  return open
+    .map((group) => {
+      const days = group.start === group.end ? group.start : `${group.start}–${group.end}`
+      return `${days} ${group.text}`
+    })
+    .join(' · ')
+}
+
+export async function saveHours(locationId, hours) {
+  return patchLocationSettings(locationId, { online_orders: { hours } })
+}
