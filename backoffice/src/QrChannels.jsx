@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react'
 import {
-  AlertTriangle, Check, Copy, Download, ExternalLink, Image, LayoutGrid,
+  AlertTriangle, Check, Clock, Copy, Download, ExternalLink, Image, LayoutGrid,
   QrCode, RefreshCw, ShoppingBag, Smartphone, Store, Table, Code2,
   CalendarClock, Wallet, Contact,
 } from 'lucide-react'
@@ -14,6 +14,7 @@ import {
   orderUrl, tableOrderUrl, reserveUrl,
   embedButtonSnippet, embedIframeSnippet,
   agorotToInput, inputToAgorot,
+  WEEK_DAYS, dayWindow, withDay, defaultHours, hoursSummary,
 } from './online'
 import {
   Field, LinkBlock, NumberSelect, QrCanvas, SettingGroup, SnippetBlock, Toggle,
@@ -174,6 +175,81 @@ function SlugBlock({ locationId, slug, onSaved }) {
         </p>
       )}
     </div>
+  )
+}
+
+/**
+ * Часы работы — окно приёма заказов (Kassa 112).
+ *
+ * Гость выбирает время только внутри этих окон, и сервер проверяет то же
+ * правило независимо от UI. Пока расписание не включено, приём идёт
+ * круглосуточно — это и есть поведение точек, которые часы не настраивали.
+ *
+ * Один интервал на день: перерыв на обед формат поддерживает (массив окон),
+ * но в редакторе его нет — ради простоты частого случая. День без окна
+ * считается закрытым.
+ */
+function OpeningHours({ hours, onChange }) {
+  const enabled = hours !== null && hours !== undefined
+
+  return (
+    <>
+      <Toggle
+        label="Limit ordering to opening hours"
+        hint="Off — orders are accepted around the clock. On — guests can only order for times inside the hours below."
+        checked={enabled}
+        onChange={(on) => onChange(on ? defaultHours() : null)}
+      />
+
+      {enabled && (
+        <div className="hours-editor">
+          {WEEK_DAYS.map((day) => {
+            const window = dayWindow(hours, day.key)
+            const open = window !== null
+            return (
+              <div key={day.key} className={`hours-row${open ? '' : ' is-closed'}`}>
+                <label className="hours-day">
+                  <input
+                    type="checkbox"
+                    checked={open}
+                    onChange={(event) => onChange(
+                      withDay(hours, day.key, event.target.checked ? ['08:00', '20:00'] : null)
+                    )}
+                  />
+                  <span>{day.label}</span>
+                </label>
+                {open ? (
+                  <div className="hours-window">
+                    <input
+                      type="time"
+                      value={window[0]}
+                      onChange={(event) => onChange(
+                        withDay(hours, day.key, [event.target.value, window[1]])
+                      )}
+                    />
+                    <span className="hours-dash">–</span>
+                    <input
+                      type="time"
+                      value={window[1]}
+                      onChange={(event) => onChange(
+                        withDay(hours, day.key, [window[0], event.target.value])
+                      )}
+                    />
+                  </div>
+                ) : (
+                  <span className="hours-closed">Closed</span>
+                )}
+              </div>
+            )
+          })}
+          <p className="form-hint">
+            Times are in the location’s own time zone. A closing time earlier
+            than the opening time means the day runs past midnight — 20:00–02:00
+            keeps orders open until two in the morning.
+          </p>
+        </div>
+      )}
+    </>
   )
 }
 
@@ -419,6 +495,25 @@ function OnlineTab({ context, locationId, settings, tables, patch, slug, onSlugS
         ) : (
           <p className="form-hint" style={{ marginTop: 12 }}>
             Turn ordering on above to choose fulfilment options.
+          </p>
+        )}
+      </SettingGroup>
+
+      <SettingGroup
+        {...group('hours')}
+        icon={Clock}
+        title="Opening hours"
+        hint="When the guest page accepts orders — now and for later."
+        value={hoursSummary(online.hours)}
+      >
+        {enabled ? (
+          <OpeningHours
+            hours={online.hours ?? null}
+            onChange={(next) => patch({ hours: next })}
+          />
+        ) : (
+          <p className="form-hint" style={{ marginTop: 12 }}>
+            Turn ordering on above to set opening hours.
           </p>
         )}
       </SettingGroup>
