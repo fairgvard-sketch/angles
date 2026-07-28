@@ -40,7 +40,7 @@ const navigation = [
   { id: 'locations', label: 'Locations', icon: Store },
   { id: 'menu', label: 'Menu & catalogue', icon: MenuIcon },
   { id: 'team', label: 'Team', icon: Users },
-  { id: 'online', label: 'QR & reservations', icon: QrCode },
+  { id: 'online', label: 'QR menu', icon: QrCode },
   { id: 'devices', label: 'Devices', icon: MonitorSmartphone },
   { id: 'reports', label: 'Reports', icon: BarChart3 },
   { id: 'integrations', label: 'Integrations', icon: CreditCard },
@@ -511,7 +511,7 @@ function Overview({ context, onNavigate, onReloadContext }) {
           <div className="quick-list">
             {hasCapability(context, 'pos_reports') && <button onClick={() => onNavigate('sales')}><BarChart3 /><span><strong>Sales overview</strong><small>Revenue, orders and top items</small></span><ChevronRight /></button>}
             {catalog && <button onClick={() => onNavigate('menu')}><MenuIcon /><span><strong>Menu & catalogue</strong><small>Prices, items and modifiers</small></span><ChevronRight /></button>}
-            <button onClick={() => onNavigate('online')}><QrCode /><span><strong>Online channels</strong><small>QR menu and reservations</small></span><ChevronRight /></button>
+            <button onClick={() => onNavigate('online')}><QrCode /><span><strong>QR menu</strong><small>Guest link, ordering and table booking</small></span><ChevronRight /></button>
             {pos && <button onClick={() => onNavigate('team')}><Users /><span><strong>Team access</strong><small>Roles, PINs and permissions</small></span><ChevronRight /></button>}
           </div>
         </section>
