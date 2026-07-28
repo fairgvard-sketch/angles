@@ -17,6 +17,7 @@ import {
   Settings,
   ShoppingBag,
   Store,
+  UserRound,
   Users,
   X,
 } from 'lucide-react'
@@ -29,6 +30,7 @@ import QrChannels from './QrChannels'
 import OrdersInbox from './OrdersInbox'
 import ReservationsDesk from './ReservationsDesk'
 import DevicesManager from './DevicesManager'
+import GuestsManager from './GuestsManager'
 import ActivityManager, { ActivityCard } from './ActivityManager'
 
 const navigation = [
@@ -40,6 +42,7 @@ const navigation = [
   { id: 'locations', label: 'Locations', icon: Store },
   { id: 'menu', label: 'Menu & catalogue', icon: MenuIcon },
   { id: 'team', label: 'Team', icon: Users },
+  { id: 'guests', label: 'Customers', icon: UserRound },
   { id: 'online', label: 'QR menu', icon: QrCode },
   { id: 'devices', label: 'Devices', icon: MonitorSmartphone },
   { id: 'reports', label: 'Reports', icon: BarChart3 },
@@ -624,8 +627,9 @@ function Dashboard({ session, context, onReloadContext }) {
           {activeSection === 'team' && <TeamManager context={context} />}
           {activeSection === 'online' && <QrChannels context={context} />}
           {activeSection === 'devices' && <DevicesManager context={context} />}
+          {activeSection === 'guests' && <GuestsManager context={context} />}
           {activeSection === 'settings' && <AccountSettingsPage email={session.user.email} onSignOut={signOut} />}
-          {!['overview', 'orders', 'reservations', 'sales', 'activity', 'locations', 'menu', 'team', 'online', 'devices'].includes(activeSection) && (
+          {!['overview', 'orders', 'reservations', 'sales', 'activity', 'locations', 'menu', 'team', 'online', 'devices', 'guests'].includes(activeSection) && (
             activeSection !== 'settings' && <SectionPage section={activeSection} context={context} />
           )}
         </main>

@@ -239,6 +239,65 @@ a { color: inherit; }
   .device-name small { white-space: normal; }
 }
 
+/* ── Customers: база клиентов лояльности (114) ───────────────── */
+.guest-search { display: flex; align-items: center; gap: 8px; flex: 1; max-width: 320px; height: 38px; padding: 0 12px; border: 1px solid #cfd2d8; border-radius: 8px; background: #fff; }
+.guest-search svg { width: 15px; height: 15px; color: #9ba0a8; flex-shrink: 0; }
+.guest-search input { flex: 1; min-width: 0; border: 0; outline: none; font-size: 14px; background: transparent; }
+
+.guest-row { width: 100%; text-align: start; background: none; border: 0; cursor: pointer; font: inherit; }
+.guest-row:hover { background: #f6f7f9; }
+.guest-main { min-width: 0; }
+.guest-main strong { display: block; font-size: 13px; font-weight: 700; color: #25282d; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.guest-main small { display: block; margin-top: 3px; color: #9ba0a8; font-size: 11px; font-variant-numeric: tabular-nums; }
+.guest-meta { display: flex; align-items: center; gap: 18px; flex-shrink: 0; font-variant-numeric: tabular-nums; }
+.guest-balance { font-size: 13px; font-weight: 750; color: #25282d; white-space: nowrap; }
+.guest-visits, .guest-spent { font-size: 12px; color: #5f646c; white-space: nowrap; }
+.guest-seen { font-size: 12px; color: #7c8087; white-space: nowrap; min-width: 62px; text-align: end; }
+
+/* Карточка гостя */
+.guest-stats { display: grid; grid-template-columns: repeat(4, 1fr); gap: 10px; }
+.guest-stats > div { padding: 10px 12px; border: 1px solid #e8e9ec; border-radius: 8px; background: #fafbfc; }
+.guest-stats span { display: block; font-size: 11px; font-weight: 700; color: #7c8087; text-transform: uppercase; letter-spacing: .02em; }
+.guest-stats strong { display: block; margin-top: 4px; font-size: 15px; font-weight: 800; color: #25282d; font-variant-numeric: tabular-nums; }
+
+.guest-note { margin: 0; padding: 10px 12px; border-radius: 8px; background: #fff8e6; border: 1px solid #f0e2bd; font-size: 13px; color: #5c4c22; }
+
+.guest-section-label { display: block; margin-bottom: 6px; font-size: 11px; font-weight: 700; color: #7c8087; text-transform: uppercase; letter-spacing: .02em; }
+.guest-fav-list { display: flex; flex-wrap: wrap; gap: 6px; }
+.guest-fav { padding: 4px 10px; border-radius: 999px; background: #f1f2f4; font-size: 12px; font-weight: 650; color: #3c4148; }
+
+.guest-tabs { display: inline-flex; gap: 2px; padding: 2px; border: 1px solid #e8e9ec; border-radius: 8px; background: #f6f7f9; }
+.guest-tabs button { height: 32px; padding: 0 14px; border: 0; border-radius: 6px; background: none; font: inherit; font-size: 13px; font-weight: 700; color: #7c8087; cursor: pointer; }
+.guest-tabs button.is-active { background: #fff; color: #25282d; box-shadow: 0 1px 2px rgb(0 0 0 / 8%); }
+
+.guest-orders { display: grid; gap: 6px; }
+.guest-order { border: 1px solid #e8e9ec; border-radius: 8px; overflow: hidden; }
+.guest-order-head { display: flex; align-items: center; gap: 12px; width: 100%; padding: 9px 12px; border: 0; background: none; font: inherit; text-align: start; cursor: pointer; }
+.guest-order-head:hover { background: #f6f7f9; }
+.guest-order-head strong { font-size: 13px; font-weight: 750; color: #25282d; font-variant-numeric: tabular-nums; }
+.guest-order-date { flex: 1; font-size: 12px; color: #7c8087; font-variant-numeric: tabular-nums; }
+.guest-order-total { font-size: 13px; font-weight: 700; color: #25282d; font-variant-numeric: tabular-nums; }
+.guest-order-chevron { color: #9ba0a8; font-size: 11px; }
+.guest-order-items { padding: 8px 12px; border-top: 1px solid #e8e9ec; background: #fafbfc; display: grid; gap: 4px; }
+.guest-order-item { display: flex; align-items: baseline; gap: 8px; font-size: 12px; }
+.guest-order-item .qty { color: #7c8087; font-variant-numeric: tabular-nums; flex-shrink: 0; }
+.guest-order-item .name { flex: 1; color: #25282d; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.guest-order-item .sum { color: #25282d; font-variant-numeric: tabular-nums; flex-shrink: 0; }
+.guest-order-item.is-discount { padding-top: 5px; border-top: 1px solid #e8e9ec; }
+.guest-order-item.is-discount .name { color: #7c8087; }
+
+.guest-events { display: grid; gap: 4px; }
+.guest-event { display: flex; align-items: center; gap: 12px; padding: 8px 12px; border: 1px solid #e8e9ec; border-radius: 8px; }
+.guest-event-date { flex: 1; font-size: 12px; color: #7c8087; font-variant-numeric: tabular-nums; }
+.guest-event-delta { font-size: 13px; font-weight: 750; color: #25282d; font-variant-numeric: tabular-nums; }
+.guest-event-delta.is-positive { color: #34734c; }
+
+@media (max-width: 640px) {
+  .guest-stats { grid-template-columns: repeat(2, 1fr); }
+  .guest-meta { gap: 10px; }
+  .guest-visits, .guest-spent { display: none; }
+}
+
 /* ── Лента активности ─────────────────────────────────────── */
 .activity-panel { margin-top: 20px; }
 .activity-list { display: grid; padding: 6px 0; }
