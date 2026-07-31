@@ -87,3 +87,100 @@ export function visitLabel(iso) {
   if (sameDay(date, tomorrow)) return `Tomorrow · ${time}`
   return `${date.toLocaleDateString([], { weekday: 'short', day: 'numeric', month: 'short' })} · ${time}`
 }
+
+// ── Таймлайн хостес (Kassa 119/120) ──────────────────────────
+
+/**
+ * Брони суток для полотна. Берём с запасом в сутки назад: ночная смена
+ * начинается вчера, а фильтровать по концу визита через PostgREST нельзя —
+ * длительность у каждой брони своя. Лишнее отсечёт раскладка по окну дня.
+ *
+ * `reservation_tables` (119) — источник занятости: столы объединения
+ * приходят строками, а не разбором массива на клиенте.
+ */
+export async function fetchTimelineReservations(locationId, fromMs, toMs) {
+  const { data, error } = await supabase
+    .from('reservations')
+    .select(
+      'id, status, customer_name, customer_phone, party_size, reserved_at, '
+      + 'duration_min, note, order_id, arrived_at, table_id, hold_table_ids, zone_id, '
+      + 'tables_link:reservation_tables ( table_id, is_primary )'
+    )
+    .eq('location_id', locationId)
+    .gte('reserved_at', new Date(fromMs - 24 * 3600_000).toISOString())
+    .lt('reserved_at', new Date(toMs).toISOString())
+    .order('reserved_at', { ascending: true })
+    .limit(500)
+  if (error) throw new Error(error.message)
+  return data ?? []
+}
+
+/** Столы и зоны точки для строк полотна */
+export async function fetchTimelineTables(locationId) {
+  const [tables, zones] = await Promise.all([
+    supabase.from('tables')
+      .select('id, label, seats, zone_id, sort_order, is_active, status')
+      .eq('location_id', locationId)
+      .order('sort_order'),
+    supabase.from('table_zones')
+      .select('id, name, sort_order')
+      .eq('location_id', locationId).eq('is_active', true)
+      .order('sort_order'),
+  ])
+  if (tables.error) throw new Error(tables.error.message)
+  if (zones.error) throw new Error(zones.error.message)
+  const zoneName = new Map((zones.data ?? []).map((z) => [z.id, z.name]))
+  return (tables.data ?? []).map((t) => ({
+    id: t.id,
+    label: t.label,
+    seats: t.seats ?? 2,
+    zoneId: t.zone_id ?? null,
+    zoneName: t.zone_id ? zoneName.get(t.zone_id) ?? null : null,
+    sortOrder: t.sort_order ?? 0,
+    blocked: !t.is_active || t.status === 'disabled',
+  }))
+}
+
+/** Настройки брони точки — из них берётся окно дня */
+export async function fetchReservationSettings(locationId) {
+  const { data, error } = await supabase
+    .from('locations')
+    .select('timezone, rsv:settings->reservations')
+    .eq('id', locationId)
+    .maybeSingle()
+  if (error) throw new Error(error.message)
+  return {
+    timezone: data?.timezone || 'Asia/Jerusalem',
+    schedule: data?.rsv?.schedule ?? null,
+  }
+}
+
+/** Назначить / объединить / разъединить столы визита (120) */
+export async function setReservationTables(locationId, id, tableIds) {
+  const { error } = await supabase.rpc('set_reservation_tables_web', {
+    p_location_id: locationId,
+    p_id: id,
+    p_table_ids: tableIds,
+  })
+  if (error) throw new Error(error.message)
+}
+
+/** Отметить посадку гостя без POS-заказа (120) */
+export async function markReservationArrived(locationId, id) {
+  const { error } = await supabase.rpc('mark_reservation_arrived_web', {
+    p_location_id: locationId,
+    p_id: id,
+  })
+  if (error) throw new Error(error.message)
+}
+
+/** Человеческий текст ошибок стола хостес */
+export function deskErrorText(message) {
+  const m = String(message || '')
+  if (m.includes('pos_mode')) return 'This booking is seated into a POS order — it is handled on the register.'
+  if (m.includes('table_busy')) return 'That table is taken for this time — pick another.'
+  if (m.includes('not_active')) return 'This booking is no longer active.'
+  if (m.includes('not_confirmed')) return 'Confirm the booking before seating the guest.'
+  if (m.includes('module_disabled')) return 'The Reserve product is not active for this account.'
+  return m
+}

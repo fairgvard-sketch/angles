@@ -858,3 +858,87 @@ a { color: inherit; }
 .export-report td { padding: 10px; border-top: 1px solid #eef0f2; color: #1b1e24; font-variant-numeric: tabular-nums; }
 .export-report td:last-child, .export-report th:last-child,
 .export-report td:nth-child(2), .export-report th:nth-child(2) { text-align: end; }
+
+
+/* ── Таймлайн хостес (Kassa 119/120) ─────────────────────────
+   Столы по вертикали, время по горизонтали. Полотно прокручивается
+   горизонтально; колонка столов и линейка часов держат ширину, поэтому
+   блоки позиционируются процентами внутри трека фиксированной ширины. */
+.timeline-controls {
+  display: flex; flex-wrap: wrap; align-items: center; gap: 12px; margin: 16px 0;
+}
+.timeline-daynav, .timeline-zones { display: flex; align-items: center; gap: 6px; flex-wrap: wrap; }
+.timeline-daynav input[type="date"] {
+  height: 36px; padding: 0 10px; border: 1px solid #cfd2d8; border-radius: 8px;
+  background: #fff; font-size: 14px;
+}
+.timeline-daynav svg { width: 16px; height: 16px; }
+.timeline-summary { display: flex; gap: 18px; margin-inline-start: auto; }
+.timeline-summary span { display: flex; flex-direction: column; }
+.timeline-summary small { color: #5d626b; font-size: 12px; }
+.timeline-summary strong { font-size: 18px; color: #16181d; font-variant-numeric: tabular-nums; }
+.timeline-summary .is-accent strong { color: #a15c07; }
+
+.timeline-scroll {
+  overflow-x: auto; border: 1px solid #e3e5e9; border-radius: 12px; background: #fff;
+}
+.timeline-ruler { display: flex; position: sticky; top: 0; z-index: 2; background: #fff; border-bottom: 1px solid #e3e5e9; }
+.timeline-ruler .timeline-track { height: 32px; }
+.timeline-zonerow { display: flex; background: #f6f7f9; border-bottom: 1px solid #eef0f2; }
+.timeline-zonerow .timeline-label { font-size: 12px; font-weight: 700; color: #5d626b; padding: 6px 12px; }
+.timeline-row { display: flex; border-bottom: 1px solid #f0f1f3; }
+.timeline-row:last-child { border-bottom: 0; }
+.timeline-label {
+  flex: 0 0 auto; display: flex; align-items: center; gap: 8px;
+  padding: 8px 12px; border-inline-end: 1px solid #e3e5e9; background: #fff;
+}
+.timeline-label strong { font-size: 15px; color: #16181d; }
+.timeline-label small { color: #7a7f88; font-size: 12px; }
+.timeline-track { position: relative; height: 56px; }
+.timeline-track.is-blocked { background: #f2f3f5; }
+.timeline-tick {
+  position: absolute; top: 8px; transform: translateX(-50%);
+  font-size: 12px; font-weight: 650; color: #5d626b; font-variant-numeric: tabular-nums;
+}
+.timeline-grid { position: absolute; inset-block: 0; width: 1px; background: #f0f1f3; }
+.timeline-now { position: absolute; inset-block: 0; width: 2px; background: #d92d20; z-index: 1; }
+.timeline-blocked {
+  position: absolute; inset: 0; display: flex; align-items: center; justify-content: center;
+  font-size: 12px; font-weight: 650; color: #9ba0a8;
+}
+.timeline-block {
+  position: absolute; top: 6px; bottom: 6px; min-width: 44px;
+  display: flex; flex-direction: column; justify-content: center; gap: 2px;
+  padding: 0 8px; border-radius: 8px; border: 1px solid; text-align: start;
+  overflow: hidden; cursor: pointer; font: inherit;
+}
+.timeline-block strong { font-size: 13px; font-weight: 700; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.timeline-block small { font-size: 11px; opacity: 0.8; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.timeline-block.is-pending { background: #fff8eb; border-color: #f0c274; color: #6b4708; }
+.timeline-block.is-confirmed { background: #fff; border-color: #cfd2d8; color: #16181d; }
+.timeline-block.is-arrived { background: #16181d; border-color: #16181d; color: #fff; }
+.timeline-block.is-done { background: #f2f3f5; border-color: #e3e5e9; color: #7a7f88; }
+.timeline-block.is-noshow { background: #fdf1f0; border-color: #f3c4c0; color: #9b2c22; }
+.timeline-block.is-conflict { box-shadow: 0 0 0 2px #d92d20; }
+
+.timeline-tablepick { display: flex; flex-wrap: wrap; gap: 6px; margin: 8px 0; }
+
+/* Лист карточки визита */
+.sheet-backdrop {
+  position: fixed; inset: 0; z-index: 50; background: rgb(0 0 0 / 40%);
+  display: flex; align-items: flex-end; justify-content: center;
+}
+.sheet {
+  width: 100%; max-width: 560px; background: #fff;
+  border-radius: 16px 16px 0 0; padding: 20px; display: flex; flex-direction: column; gap: 10px;
+  max-height: 88vh; overflow-y: auto;
+}
+.sheet h3 { font-size: 18px; color: #16181d; }
+.sheet-sub { color: #5d626b; font-size: 14px; }
+.sheet-section { display: flex; flex-direction: column; gap: 6px; margin-top: 6px; }
+.sheet-section-title { font-size: 12px; font-weight: 700; color: #5d626b; text-transform: uppercase; letter-spacing: .04em; }
+
+@media (max-width: 720px) {
+  .timeline-summary { margin-inline-start: 0; gap: 12px; }
+  .sheet { max-width: none; }
+}

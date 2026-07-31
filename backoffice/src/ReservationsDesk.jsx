@@ -6,6 +6,7 @@ import {
   fetchReservations, setReservationStatus, visitLabel,
 } from './reservations'
 import { playNewOrderChime } from './orders'
+import TimelineDesk from './TimelineDesk'
 
 /**
  * «Reservations» — веб-стол хостес (Kassa 102): подтверждение, отказ,
@@ -66,6 +67,9 @@ export default function ReservationsDesk({ context }) {
   const [data, setData] = useState(null)
   const [error, setError] = useState('')
   const [busy, setBusy] = useState(null) // { id, to }
+  // Таймлайн — вид по умолчанию: владелец открывает раздел, чтобы увидеть
+  // зал. Списки заявок остаются вторым видом, а не удаляются.
+  const [view, setView] = useState('timeline')
   const knownIds = useRef(new Set())
 
   const refresh = useCallback(async (withSound = false) => {
@@ -148,8 +152,24 @@ export default function ReservationsDesk({ context }) {
         </div>
       )}
 
+      <div className="timeline-zones" style={{ marginBottom: 16 }}>
+        {['timeline', 'list'].map((v) => (
+          <button
+            key={v}
+            type="button"
+            className={view === v ? 'primary-button compact' : 'secondary-button compact'}
+            onClick={() => setView(v)}
+          >
+            {v === 'timeline' ? 'Timeline' : 'List'}
+          </button>
+        ))}
+      </div>
+
       {error && <p className="form-error" role="alert">{error}</p>}
 
+      {view === 'timeline' && locationId && <TimelineDesk locationId={locationId} />}
+
+      {view === 'list' && (
       <section className="panel form-panel">
         <div className="panel-heading">
           <div>
@@ -177,7 +197,9 @@ export default function ReservationsDesk({ context }) {
           </div>
         )}
       </section>
+      )}
 
+      {view === 'list' && (
       <section className="panel form-panel">
         <div className="panel-heading">
           <div><h2>Upcoming & today</h2><p>Confirmed visits from today onwards.</p></div>
@@ -199,8 +221,9 @@ export default function ReservationsDesk({ context }) {
           </div>
         )}
       </section>
+      )}
 
-      {history.length > 0 && (
+      {view === 'list' && history.length > 0 && (
         <section className="panel form-panel">
           <div className="panel-heading">
             <div><h2>Recent history</h2><p>Completed, no-show, rejected and cancelled bookings.</p></div>
