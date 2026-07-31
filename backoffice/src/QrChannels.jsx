@@ -2,7 +2,7 @@ import { useEffect, useState } from 'react'
 import {
   AlertTriangle, Check, Clock, Copy, Download, ExternalLink, Image, LayoutGrid,
   QrCode, RefreshCw, ShoppingBag, Smartphone, Store, Table, Code2,
-  CalendarClock, Wallet, Contact,
+  CalendarClock, Contact,
 } from 'lucide-react'
 import { fetchLocation, fetchLocationSlug, fetchTables, saveLocationSlug } from './settings'
 import {
@@ -13,9 +13,14 @@ import {
   uploadHeroVideo,
   orderUrl, tableOrderUrl, reserveUrl,
   embedButtonSnippet, embedIframeSnippet,
-  agorotToInput, inputToAgorot,
   WEEK_DAYS, dayWindow, withDay, defaultHours, hoursSummary,
 } from './online'
+import {
+  WEEK_DAYS as RSV_WEEK_DAYS, normalizeSchedule, dayWindows, withAddedWindow,
+  withRemovedWindow, withWindowEdge, withDayWindows, withException,
+  withoutException, exceptionList, previewDays, formatWindows, scheduleSummary,
+  validateSchedule, todayInZone,
+} from './reserve-schedule'
 import {
   Field, LinkBlock, NumberSelect, QrCanvas, SettingGroup, SnippetBlock, Toggle,
   downloadQr, useCopy,
@@ -633,34 +638,221 @@ function OnlineTab({ context, locationId, settings, tables, patch, slug, onSlugS
 
 // ── Бронирование ─────────────────────────────────────────────
 
-function ReserveTab({ locationId, settings, patch, slug, openGroup, onOpenGroup }) {
+/**
+ * Недельное расписание брони (Kassa 117): окна по дням (несколько на день —
+ * обед и ужин), исключения по датам, запас до визита и горизонт записи.
+ *
+ * Заменяет пару open/close, действовавшую на все семь дней сразу, и
+ * свободный текст «часы работы», который вёлся отдельно от неё. Расхождение
+ * этих двух полей и было причиной субботних слотов у заведения, закрытого
+ * по субботам: гостю показывали одно, сервер принимал другое.
+ *
+ * Расписание сохраняется целиком одним патчем: серверный merge заменяет
+ * ключ schedule целиком, поэтому частичная отправка стёрла бы остальные дни.
+ */
+function ReservationSchedule({ schedule, tz, onChange }) {
+  const [error, setError] = useState('')
+  const [newDate, setNewDate] = useState('')
+
+  function commit(next) {
+    const problem = validateSchedule(next)
+    setError(problem || '')
+    if (problem) return
+    onChange(next)
+  }
+
+  const exceptions = exceptionList(schedule)
+  const preview = previewDays(schedule, tz)
+
+  return (
+    <>
+      <div className="hours-editor">
+        {RSV_WEEK_DAYS.map((day) => {
+          const windows = dayWindows(schedule, day.key)
+          const open = windows.length > 0
+          return (
+            <div key={day.key} className={`hours-row${open ? '' : ' is-closed'}`}>
+              <label className="hours-day">
+                <input
+                  type="checkbox"
+                  checked={open}
+                  onChange={(event) => commit(withDayWindows(
+                    schedule, day.key, event.target.checked ? [['08:00', '20:00']] : []
+                  ))}
+                />
+                <span>{day.label}</span>
+              </label>
+              {open ? (
+                <div className="hours-windows">
+                  {windows.map((window, index) => (
+                    <div key={index} className="hours-window">
+                      <input
+                        type="time"
+                        value={window[0]}
+                        onChange={(event) => commit(
+                          withWindowEdge(schedule, day.key, index, 0, event.target.value)
+                        )}
+                      />
+                      <span className="hours-dash">–</span>
+                      <input
+                        type="time"
+                        value={window[1]}
+                        onChange={(event) => commit(
+                          withWindowEdge(schedule, day.key, index, 1, event.target.value)
+                        )}
+                      />
+                      {windows.length > 1 && (
+                        <button
+                          type="button"
+                          className="secondary-button compact"
+                          onClick={() => commit(withRemovedWindow(schedule, day.key, index))}
+                        >
+                          Remove
+                        </button>
+                      )}
+                    </div>
+                  ))}
+                  <button
+                    type="button"
+                    className="secondary-button compact"
+                    onClick={() => commit(withAddedWindow(schedule, day.key))}
+                  >
+                    Add a service period
+                  </button>
+                </div>
+              ) : (
+                <span className="hours-closed">Closed</span>
+              )}
+            </div>
+          )
+        })}
+      </div>
+      <p className="form-hint">
+        Times are in the location’s own time zone. A second period on the same
+        day covers a split shift — lunch and dinner. A closing time earlier than
+        the opening time means the shift runs past midnight: 20:00–02:00 keeps
+        bookings open until two in the morning.
+      </p>
+
+      <div className="panel-heading" style={{ marginTop: 20 }}>
+        <div>
+          <h3>Holidays and one-off changes</h3>
+          <p>A date here replaces the weekly rule for that day entirely.</p>
+        </div>
+      </div>
+      {exceptions.length > 0 && (
+        <div className="hours-editor">
+          {exceptions.map(({ date, windows }) => (
+            <div key={date} className={`hours-row${windows.length ? '' : ' is-closed'}`}>
+              <span className="hours-day"><span>{date}</span></span>
+              {windows.length > 0 ? (
+                <div className="hours-window">
+                  <input
+                    type="time"
+                    value={windows[0][0]}
+                    onChange={(event) => commit(withException(
+                      schedule, date, [[event.target.value, windows[0][1]]]
+                    ))}
+                  />
+                  <span className="hours-dash">–</span>
+                  <input
+                    type="time"
+                    value={windows[0][1]}
+                    onChange={(event) => commit(withException(
+                      schedule, date, [[windows[0][0], event.target.value]]
+                    ))}
+                  />
+                </div>
+              ) : (
+                <span className="hours-closed">Closed</span>
+              )}
+              <div className="order-actions">
+                <button
+                  type="button"
+                  className="secondary-button compact"
+                  onClick={() => commit(withException(
+                    schedule, date, windows.length ? [] : [['18:00', '23:00']]
+                  ))}
+                >
+                  {windows.length ? 'Mark closed' : 'Set hours'}
+                </button>
+                <button
+                  type="button"
+                  className="secondary-button compact"
+                  onClick={() => commit(withoutException(schedule, date))}
+                >
+                  Remove
+                </button>
+              </div>
+            </div>
+          ))}
+        </div>
+      )}
+      <div className="qr-grid">
+        <Field label="Add a date">
+          <input
+            type="date"
+            value={newDate}
+            min={todayInZone(tz)}
+            onChange={(event) => setNewDate(event.target.value)}
+          />
+        </Field>
+        <Field label="&nbsp;">
+          <button
+            type="button"
+            className="secondary-button"
+            disabled={!newDate}
+            onClick={() => {
+              commit(withException(schedule, newDate, []))
+              setNewDate('')
+            }}
+          >
+            Close this date
+          </button>
+        </Field>
+      </div>
+
+      <div className="panel-heading" style={{ marginTop: 20 }}>
+        <div>
+          <h3>Next seven days</h3>
+          <p>Exactly what a guest can book right now.</p>
+        </div>
+      </div>
+      <div className="hours-editor">
+        {preview.map((day) => (
+          <div key={day.date} className={`hours-row${day.windows.length ? '' : ' is-closed'}`}>
+            <span className="hours-day">
+              <span>
+                {RSV_WEEK_DAYS[day.dow]?.short} {day.date.slice(5)}
+                {day.isToday ? ' · today' : ''}
+                {day.isException ? ' · one-off' : ''}
+              </span>
+            </span>
+            <span className={day.windows.length ? '' : 'hours-closed'}>
+              {formatWindows(day.windows)}
+            </span>
+          </div>
+        ))}
+      </div>
+
+      {error && <p className="form-error" role="alert">{error}</p>}
+    </>
+  )
+}
+
+function ReserveTab({ locationId, settings, patch, slug, tz, openGroup, onOpenGroup }) {
   const enabled = reservationsEnabled(settings)
   const rsv = settings.reservations || {}
   const instant = rsv.instant === true
-  const depositOn = rsv.deposit_required === true
-
-  // Депозит — деньги: держим черновик строкой, коммитим агороты на blur,
-  // чтобы промежуточный ввод «1.» не улетал в базу как мусор.
-  const [depositDraft, setDepositDraft] = useState(agorotToInput(rsv.deposit_amount))
-  const [depositError, setDepositError] = useState('')
-
-  function commitDeposit() {
-    const agorot = inputToAgorot(depositDraft)
-    if (agorot === null) {
-      setDepositError('Enter an amount like 50 or 49.90')
-      return
-    }
-    setDepositError('')
-    setDepositDraft(agorotToInput(agorot))
-    patch({ deposit_amount: agorot })
-  }
+  // Расписание (Kassa 117). Точка без ключа schedule разворачивается из
+  // legacy open/close, поэтому редактор всегда открывается заполненным.
+  const schedule = normalizeSchedule(rsv)
 
   const group = (key) => ({
     open: openGroup === key,
     onToggle: () => onOpenGroup(openGroup === key ? null : key),
   })
 
-  const hoursValue = rsv.open && rsv.close ? `${rsv.open}–${rsv.close}` : 'Any hour'
 
   return (
     <>
@@ -677,47 +869,60 @@ function ReserveTab({ locationId, settings, patch, slug, openGroup, onOpenGroup 
       <SettingGroup
         {...group('hours')}
         icon={CalendarClock}
-        title="Booking hours & party size"
-        hint="Which slots the guest can pick."
-        value={`${hoursValue} · up to ${rsv.max_party ?? 20}`}
+        title="Booking hours"
+        hint="The one schedule guests see and book by."
+        value={scheduleSummary(schedule)}
       >
         {enabled ? (
-          <>
-            <p className="form-hint" style={{ marginTop: 12 }}>
-              Leave the times empty to accept any hour.
-            </p>
-            <div className="qr-grid">
-              <Field label="Opens">
-                <input
-                  type="time"
-                  value={rsv.open ?? ''}
-                  onChange={(e) => patch({ open: e.target.value || null })}
-                />
-              </Field>
-              <Field label="Closes">
-                <input
-                  type="time"
-                  value={rsv.close ?? ''}
-                  onChange={(e) => patch({ close: e.target.value || null })}
-                />
-              </Field>
-              <Field label="Slot, minutes">
-                <NumberSelect
-                  value={rsv.slot_min} fallback={15} options={[15, 30, 60]}
-                  onChange={(v) => patch({ slot_min: v })}
-                />
-              </Field>
-              <Field label="Max party size">
-                <NumberSelect
-                  value={rsv.max_party} fallback={20} options={[2, 4, 6, 8, 10, 12, 15, 20, 30, 50]}
-                  onChange={(v) => patch({ max_party: v })}
-                />
-              </Field>
-            </div>
-          </>
+          <ReservationSchedule
+            schedule={schedule}
+            tz={tz}
+            onChange={(next) => patch({ schedule: next })}
+          />
         ) : (
           <p className="form-hint" style={{ marginTop: 12 }}>
             Turn reservations on above to set booking hours.
+          </p>
+        )}
+      </SettingGroup>
+
+      <SettingGroup
+        {...group('window')}
+        icon={Clock}
+        title="Slots & booking window"
+        hint="Slot length, party limit and how far ahead guests can book."
+        value={`${rsv.slot_min ?? 15} min · up to ${rsv.max_party ?? 20}`}
+      >
+        {enabled ? (
+          <div className="qr-grid">
+            <Field label="Slot, minutes">
+              <NumberSelect
+                value={rsv.slot_min} fallback={15} options={[15, 30, 60]}
+                onChange={(v) => patch({ slot_min: v })}
+              />
+            </Field>
+            <Field label="Max party size">
+              <NumberSelect
+                value={rsv.max_party} fallback={20} options={[2, 4, 6, 8, 10, 12, 15, 20, 30, 50]}
+                onChange={(v) => patch({ max_party: v })}
+              />
+            </Field>
+            <Field label="Book at least, minutes ahead">
+              <NumberSelect
+                value={schedule.lead_min} fallback={30} options={[0, 15, 30, 60, 120, 180, 1440]}
+                onChange={(v) => patch({ schedule: { ...schedule, lead_min: v } })}
+              />
+            </Field>
+            <Field label="Book at most, days ahead">
+              <NumberSelect
+                value={schedule.horizon_days} fallback={30} options={[7, 14, 30, 60, 90, 180, 365]}
+                onChange={(v) => patch({ schedule: { ...schedule, horizon_days: v } })}
+              />
+            </Field>
+          </div>
+        ) : (
+          <p className="form-hint" style={{ marginTop: 12 }}>
+            Turn reservations on above to set the booking window.
           </p>
         )}
       </SettingGroup>
@@ -769,49 +974,11 @@ function ReserveTab({ locationId, settings, patch, slug, openGroup, onOpenGroup 
         )}
       </SettingGroup>
 
-      <SettingGroup
-        {...group('deposit')}
-        icon={Wallet}
-        title="Deposit"
-        hint="Ask larger parties to pay upfront when booking."
-        value={depositOn ? `₪ ${agorotToInput(rsv.deposit_amount)} from ${rsv.deposit_from_party ?? 1}` : 'Off'}
-      >
-        {enabled ? (
-          <>
-            <Toggle
-              label="Require a deposit"
-              hint="Ask larger parties to pay upfront when booking."
-              checked={depositOn}
-              onChange={(v) => patch({ deposit_required: v })}
-            />
-            {depositOn && (
-              <div className="qr-grid">
-                <Field label="Deposit amount, ₪">
-                  <input
-                    inputMode="decimal"
-                    placeholder="0"
-                    value={depositDraft}
-                    onChange={(e) => setDepositDraft(e.target.value)}
-                    onBlur={commitDeposit}
-                  />
-                </Field>
-                <Field label="From party of">
-                  <NumberSelect
-                    value={rsv.deposit_from_party} fallback={1} options={[1, 2, 4, 6, 8, 10, 12]}
-                    onChange={(v) => patch({ deposit_from_party: v })}
-                  />
-                </Field>
-              </div>
-            )}
-            {depositError && <p className="form-error" role="alert">{depositError}</p>}
-          </>
-        ) : (
-          <p className="form-hint" style={{ marginTop: 12 }}>
-            Turn reservations on above to require a deposit.
-          </p>
-        )}
-      </SettingGroup>
-
+      {/* Депозит убран из интерфейса (Kassa 117). Поля deposit_* и серверная
+          логика сохранены — точка, у которой флаг уже проставлен, ведёт себя
+          как прежде, — но показывать переключатель нельзя: оплаты за ним нет
+          и не планируется, а владелец воспринимал его как работающую
+          предоплату. Вернуть — только вместе с реальным приёмом платежа. */}
       <SettingGroup
         {...group('page')}
         icon={Contact}
@@ -826,17 +993,10 @@ function ReserveTab({ locationId, settings, patch, slug, openGroup, onOpenGroup 
               onBlur={(e) => patch({ display_name: e.target.value.trim() || null })}
             />
           </Field>
-          {/* Одна строка на день, день и время разделены «·» — так их
-              парсит HoursRows на гостевой странице (PublicReservePage).
-              Однострочный input не дал бы ввести перевод строки. */}
-          <Field label="Opening hours">
-            <textarea
-              rows={4}
-              defaultValue={rsv.hours || ''}
-              placeholder={'Sun–Thu · 8:00–22:00\nFri · 8:00–14:00\nSat · closed'}
-              onBlur={(e) => patch({ hours: e.target.value.trim() || null })}
-            />
-          </Field>
+          {/* Свободный текст часов убран (Kassa 117): он вёлся ОТДЕЛЬНО от
+              часов приёма и расходился с ними — страница писала «шабат
+              закрыто» и предлагала субботние слоты. Гостю теперь показывается
+              расписание из группы «Booking hours». */}
           <Field label="Address">
             <input
               defaultValue={rsv.address || ''}
@@ -1033,6 +1193,7 @@ export default function QrChannels({ context }) {
           settings={settings}
           patch={makePatcher('reservations', saveReservations)}
           slug={slug}
+          tz={locations.find((l) => l.id === activeId)?.timezone || 'Asia/Jerusalem'}
           openGroup={openGroup}
           onOpenGroup={setOpenGroup}
         />

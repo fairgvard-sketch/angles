@@ -774,9 +774,17 @@ a { color: inherit; }
 .hours-dash { color: #9ba0a8; }
 .hours-closed { color: #9ba0a8; font-size: 13px; font-weight: 650; }
 
+/* Расписание брони (Kassa 117) допускает НЕСКОЛЬКО окон в день — обед и
+   ужин. Окна становятся друг под другом, кнопка «добавить» замыкает
+   колонку; у заказов остаётся один интервал и одна строка. */
+.hours-windows { display: flex; flex-direction: column; align-items: flex-end; gap: 8px; }
+.hours-windows .secondary-button.compact { white-space: nowrap; }
+.hours-row .order-actions { display: flex; gap: 8px; }
+
 @media (max-width: 640px) {
   .hours-row { grid-template-columns: minmax(0, 1fr); gap: 8px; }
   .hours-window { justify-content: flex-start; }
+  .hours-windows { align-items: stretch; }
 }
 
 /* Онбординг digital-only аккаунта: карточки цели + форма названий. */
