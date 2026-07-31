@@ -942,3 +942,7 @@ a { color: inherit; }
   .timeline-summary { margin-inline-start: 0; gap: 12px; }
   .sheet { max-width: none; }
 }
+
+/* Неявки гостя (Kassa 121): красная метка среди нейтральных — единственное,
+   что в этом блоке требует внимания хостес. */
+.guest-fav.is-warn { background: #fdf1f0; color: #9b2c22; }

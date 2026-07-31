@@ -57,6 +57,10 @@ function GuestCard({ guest, onModeKnown, onClose }) {
   const orders = card?.orders ?? []
   const favorites = card?.favorites ?? []
   const events = card?.events ?? []
+  // Kassa 121: ресторанное поведение и внутренние метки. У точки без кассы
+  // заказы пусты, а этот блок полон — профиль осмыслен и без POS.
+  const rsv = card?.reservations
+  const tags = card?.tags ?? []
 
   return (
     <div className="modal-scrim" onClick={onClose}>
@@ -74,6 +78,31 @@ function GuestCard({ guest, onModeKnown, onClose }) {
             <div><span>Total spent</span><strong>{formatMoney(guest.total_spent)}</strong></div>
             <div><span>Last visit</span><strong>{lastVisitLabel(guest.last_visit_at)}</strong></div>
           </div>
+
+          {rsv && rsv.total > 0 && (
+            <div className="guest-favs">
+              <span className="guest-section-label">Bookings</span>
+              <div className="guest-fav-list">
+                <span className="guest-fav">{rsv.visits} visits</span>
+                {rsv.upcoming > 0 && <span className="guest-fav">{rsv.upcoming} upcoming</span>}
+                {rsv.no_shows > 0 && (
+                  <span className="guest-fav is-warn">{rsv.no_shows} no-show</span>
+                )}
+                {rsv.cancelled > 0 && <span className="guest-fav">{rsv.cancelled} cancelled</span>}
+                {rsv.zone && <span className="guest-fav">{rsv.zone}</span>}
+                {rsv.avg_party && <span className="guest-fav">~{rsv.avg_party} guests</span>}
+              </div>
+            </div>
+          )}
+
+          {tags.length > 0 && (
+            <div className="guest-favs">
+              <span className="guest-section-label">Tags</span>
+              <div className="guest-fav-list">
+                {tags.map((tag) => <span className="guest-fav" key={tag}>{tag}</span>)}
+              </div>
+            </div>
+          )}
 
           {card?.notes && (
             <p className="guest-note">{card.notes}</p>
