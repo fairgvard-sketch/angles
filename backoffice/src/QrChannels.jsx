@@ -2,7 +2,7 @@ import { useEffect, useState } from 'react'
 import {
   AlertTriangle, Check, Clock, Copy, Download, ExternalLink, Image, LayoutGrid,
   QrCode, RefreshCw, ShoppingBag, Smartphone, Store, Table, Code2,
-  CalendarClock, Contact,
+  CalendarClock, Contact, Ban,
 } from 'lucide-react'
 import { fetchLocation, fetchLocationSlug, fetchTables, saveLocationSlug } from './settings'
 import {
@@ -650,6 +650,37 @@ function OnlineTab({ context, locationId, settings, tables, patch, slug, onSlugS
  * Расписание сохраняется целиком одним патчем: серверный merge заменяет
  * ключ schedule целиком, поэтому частичная отправка стёрла бы остальные дни.
  */
+/**
+ * Правило отсечки: за сколько минут до визита гость теряет право менять
+ * бронь. Значение — минуты (их читает `reservation_guest_block`, Kassa 118),
+ * но выбирать «1440» вместо «за сутки» владелец не должен.
+ */
+const CUTOFF_OPTIONS = [
+  { value: 0, label: 'Any time before the visit' },
+  { value: 60, label: '1 hour before' },
+  { value: 120, label: '2 hours before' },
+  { value: 180, label: '3 hours before' },
+  { value: 360, label: '6 hours before' },
+  { value: 720, label: '12 hours before' },
+  { value: 1440, label: '24 hours before' },
+  { value: 2880, label: '2 days before' },
+]
+
+function CutoffSelect({ value, onChange }) {
+  return (
+    <select value={Number(value) || 0} onChange={(e) => onChange(Number(e.target.value))}>
+      {CUTOFF_OPTIONS.map((o) => (
+        <option key={o.value} value={o.value}>{o.label}</option>
+      ))}
+    </select>
+  )
+}
+
+function cutoffLabel(value) {
+  const found = CUTOFF_OPTIONS.find((o) => o.value === (Number(value) || 0))
+  return found ? found.label : `${value} min before`
+}
+
 function ReservationSchedule({ schedule, tz, onChange }) {
   const [error, setError] = useState('')
   const [newDate, setNewDate] = useState('')
@@ -923,6 +954,52 @@ function ReserveTab({ locationId, settings, patch, slug, tz, openGroup, onOpenGr
         ) : (
           <p className="form-hint" style={{ marginTop: 12 }}>
             Turn reservations on above to set the booking window.
+          </p>
+        )}
+      </SettingGroup>
+
+      <SettingGroup
+        {...group('cutoff')}
+        icon={Ban}
+        title="Cancellation & changes"
+        hint="Until when a guest may cancel or move the booking themselves."
+        value={cutoffLabel(rsv.cancel_cutoff_min)}
+      >
+        {enabled ? (
+          <>
+            <div className="qr-grid">
+              <Field label="Guests can cancel">
+                <CutoffSelect
+                  value={rsv.cancel_cutoff_min}
+                  onChange={(v) => patch({ cancel_cutoff_min: v })}
+                />
+              </Field>
+              <Field label="Guests can move the booking">
+                <CutoffSelect
+                  value={rsv.reschedule_cutoff_min}
+                  onChange={(v) => patch({ reschedule_cutoff_min: v })}
+                />
+              </Field>
+            </div>
+            <p className="form-hint">
+              After the cut-off the buttons disappear from the guest page and the
+              server refuses the change — the rule is not a hint. A booking the
+              register has not confirmed yet can always be withdrawn by the guest:
+              holding someone on an undecided request and refusing to release it
+              would not be fair.
+            </p>
+            <Field label="Cancellation policy shown to the guest">
+              <textarea
+                rows={3}
+                defaultValue={rsv.policy || ''}
+                placeholder="Please let us know at least 2 hours ahead if your plans change."
+                onBlur={(e) => patch({ policy: e.target.value.trim() || null })}
+              />
+            </Field>
+          </>
+        ) : (
+          <p className="form-hint" style={{ marginTop: 12 }}>
+            Turn reservations on above to set cancellation rules.
           </p>
         )}
       </SettingGroup>
