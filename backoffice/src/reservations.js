@@ -184,3 +184,52 @@ export function deskErrorText(message) {
   if (m.includes('module_disabled')) return 'The Reserve product is not active for this account.'
   return m
 }
+
+// ── Лист ожидания (Kassa 122) ────────────────────────────────
+
+/** Записи листа: ждущие и те, кому уже отправлено предложение */
+export async function fetchWaitlist(locationId) {
+  const { data, error } = await supabase
+    .from('waitlist_entries')
+    .select('id, customer_name, customer_phone, party_size, wanted_date, '
+      + 'time_from, time_to, zone_ids, note, status, offer_at, offer_expires, created_at')
+    .eq('location_id', locationId)
+    .in('status', ['waiting', 'offered'])
+    .order('created_at')
+  if (error) throw new Error(error.message)
+  return data ?? []
+}
+
+/**
+ * Кого можно позвать на освободившееся время. Сервер проверяет не только
+ * пожелание гостя, но и реальную возможность посадить: предлагать слот,
+ * на который нет стола, значит обмануть дважды.
+ */
+export async function fetchWaitlistMatches(locationId, atIso) {
+  const { data, error } = await supabase.rpc('waitlist_matches', {
+    p_location_id: locationId,
+    p_at: atIso,
+  })
+  if (error) throw new Error(error.message)
+  return data ?? []
+}
+
+/** Отправить предложение на время. Стол не резервируется (Kassa 122). */
+export async function offerWaitlistSlot(id, atIso, ttlMin = 30) {
+  const { data, error } = await supabase.rpc('offer_waitlist_slot', {
+    p_id: id,
+    p_at: atIso,
+    p_ttl_min: ttlMin,
+  })
+  if (error) throw new Error(error.message)
+  return data
+}
+
+/** Разослать просьбы подтвердить приход по броням ближайшего окна */
+export async function requestConfirmations(locationId) {
+  const { data, error } = await supabase.rpc('request_reservation_confirmations', {
+    p_location_id: locationId,
+  })
+  if (error) throw new Error(error.message)
+  return data ?? 0
+}

@@ -7,6 +7,7 @@ import {
 } from './reservations'
 import { playNewOrderChime } from './orders'
 import TimelineDesk from './TimelineDesk'
+import WaitlistPanel from './WaitlistPanel'
 
 /**
  * «Reservations» — веб-стол хостес (Kassa 102): подтверждение, отказ,
@@ -153,14 +154,14 @@ export default function ReservationsDesk({ context }) {
       )}
 
       <div className="timeline-zones" style={{ marginBottom: 16 }}>
-        {['timeline', 'list'].map((v) => (
+        {['timeline', 'list', 'waitlist'].map((v) => (
           <button
             key={v}
             type="button"
             className={view === v ? 'primary-button compact' : 'secondary-button compact'}
             onClick={() => setView(v)}
           >
-            {v === 'timeline' ? 'Timeline' : 'List'}
+            {v === 'timeline' ? 'Timeline' : v === 'list' ? 'List' : 'Waitlist'}
           </button>
         ))}
       </div>
@@ -168,6 +169,7 @@ export default function ReservationsDesk({ context }) {
       {error && <p className="form-error" role="alert">{error}</p>}
 
       {view === 'timeline' && locationId && <TimelineDesk locationId={locationId} />}
+      {view === 'waitlist' && locationId && <WaitlistPanel locationId={locationId} />}
 
       {view === 'list' && (
       <section className="panel form-panel">

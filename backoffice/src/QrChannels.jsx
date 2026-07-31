@@ -988,6 +988,12 @@ function ReserveTab({ locationId, settings, patch, slug, tz, openGroup, onOpenGr
               holding someone on an undecided request and refusing to release it
               would not be fair.
             </p>
+            <Toggle
+              label="Keep a waitlist"
+              hint="When the day is full, guests can leave a wish instead of leaving empty-handed. Only turn this on if someone will actually call them back."
+              checked={rsv.waitlist === true}
+              onChange={(v) => patch({ waitlist: v })}
+            />
             <Field label="Cancellation policy shown to the guest">
               <textarea
                 rows={3}
