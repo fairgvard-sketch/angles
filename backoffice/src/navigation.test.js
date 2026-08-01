@@ -42,10 +42,26 @@ test('POS-only: касса, отчёты и каталог; гостевых с�
   const nav = ids(POS_ONLY)
   assert.deepEqual(nav, [
     'overview', 'sales', 'activity', 'locations', 'menu', 'team',
-    'guests', 'devices', 'reports', 'integrations',
+    'guests', 'devices',
   ])
   assert.ok(!nav.includes('orders'))
   assert.ok(!nav.includes('reservations'))
+})
+
+test('ненаписанные модули не показываются клиенту ни при каких capabilities', () => {
+  for (const shape of [POS_ONLY, MENU_ONLY, ORDERS_ONLY, RESERVE_ONLY, {}, { products: ['pos'] }]) {
+    const nav = ids(shape)
+    assert.ok(!nav.includes('reports'), 'Reports виден клиенту')
+    assert.ok(!nav.includes('integrations'), 'Integrations виден клиенту')
+  }
+})
+
+test('developer видит ненаписанные модули — но только он', () => {
+  const nav = ids(DEVELOPER)
+  assert.ok(nav.includes('reports'))
+  assert.ok(nav.includes('integrations'))
+  const sameCapsNotDeveloper = { ...DEVELOPER, account_type: 'customer' }
+  assert.ok(!ids(sameCapsNotDeveloper).includes('reports'))
 })
 
 test('Menu-only: каталог и гостевые ссылки без разделов кассы', () => {
@@ -72,8 +88,8 @@ test('Developer: все разделы', () => {
   assert.deepEqual(nav, NAV_ITEMS.map((item) => item.id))
 })
 
-test('Контекст без capabilities и products — старый сервер, показываем всё', () => {
-  assert.deepEqual(ids({}), NAV_ITEMS.map((item) => item.id))
+test('Контекст без capabilities и products — старый сервер, показываем всё готовое', () => {
+  assert.deepEqual(ids({}), NAV_ITEMS.filter((i) => !i.planned).map((item) => item.id))
 })
 
 test('Контекст без capabilities: видимость приближается по продуктам (до 105)', () => {

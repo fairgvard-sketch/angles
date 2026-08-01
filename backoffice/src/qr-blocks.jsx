@@ -48,7 +48,7 @@ export async function downloadQr(url, name) {
 }
 
 /** Canvas с QR-кодом ссылки. */
-export function QrCanvas({ url, size = 176, className = 'qr-canvas' }) {
+export function QrCanvas({ url, size = 176, className = 'qr-canvas', label = 'Guest link' }) {
   const canvasRef = useRef(null)
 
   useEffect(() => {
@@ -57,10 +57,17 @@ export function QrCanvas({ url, size = 176, className = 'qr-canvas' }) {
     }
   }, [url, size])
 
-  return <canvas ref={canvasRef} className={className} aria-label="QR code for the guest link" />
+  return <canvas ref={canvasRef} className={className} aria-label={`QR code — ${label}`} />
 }
 
-/** QR + ссылка с копированием, открытием и скачиванием PNG. */
+/**
+ * QR + ссылка с копированием, открытием и скачиванием PNG.
+ *
+ * Таких блоков на экране несколько (стойка, конкретный стол, бронь), а
+ * подписи кнопок одинаковые. Скринридер читал бы «Copy link, Copy link,
+ * Copy link», поэтому в доступное имя добавляется, какая это ссылка;
+ * видимый текст в нём сохраняется целиком (WCAG «Label in Name»).
+ */
 export function LinkBlock({ url, hint, title = 'Guest link' }) {
   const [copyState, copy] = useCopy(url)
 
@@ -70,16 +77,27 @@ export function LinkBlock({ url, hint, title = 'Guest link' }) {
         <h3>{title}</h3>
         <p>{hint}</p>
         <div className="qr-link-row">
-          <input value={url} readOnly onFocus={(e) => e.target.select()} />
+          <input value={url} readOnly aria-label={`${title} — address`} onFocus={(e) => e.target.select()} />
         </div>
         <div className="qr-actions">
-          <button type="button" className="secondary-button" onClick={copy}>
+          <button type="button" className="secondary-button" aria-label={`Copy link — ${title}`} onClick={copy}>
             {copyState === 'copied' ? <><Check /> Copied</> : <><Copy /> Copy link</>}
           </button>
-          <button type="button" className="secondary-button" onClick={() => downloadQr(url, title)}>
+          <button
+            type="button"
+            className="secondary-button"
+            aria-label={`Download PNG — ${title}`}
+            onClick={() => downloadQr(url, title)}
+          >
             <Download /> Download PNG
           </button>
-          <a className="secondary-button" href={url} target="_blank" rel="noreferrer">
+          <a
+            className="secondary-button"
+            href={url}
+            target="_blank"
+            rel="noreferrer"
+            aria-label={`Open menu — ${title}`}
+          >
             <ExternalLink /> Open menu
           </a>
         </div>
@@ -87,7 +105,7 @@ export function LinkBlock({ url, hint, title = 'Guest link' }) {
           <p className="qr-copy-error" role="alert">Copy was blocked. Select the link above and copy it manually.</p>
         )}
       </div>
-      <QrCanvas url={url} />
+      <QrCanvas url={url} label={title} />
     </div>
   )
 }
@@ -107,13 +125,14 @@ export function SnippetBlock({ title, hint, code }) {
         <textarea
           value={code}
           readOnly
+          aria-label={`${title} — HTML`}
           rows={code.split('\n').length}
           spellCheck={false}
           onFocus={(e) => e.target.select()}
         />
       </div>
       <div className="qr-actions">
-        <button type="button" className="secondary-button" onClick={copy}>
+        <button type="button" className="secondary-button" aria-label={`Copy code — ${title}`} onClick={copy}>
           {copyState === 'copied' ? <><Check /> Copied</> : <><Copy /> Copy code</>}
         </button>
       </div>

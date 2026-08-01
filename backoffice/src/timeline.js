@@ -89,14 +89,8 @@ export function dayWindows(schedule, dateStr) {
   return Array.isArray(windows) ? windows : []
 }
 
-/**
- * Видимое окно дня: от расписания точки, расширенное под брони вне его.
- * Ручная бронь на нерабочее время обязана быть видна, а не исчезнуть.
- */
-export function timelineWindow(dateStr, tz, schedule, bookings = []) {
-  let fromMin = DEFAULT_FROM_MIN
-  let toMin = DEFAULT_TO_MIN
-
+/** Минуты видимого окна от расписания: запас до открытия и после закрытия */
+function windowMinutes(schedule, dateStr) {
   const parsed = dayWindows(schedule, dateStr)
     .map((w) => {
       const from = hmToMin(w[0])
@@ -107,19 +101,61 @@ export function timelineWindow(dateStr, tz, schedule, bookings = []) {
     })
     .filter(Boolean)
 
-  if (parsed.length > 0) {
-    fromMin = Math.min(...parsed.map((w) => w.from)) - 30
-    toMin = Math.max(...parsed.map((w) => w.to)) + 90
+  if (parsed.length === 0) return { fromMin: DEFAULT_FROM_MIN, toMin: DEFAULT_TO_MIN }
+  return {
+    fromMin: Math.min(...parsed.map((w) => w.from)) - 30,
+    toMin: Math.max(...parsed.map((w) => w.to)) + 90,
   }
+}
+
+/**
+ * Границы выбранного «ресторанного дня» в зоне точки: от полуночи до
+ * полуночи, а при ночной смене — до конца её окна (18:00–02:00 → до 02:00
+ * следующих суток плюс тот же запас).
+ *
+ * Это ответ на вопрос «чей это визит»: полотно дня не может растянуться
+ * за них, иначе одна вчерашняя бронь превращает сутки в 34 часа.
+ */
+export function dayBounds(dateStr, tz, schedule) {
+  const { toMin } = windowMinutes(schedule, dateStr)
+  return {
+    startMs: zonedToUtc(dateStr, 0, tz).getTime(),
+    endMs: zonedToUtc(dateStr, Math.max(1440, toMin), tz).getTime(),
+  }
+}
+
+/** Брони выбранного дня: занятость пересекается с его границами */
+export function bookingsForDay(bookings, bounds) {
+  return bookings.filter((b) => b.endMs > bounds.startMs && b.startMs < bounds.endMs)
+}
+
+/**
+ * Видимое окно дня: от расписания точки, расширенное под брони вне его.
+ * Ручная бронь на нерабочее время обязана быть видна, а не исчезнуть.
+ *
+ * Запрос броней берётся с запасом в сутки назад (ночная смена начинается
+ * вчера), поэтому окно считается ТОЛЬКО по броням выбранного дня и
+ * обрезается его границами: визит, зацепивший полночь, показывается
+ * обрезанным с края, а не раздувает шкалу на чужие сутки.
+ */
+export function timelineWindow(dateStr, tz, schedule, bookings = []) {
+  const bounds = dayBounds(dateStr, tz, schedule)
+  const { fromMin, toMin } = windowMinutes(schedule, dateStr)
 
   let startMs = zonedToUtc(dateStr, Math.max(0, fromMin), tz).getTime()
   let endMs = zonedToUtc(dateStr, toMin, tz).getTime()
 
-  for (const b of bookings) {
+  for (const b of bookingsForDay(bookings, bounds)) {
     if (b.startMs < startMs) startMs = b.startMs
     if (b.endMs > endMs) endMs = b.endMs
   }
-  if (!(endMs > startMs)) endMs = startMs + 12 * HOUR_MS
+
+  startMs = Math.max(startMs, bounds.startMs)
+  endMs = Math.min(endMs, bounds.endMs)
+  if (!(endMs > startMs)) {
+    endMs = Math.min(startMs + 12 * HOUR_MS, bounds.endMs)
+    if (!(endMs > startMs)) endMs = startMs + 12 * HOUR_MS
+  }
   return { startMs, endMs }
 }
 
@@ -136,6 +172,10 @@ export function positionOf(startMs, endMs, win) {
   }
 }
 
+/**
+ * Часовые отметки шкалы. `ts` — ключ отметки: в день перевода часов одна
+ * и та же подпись встречается дважды, и подпись ключом быть не может.
+ */
 export function hourTicks(win, tz) {
   const span = win.endMs - win.startMs
   if (span <= 0) return []
@@ -144,6 +184,7 @@ export function hourTicks(win, tz) {
   for (let ts = first; ts <= win.endMs; ts += HOUR_MS) {
     const p = partsInZone(new Date(ts), tz)
     out.push({
+      ts,
       label: p ? `${pad(p.hour)}:${pad(p.minute)}` : '',
       leftPct: ((ts - win.startMs) / span) * 100,
     })

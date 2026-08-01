@@ -39,6 +39,34 @@ const STATE_LABEL = {
   noshow: 'No-show',
 }
 
+/** Время визита в зоне точки — и в подписи блока, и в карточке */
+function timeInZone(ms, tz) {
+  try {
+    return new Intl.DateTimeFormat('en-GB', {
+      timeZone: tz, hour: '2-digit', minute: '2-digit', hourCycle: 'h23',
+    }).format(new Date(ms))
+  } catch {
+    return ''
+  }
+}
+
+/** Читаемое имя блока: гость, стол, время, состояние */
+function blockLabel(block, table, tz) {
+  const { booking } = block
+  const parts = [
+    booking.guestName,
+    `${booking.partySize} guests`,
+    `table ${table.label}`,
+    `${timeInZone(booking.startMs, tz)}–${timeInZone(booking.endMs, tz)}`,
+    STATE_LABEL[booking.state],
+  ]
+  if (block.combined) parts.push('combined tables')
+  if (block.clipsStart) parts.push('started the day before')
+  if (block.clipsEnd) parts.push('continues past this day')
+  if (block.conflict) parts.push('overlaps another booking')
+  return parts.join(' · ')
+}
+
 export default function TimelineDesk({ locationId }) {
   const [nowMs, setNowMs] = useState(() => Date.now())
   useEffect(() => {
@@ -63,19 +91,28 @@ export default function TimelineDesk({ locationId }) {
     [date, tz, meta.schedule]
   )
 
+  // Ответ на устаревший запрос не должен переписать полотно: при быстрой
+  // смене дат сеть возвращает их в произвольном порядке, и хостес увидел
+  // бы вчерашние брони на сегодняшней дате.
+  const requestRef = useRef(0)
+
   const load = useCallback(async () => {
     if (!locationId) return
+    const ticket = requestRef.current + 1
+    requestRef.current = ticket
     try {
       const [settings, tbls, list] = await Promise.all([
         fetchReservationSettings(locationId),
         fetchTimelineTables(locationId),
         fetchTimelineReservations(locationId, baseWindow.startMs, baseWindow.endMs),
       ])
+      if (requestRef.current !== ticket) return
       setMeta(settings)
       setTables(tbls)
       setRaw(list)
       setError('')
     } catch (e) {
+      if (requestRef.current !== ticket) return
       setError(deskErrorText(e.message))
     }
   }, [locationId, baseWindow.startMs, baseWindow.endMs])
@@ -222,7 +259,7 @@ export default function TimelineDesk({ locationId }) {
               <div className="timeline-label" style={{ width: LABEL_W }} />
               <div className="timeline-track" style={{ width: trackWidth }}>
                 {ticks.map((tick) => (
-                  <span key={tick.label} className="timeline-tick" style={{ left: `${tick.leftPct}%` }}>
+                  <span key={tick.ts} className="timeline-tick" style={{ left: `${tick.leftPct}%` }}>
                     {tick.label}
                   </span>
                 ))}
@@ -250,7 +287,7 @@ export default function TimelineDesk({ locationId }) {
                       style={{ width: trackWidth }}
                     >
                       {ticks.map((tick) => (
-                        <span key={tick.label} className="timeline-grid" style={{ left: `${tick.leftPct}%` }} />
+                        <span key={tick.ts} className="timeline-grid" style={{ left: `${tick.leftPct}%` }} />
                       ))}
                       {row.table.blocked && <span className="timeline-blocked">disabled</span>}
                       {markerPct !== null && (
@@ -261,10 +298,16 @@ export default function TimelineDesk({ locationId }) {
                           key={block.booking.id}
                           type="button"
                           className={`timeline-block ${STATE_CLASS[block.booking.state]}${
-                            block.conflict ? ' is-conflict' : ''}`}
+                            block.conflict ? ' is-conflict' : ''}${
+                            block.clipsStart ? ' is-clip-start' : ''}${
+                            block.clipsEnd ? ' is-clip-end' : ''}`}
                           style={{ left: `${block.leftPct}%`, width: `${block.widthPct}%` }}
                           onClick={() => setDetail(raw.find((r) => r.id === block.booking.id) ?? null)}
-                          title={`${block.booking.guestName} · ${block.booking.partySize}`}
+                          // Одинаковых блоков на экране десятки: без имени
+                          // с гостем, столом и временем скринридер читает
+                          // подряд «кнопка, кнопка, кнопка».
+                          aria-label={blockLabel(block, row.table, tz)}
+                          title={blockLabel(block, row.table, tz)}
                         >
                           <strong>{block.booking.guestName}</strong>
                           <small>

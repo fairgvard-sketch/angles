@@ -10,6 +10,11 @@
  * module_disabled); скрытый пункт меню не является защитой.
  */
 
+/**
+ * `planned: true` — раздела ещё нет. Такой пункт виден только в
+ * developer-аккаунте и открывает честное «в планах»: обычный клиент не
+ * должен находить в меню обещание, за которым ничего не стоит.
+ */
 export const NAV_ITEMS = [
   { id: 'overview', label: 'Home' },
   { id: 'orders', label: 'Orders' },
@@ -22,9 +27,13 @@ export const NAV_ITEMS = [
   { id: 'guests', label: 'Customers' },
   { id: 'online', label: 'QR menu' },
   { id: 'devices', label: 'Devices' },
-  { id: 'reports', label: 'Reports' },
-  { id: 'integrations', label: 'Integrations' },
+  { id: 'reports', label: 'Reports', planned: true },
+  { id: 'integrations', label: 'Integrations', planned: true },
 ]
+
+export function isDeveloperAccount(context) {
+  return context?.account_type === 'developer'
+}
 
 // ── Продукты и capabilities (100/103/105) ────────────────────
 /**
@@ -59,10 +68,15 @@ export function hasCapability(context, capability) {
 }
 
 export function visibleNavigation(context) {
+  const developer = isDeveloperAccount(context)
   const products = context?.products
-  if (!Array.isArray(products) && !Array.isArray(context?.capabilities)) return NAV_ITEMS
+  if (!Array.isArray(products) && !Array.isArray(context?.capabilities)) {
+    return NAV_ITEMS.filter(({ planned }) => !planned || developer)
+  }
   const can = (c) => hasCapability(context, c)
-  return NAV_ITEMS.filter(({ id }) => {
+  return NAV_ITEMS.filter(({ id, planned }) => {
+    // Ненаписанный модуль не показываем клиенту ни при каких capabilities
+    if (planned) return developer
     if (id === 'overview' || id === 'locations') return true
     if (id === 'menu') return can('catalog_manage')
     if (id === 'online') {
@@ -75,7 +89,7 @@ export function visibleNavigation(context) {
     // Веб-стол хостес (102): reservations_desk, работает и у POS-точек
     if (id === 'reservations') return can('reservations_desk')
     if (id === 'sales') return can('pos_reports')
-    // activity/team/devices/reports/integrations — POS-контур
+    // activity/team/devices/guests — POS-контур
     return can('pos_operate')
   })
 }

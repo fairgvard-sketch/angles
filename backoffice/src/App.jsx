@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from 'react'
+import { useEffect, useMemo, useRef, useState } from 'react'
 import {
   Activity,
   BarChart3,
@@ -7,6 +7,7 @@ import {
   Check,
   ChevronRight,
   CircleHelp,
+  Copy,
   CreditCard,
   LayoutDashboard,
   LogOut,
@@ -259,7 +260,144 @@ function Onboarding({ email }) {
   )
 }
 
-function Sidebar({ items, active, onNavigate, open, onClose, email }) {
+/**
+ * Панель помощи (Phase 1).
+ *
+ * До неё кнопка Help была нарисована в двух местах и не делала ничего.
+ * Содержимое — только то, что действительно есть: шаги настройки ведут в
+ * существующие разделы по capabilities, а диагностика копируется одной
+ * кнопкой, чтобы владельцу не пришлось искать id организации в консоли.
+ */
+const HELP_STEPS = [
+  {
+    view: 'menu',
+    capability: 'catalog_manage',
+    title: 'Fill in the catalogue',
+    detail: 'Categories, items, sizes and modifiers. Everything else reads from here.',
+  },
+  {
+    view: 'online',
+    capability: 'public_menu',
+    title: 'Publish the guest menu',
+    detail: 'Short link, QR code and the snippet for your own website.',
+  },
+  {
+    view: 'orders',
+    capability: 'orders_desk',
+    title: 'Take online orders',
+    detail: 'Turn ordering on, pick fulfilment types and watch the inbox.',
+  },
+  {
+    view: 'reservations',
+    capability: 'reservations_desk',
+    title: 'Open table bookings',
+    detail: 'Zones and tables, weekly schedule, then the launch checklist.',
+  },
+  {
+    view: 'team',
+    capability: 'pos_operate',
+    title: 'Set up the team and registers',
+    detail: 'Roles and PINs for staff, connected devices and their health.',
+  },
+]
+
+function HelpPanel({ context, email, onNavigate, onClose }) {
+  const closeRef = useRef(null)
+  const [copied, setCopied] = useState(false)
+
+  useEffect(() => {
+    closeRef.current?.focus()
+    function onKey(event) {
+      if (event.key === 'Escape') onClose()
+    }
+    document.addEventListener('keydown', onKey)
+    return () => document.removeEventListener('keydown', onKey)
+  }, [onClose])
+
+  const locations = context.locations || []
+  const diagnostics = [
+    `Organisation: ${context.organization?.name || '—'} (${context.organization?.id || '—'})`,
+    `Account: ${email}`,
+    `Role: ${context.member?.role || '—'}`,
+    ...locations.map((l) => `Location: ${l.name} (${l.id})`),
+    `Products: ${(context.products || []).join(', ') || '—'}`,
+  ].join('\n')
+
+  async function copyDiagnostics() {
+    try {
+      await navigator.clipboard.writeText(diagnostics)
+      setCopied(true)
+      setTimeout(() => setCopied(false), 2000)
+    } catch {
+      setCopied(false)
+    }
+  }
+
+  const steps = HELP_STEPS.filter((step) => hasCapability(context, step.capability))
+
+  return (
+    <div className="sheet-backdrop" onClick={onClose} role="presentation">
+      <div
+        className="sheet help-sheet"
+        onClick={(event) => event.stopPropagation()}
+        role="dialog"
+        aria-modal="true"
+        aria-labelledby="help-title"
+      >
+        <div className="help-head">
+          <h3 id="help-title">Help</h3>
+          <button
+            type="button"
+            className="icon-button"
+            aria-label="Close help"
+            onClick={onClose}
+            ref={closeRef}
+          >
+            <X />
+          </button>
+        </div>
+
+        {steps.length > 0 && (
+          <div className="sheet-section">
+            <span className="sheet-section-title">Setting up</span>
+            <div className="help-list">
+              {steps.map((step) => (
+                <button
+                  key={step.view}
+                  type="button"
+                  className="help-step"
+                  onClick={() => { onNavigate(step.view); onClose() }}
+                >
+                  <span>
+                    <strong>{step.title}</strong>
+                    <small>{step.detail}</small>
+                  </span>
+                  <ChevronRight />
+                </button>
+              ))}
+            </div>
+          </div>
+        )}
+
+        <div className="sheet-section">
+          <span className="sheet-section-title">Your details</span>
+          <pre className="help-diagnostics">{diagnostics}</pre>
+          <button type="button" className="secondary-button" onClick={copyDiagnostics}>
+            {copied ? <><Check /> Copied</> : <><Copy /> Copy these details</>}
+          </button>
+          <p className="form-hint">
+            Send these details to your ANGLE contact when something needs looking
+            at — they identify the workspace without any personal data.
+          </p>
+        </div>
+
+        <button type="button" className="secondary-button" onClick={onClose}>Close</button>
+      </div>
+    </div>
+  )
+}
+
+function Sidebar({ items, active, onNavigate, open, onClose, onHelp, email }) {
   function openSettings() {
     onNavigate('settings')
     onClose()
@@ -272,7 +410,13 @@ function Sidebar({ items, active, onNavigate, open, onClose, email }) {
         <div className="sidebar-top">
           <Brand />
           <div className="sidebar-top-actions">
-            <button className="icon-button sidebar-mobile-action" aria-label="Help"><CircleHelp /></button>
+            <button
+              className="icon-button sidebar-mobile-action"
+              aria-label="Help"
+              onClick={() => { onHelp(); onClose() }}
+            >
+              <CircleHelp />
+            </button>
             <button className="icon-button sidebar-mobile-action" aria-label="Settings" onClick={openSettings}><Settings /></button>
             <button className="icon-button sidebar-close" onClick={onClose} aria-label="Close navigation"><X /></button>
           </div>
@@ -289,7 +433,7 @@ function Sidebar({ items, active, onNavigate, open, onClose, email }) {
           })}
         </nav>
         <div className="sidebar-bottom">
-          <button><CircleHelp /><span>Help</span></button>
+          <button onClick={() => { onHelp(); onClose() }}><CircleHelp /><span>Help</span></button>
           <button className={active === 'settings' ? 'active' : ''} onClick={openSettings}><Settings /><span>Settings</span></button>
           <div className="account-chip">
             <span className="avatar">{email?.slice(0, 1).toUpperCase() || 'A'}</span>
@@ -469,30 +613,50 @@ function Overview({ context, onNavigate, onReloadContext }) {
   )
 }
 
-function SectionPage({ section, context }) {
+/**
+ * Раздел, которого ещё нет (Phase 1).
+ *
+ * Reports и Integrations выглядели как работающие модули, а открывали
+ * пустую панель с текстом про POS. Клиентским аккаунтам их больше не
+ * показывают (`navigation.js`), developer видит честное «в планах» и то,
+ * чем пользоваться сейчас.
+ */
+const PLANNED_SECTIONS = {
+  reports: {
+    summary: 'Cross-location reporting beyond what Overview already shows.',
+    instead: { view: 'sales', label: 'Overview', detail: 'Revenue, orders and top items for a period.' },
+  },
+  integrations: {
+    summary: 'Payments, accounting and connected business tools.',
+    instead: null,
+  },
+}
+
+function SectionPage({ section, context, onNavigate }) {
   const item = NAV_ITEMS.find((entry) => entry.id === section) || NAV_ITEMS[0]
   const Icon = NAV_ICONS[item.id]
-  const descriptions = {
-    locations: 'Business details, opening hours and settings for each location.',
-    menu: 'Catalogue, categories, prices, sizes and modifiers used by the POS.',
-    team: 'Owner, manager and staff access across your locations.',
-    online: 'QR menu, online ordering and table reservations.',
-    devices: 'POS terminals connected to your organisation.',
-    reports: 'Sales and operating performance across every location.',
-    integrations: 'Payments, accounting and connected business tools.',
-  }
+  const planned = PLANNED_SECTIONS[section]
   return (
     <>
       <section className="page-heading compact-heading">
         <p className="eyebrow">{context.organization?.name}</p>
         <h1>{item.label}</h1>
-        <p>{descriptions[section]}</p>
+        <p>{planned?.summary}</p>
       </section>
       <section className="section-placeholder panel">
         <span className="section-icon"><Icon /></span>
         <div>
-          <h2>{item.label}</h2>
-          <p>This workspace is connected to the same organisation as your ANGLE POS.</p>
+          <h2>Not built yet</h2>
+          <p>
+            This module is planned and is visible only in the developer
+            workspace. Nothing here is available to customer accounts, and no
+            data is collected for it.
+          </p>
+          {planned?.instead && (
+            <button className="text-button" onClick={() => onNavigate(planned.instead.view)}>
+              Use {planned.instead.label} meanwhile <ChevronRight />
+            </button>
+          )}
         </div>
       </section>
     </>
@@ -521,6 +685,7 @@ function AccountSettingsPage({ email, onSignOut }) {
 function Dashboard({ session, context, onReloadContext }) {
   const [active, setActive] = useState('overview')
   const [drawer, setDrawer] = useState(false)
+  const [help, setHelp] = useState(false)
   // Организация без активного продукта (104): стабильный экран выбора/
   // ожидания активации вместо пустых операционных разделов.
   const noProducts = Array.isArray(context.products) && context.products.length === 0
@@ -546,7 +711,15 @@ function Dashboard({ session, context, onReloadContext }) {
 
   return (
     <div className="app-shell">
-      <Sidebar items={nav} active={activeSection} onNavigate={setActive} open={drawer} onClose={() => setDrawer(false)} email={session.user.email} />
+      <Sidebar
+        items={nav}
+        active={activeSection}
+        onNavigate={setActive}
+        open={drawer}
+        onClose={() => setDrawer(false)}
+        onHelp={() => setHelp(true)}
+        email={session.user.email}
+      />
       <div className="app-main">
         <header className="topbar">
           <button className="icon-button mobile-menu" onClick={() => setDrawer(true)} aria-label="Open navigation"><MenuIcon /></button>
@@ -572,10 +745,19 @@ function Dashboard({ session, context, onReloadContext }) {
           {activeSection === 'guests' && <GuestsManager context={context} />}
           {activeSection === 'settings' && <AccountSettingsPage email={session.user.email} onSignOut={signOut} />}
           {!['overview', 'orders', 'reservations', 'sales', 'activity', 'locations', 'menu', 'team', 'online', 'devices', 'guests'].includes(activeSection) && (
-            activeSection !== 'settings' && <SectionPage section={activeSection} context={context} />
+            activeSection !== 'settings'
+              && <SectionPage section={activeSection} context={context} onNavigate={setActive} />
           )}
         </main>
       </div>
+      {help && (
+        <HelpPanel
+          context={context}
+          email={session.user.email}
+          onNavigate={setActive}
+          onClose={() => setHelp(false)}
+        />
+      )}
     </div>
   )
 }

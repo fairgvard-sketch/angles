@@ -22,7 +22,7 @@ import { patchLocationSettings } from './settings'
  * гостевые ссылки с доменом POS. Для отдельного стенда адрес можно
  * переопределить через VITE_PUBLIC_MENU_ORIGIN.
  */
-const PUBLIC_MENU_ORIGIN = import.meta.env.VITE_PUBLIC_MENU_ORIGIN || 'https://menu.angle.co.il'
+export const PUBLIC_MENU_ORIGIN = import.meta.env.VITE_PUBLIC_MENU_ORIGIN || 'https://menu.angle.co.il'
 const SITE_ORIGIN = import.meta.env.VITE_SITE_ORIGIN || 'https://angle.co.il'
 
 /**

@@ -1,8 +1,9 @@
 import test from 'node:test'
 import assert from 'node:assert/strict'
 import {
-  blockState, buildRows, dayWindows, groupByZone, hmToMin, hourTicks, nowMarkerPct,
-  occupancySummary, positionOf, shiftDate, timelineWindow, todayInZone, zonedToUtc,
+  blockState, bookingsForDay, buildRows, dayBounds, dayWindows, groupByZone, hmToMin,
+  hourTicks, nowMarkerPct, occupancySummary, positionOf, shiftDate, timelineWindow,
+  todayInZone, zonedToUtc,
 } from './timeline.js'
 
 /**
@@ -81,6 +82,107 @@ test('окно расширяется под бронь вне расписан�
 test('закрытый день не даёт вырожденного окна', () => {
   const win = timelineWindow(DATE, TZ, { weekly: { 6: [] }, exceptions: {} })
   assert.ok(win.endMs > win.startMs)
+})
+
+// ── Изоляция суток (Phase 1, дефект 1) ───────────────────────
+
+const OVERNIGHT = { weekly: { 6: [['18:00', '02:00']] }, exceptions: {} }
+
+test('границы дня — от полуночи до полуночи в зоне точки', () => {
+  const bounds = dayBounds(DATE, TZ, SCHEDULE)
+  assert.equal(bounds.startMs, at(0))
+  assert.equal(bounds.endMs, at(24))
+})
+
+test('ночная смена продлевает границы дня за полночь', () => {
+  const bounds = dayBounds(DATE, TZ, OVERNIGHT)
+  assert.equal(bounds.startMs, at(0))
+  // 02:00 следующих суток + 90 минут запаса
+  assert.equal(bounds.endMs, at(24 + 3, 30))
+})
+
+test('вчерашняя бронь не растягивает полотно на чужие сутки', () => {
+  // Продовый случай: выбрано 1 августа, в буфере запроса бронь 31 июля 14:00
+  const leaked = booking('leaked', ['t1'], prev(14), prev(15, 30))
+  const win = timelineWindow(DATE, TZ, SCHEDULE, [leaked])
+  assert.equal(win.startMs, at(7, 30))
+  assert.equal(win.endMs, at(21, 30))
+  assert.equal((win.endMs - win.startMs) / 3_600_000, 14)
+})
+
+test('вчерашняя бронь не попадает ни в одну строку таймлайна', () => {
+  const leaked = booking('leaked', ['t1'], prev(14), prev(15, 30))
+  const mine = booking('mine', ['t1'], at(12), at(13, 30))
+  const win = timelineWindow(DATE, TZ, SCHEDULE, [leaked, mine])
+  const rows = buildRows([table('t1', '1')], [leaked, mine], win)
+  assert.deepEqual(rows[0].blocks.map((b) => b.booking.id), ['mine'])
+})
+
+test('визит через полночь остаётся видимым и помечается обрезанным', () => {
+  // Начался вчера в 23:00, кончается сегодня в 02:00
+  const night = booking('night', ['t1'], prev(23), at(2))
+  const win = timelineWindow(DATE, TZ, SCHEDULE, [night])
+  assert.equal(win.startMs, at(0)) // окно расширено до полуночи, но не дальше
+  const rows = buildRows([table('t1', '1')], [night], win)
+  const block = rows[0].blocks[0]
+  assert.equal(block.booking.id, 'night')
+  assert.equal(block.clipsStart, true)
+  assert.equal(block.leftPct, 0)
+})
+
+test('ночная смена показывает свой визит после полуночи целиком', () => {
+  const night = booking('night', ['t1'], at(23), at(24 + 1))
+  const win = timelineWindow(DATE, TZ, OVERNIGHT, [night])
+  const rows = buildRows([table('t1', '1')], [night], win)
+  const block = rows[0].blocks[0]
+  assert.equal(block.clipsEnd, false)
+  assert.ok(win.endMs >= night.endMs)
+})
+
+test('длинный визит не выносит правую границу за сутки', () => {
+  // Банкет на 8 часов, начатый в 20:00 обычного дня
+  const long = booking('long', ['t1'], at(20), at(28))
+  const win = timelineWindow(DATE, TZ, SCHEDULE, [long])
+  assert.equal(win.endMs, at(24))
+  const rows = buildRows([table('t1', '1')], [long], win)
+  assert.equal(rows[0].blocks[0].clipsEnd, true)
+})
+
+test('пустой день даёт окно расписания, а не вырожденное', () => {
+  const win = timelineWindow(DATE, TZ, SCHEDULE, [])
+  assert.equal(win.startMs, at(7, 30))
+  assert.equal(win.endMs, at(21, 30))
+})
+
+test('день перехода на летнее время: границы длиной 23 часа, метки не дублируются', () => {
+  // Израиль: 27 марта 2026, 02:00 → 03:00
+  const dstDate = '2026-03-27'
+  const bounds = dayBounds(dstDate, TZ, null)
+  assert.equal((bounds.endMs - bounds.startMs) / 3_600_000, 23)
+  const win = timelineWindow(dstDate, TZ, null, [])
+  const ticks = hourTicks(win, TZ)
+  assert.equal(new Set(ticks.map((t) => t.ts)).size, ticks.length)
+})
+
+test('день перехода на зимнее время: сутки длиннее, ключи меток уникальны', () => {
+  // Израиль: 25 октября 2026, 02:00 → 01:00
+  const dstDate = '2026-10-25'
+  const bounds = dayBounds(dstDate, TZ, null)
+  assert.equal((bounds.endMs - bounds.startMs) / 3_600_000, 25)
+  const ticks = hourTicks(bounds, TZ)
+  const labels = ticks.map((t) => t.label)
+  assert.ok(labels.length > new Set(labels).size, 'подпись часа повторяется — ключом быть не может')
+  assert.equal(new Set(ticks.map((t) => t.ts)).size, ticks.length)
+})
+
+test('bookingsForDay отбирает по пересечению, а не по дате начала', () => {
+  const bounds = dayBounds(DATE, TZ, SCHEDULE)
+  const kept = bookingsForDay([
+    booking('yesterday', ['t1'], prev(14), prev(15, 30)),
+    booking('crossing', ['t1'], prev(23), at(1)),
+    booking('today', ['t1'], at(12), at(13)),
+  ], bounds)
+  assert.deepEqual(kept.map((b) => b.id), ['crossing', 'today'])
 })
 
 test('час занимает свою долю ширины', () => {

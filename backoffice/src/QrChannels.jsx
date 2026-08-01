@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import {
   AlertTriangle, Check, Clock, Copy, Download, ExternalLink, Image, LayoutGrid,
   QrCode, RefreshCw, ShoppingBag, Smartphone, Store, Table, Code2,
@@ -7,7 +7,7 @@ import {
 import { fetchLocation, fetchLocationSlug, fetchTables, saveLocationSlug } from './settings'
 import {
   ORDER_TYPES, ORDER_TYPE_LABELS,
-  ONLINE_BACKGROUND_PRESETS,
+  ONLINE_BACKGROUND_PRESETS, PUBLIC_MENU_ORIGIN,
   onlineEnabled, orderTypes, toggleOrderType, saveOnlineOrders,
   reservationsEnabled, saveReservations,
   uploadHeroVideo,
@@ -94,16 +94,29 @@ function ChannelHero({ title, hint, enabled, onToggle, url, qrUrl, qrName, offNo
         <div>
           <span className="channel-link-label">Guest link</span>
           <div className="qr-link-row">
-            <input value={url} readOnly onFocus={(e) => e.target.select()} />
+            {/* Такие же блоки есть у каждого канала: доступное имя
+                называет канал, иначе подряд читается «Copy link». */}
+            <input value={url} readOnly aria-label={`${title} — guest link`} onFocus={(e) => e.target.select()} />
           </div>
           <div className="qr-actions">
-            <button type="button" className="secondary-button" onClick={copy}>
+            <button type="button" className="secondary-button" aria-label={`Copy link — ${title}`} onClick={copy}>
               {copyState === 'copied' ? <><Check /> Copied</> : <><Copy /> Copy link</>}
             </button>
-            <button type="button" className="secondary-button" onClick={() => downloadQr(codeUrl, qrName)}>
+            <button
+              type="button"
+              className="secondary-button"
+              aria-label={`Download QR — ${title}`}
+              onClick={() => downloadQr(codeUrl, qrName)}
+            >
               <Download /> Download QR
             </button>
-            <a className="secondary-button" href={url} target="_blank" rel="noreferrer">
+            <a
+              className="secondary-button"
+              href={url}
+              target="_blank"
+              rel="noreferrer"
+              aria-label={`Open page — ${title}`}
+            >
               <ExternalLink /> Open page
             </a>
           </div>
@@ -114,7 +127,7 @@ function ChannelHero({ title, hint, enabled, onToggle, url, qrUrl, qrName, offNo
       </div>
 
       <div className="channel-hero-qr">
-        <QrCanvas url={codeUrl} size={148} />
+        <QrCanvas url={codeUrl} size={148} label={title} />
       </div>
     </section>
   )
@@ -407,9 +420,47 @@ function HeroVideoField({ context, url, onChange }) {
   )
 }
 
+/**
+ * Превью гостевой страницы.
+ *
+ * Кросс-доменный кадр невозможно опросить: заблокированный он выглядит
+ * снаружи так же, как ещё не загруженный, поэтому страница сама шлёт
+ * «я поднялась» (`angle-public` / `ready`). Состояния:
+ *
+ *   loading      — кадр ещё не отдал ни одного события;
+ *   ready        — пришло подтверждение от самой страницы;
+ *   unconfirmed  — кадр загрузился, но подтверждения нет (старая версия
+ *                  публичной страницы либо блокировка) — показываем кадр
+ *                  И подсказку, а не прячем работающее превью;
+ *   blocked      — событий не было вовсе: вместо белого прямоугольника
+ *                  объяснение и ссылка «открыть страницу гостя».
+ */
+const PREVIEW_TIMEOUT_MS = 8000
+
 function GuestPreview({ url }) {
   const [previewKey, setPreviewKey] = useState(0)
+  const [status, setStatus] = useState('loading')
+  const loadedRef = useRef(false)
 
+  useEffect(() => {
+    loadedRef.current = false
+    setStatus('loading')
+    function onMessage(event) {
+      if (event.origin !== PUBLIC_MENU_ORIGIN) return
+      if (event.data?.source !== 'angle-public' || event.data?.type !== 'ready') return
+      setStatus('ready')
+    }
+    window.addEventListener('message', onMessage)
+    const timer = setTimeout(() => {
+      setStatus((s) => (s === 'ready' ? s : (loadedRef.current ? 'unconfirmed' : 'blocked')))
+    }, PREVIEW_TIMEOUT_MS)
+    return () => {
+      window.removeEventListener('message', onMessage)
+      clearTimeout(timer)
+    }
+  }, [previewKey, url])
+
+  const blocked = status === 'blocked'
   return (
     <section className="panel guest-preview-panel">
       <div className="guest-preview-copy">
@@ -419,23 +470,54 @@ function GuestPreview({ url }) {
           <p>This is the same mobile page guests open from the counter QR.</p>
         </div>
         <div className="guest-preview-actions">
-          <button type="button" className="secondary-button" onClick={() => setPreviewKey((key) => key + 1)}>
-            <RefreshCw /> Refresh
+          <button
+            type="button"
+            className="secondary-button"
+            onClick={() => setPreviewKey((key) => key + 1)}
+          >
+            <RefreshCw /> Refresh preview
           </button>
           <a className="secondary-button" href={url} target="_blank" rel="noreferrer">
             <ExternalLink /> Open full page
           </a>
         </div>
       </div>
-      <div className="guest-phone-frame">
+      <div className={`guest-phone-frame${status === 'ready' ? ' is-ready' : ''}`}>
+        {status === 'loading' && (
+          <p className="guest-preview-state" role="status">Loading the guest page…</p>
+        )}
+        {blocked && (
+          <div className="guest-preview-state is-blocked" role="status">
+            <AlertTriangle />
+            <strong>The preview did not load here</strong>
+            <p>
+              Some browsers block pages shown inside another page. The guest link
+              itself keeps working — open it in a new tab to check it.
+            </p>
+            <a className="secondary-button" href={url} target="_blank" rel="noreferrer">
+              <ExternalLink /> Open the guest page
+            </a>
+          </div>
+        )}
         <iframe
           key={previewKey}
           src={url}
           title="Guest ordering menu preview"
           loading="lazy"
           tabIndex={-1}
+          hidden={blocked}
+          onLoad={() => { loadedRef.current = true }}
         />
       </div>
+      {status === 'unconfirmed' && (
+        <p className="guest-preview-note" role="status">
+          <AlertTriangle aria-hidden />
+          <span>
+            If the phone above looks empty, your browser blocked the embedded page.
+            Use <strong>Open full page</strong> — the guest link itself is fine.
+          </span>
+        </p>
+      )}
     </section>
   )
 }

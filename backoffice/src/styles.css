@@ -661,8 +661,29 @@ a { color: inherit; }
 .guest-preview-icon svg { width: 21px; height: 21px; }
 .guest-preview-actions { display: flex; flex-wrap: wrap; justify-content: flex-end; gap: 8px; }
 .guest-preview-actions .secondary-button { min-height: 44px; text-decoration: none; }
-.guest-phone-frame { width: min(390px, calc(100% - 32px)); height: 680px; margin: 24px auto; overflow: hidden; border: 9px solid #191c21; border-radius: 30px; background: #eceef1; box-shadow: 0 18px 42px rgb(20 24 31 / 16%); }
+.guest-phone-frame { position: relative; width: min(390px, calc(100% - 32px)); height: 680px; margin: 24px auto; overflow: hidden; border: 9px solid #191c21; border-radius: 30px; background: #eceef1; box-shadow: 0 18px 42px rgb(20 24 31 / 16%); }
 .guest-phone-frame iframe { display: block; width: 100%; height: 100%; border: 0; background: #fff; }
+.guest-phone-frame iframe[hidden] { display: none; }
+/* Состояния превью лежат поверх кадра: пока страница не подтвердила
+   загрузку, владелец видит объяснение, а не белый прямоугольник. */
+.guest-preview-state {
+  position: absolute; inset: 0; z-index: 1; margin: 0;
+  display: flex; flex-direction: column; align-items: center; justify-content: center;
+  gap: 10px; padding: 24px; text-align: center;
+  background: #fff; color: #5c626c; font-size: 13px;
+}
+.guest-preview-state.is-blocked { color: #444a54; }
+.guest-preview-state svg { width: 24px; height: 24px; color: #b4720e; }
+.guest-preview-state strong { color: #16181d; font-size: 15px; }
+.guest-preview-state p { margin: 0; line-height: 1.5; }
+.guest-preview-state .secondary-button { margin-top: 6px; min-height: 44px; text-decoration: none; }
+.guest-phone-frame.is-ready .guest-preview-state { display: none; }
+.guest-preview-note {
+  display: flex; align-items: flex-start; gap: 8px;
+  margin: 0 22px 22px; padding: 12px 14px; border-radius: 12px;
+  background: #fdf7ea; border: 1px solid #f0e0bd; color: #5a4514; font-size: 13px; line-height: 1.5;
+}
+.guest-preview-note svg { width: 18px; height: 18px; flex: none; color: #b4720e; }
 
 @media (max-width: 640px) {
   .qr-grid { grid-template-columns: minmax(0, 1fr); }
@@ -920,6 +941,16 @@ a { color: inherit; }
 .timeline-block.is-done { background: #f2f3f5; border-color: #e3e5e9; color: #7a7f88; }
 .timeline-block.is-noshow { background: #fdf1f0; border-color: #f3c4c0; color: #9b2c22; }
 .timeline-block.is-conflict { box-shadow: 0 0 0 2px #d92d20; }
+/* Визит выходит за выбранные сутки: обрезанный край, а не ровный блок —
+   иначе ночная бронь читается как начавшаяся ровно в полночь. */
+.timeline-block.is-clip-start {
+  border-start-start-radius: 0; border-end-start-radius: 0;
+  border-inline-start-style: dashed;
+}
+.timeline-block.is-clip-end {
+  border-start-end-radius: 0; border-end-end-radius: 0;
+  border-inline-end-style: dashed;
+}
 
 .timeline-tablepick { display: flex; flex-wrap: wrap; gap: 6px; margin: 8px 0; }
 
@@ -937,6 +968,27 @@ a { color: inherit; }
 .sheet-sub { color: #5d626b; font-size: 14px; }
 .sheet-section { display: flex; flex-direction: column; gap: 6px; margin-top: 6px; }
 .sheet-section-title { font-size: 12px; font-weight: 700; color: #5d626b; text-transform: uppercase; letter-spacing: .04em; }
+
+/* Панель помощи */
+.help-head { display: flex; align-items: center; justify-content: space-between; gap: 12px; }
+.help-head h3 { margin: 0; }
+.help-list { display: flex; flex-direction: column; gap: 6px; }
+.help-step {
+  display: flex; align-items: center; justify-content: space-between; gap: 12px;
+  min-height: 56px; padding: 10px 14px; text-align: start; font: inherit; cursor: pointer;
+  background: #f7f8fa; border: 1px solid #e8e9ec; border-radius: 12px; color: #16181d;
+}
+.help-step:hover { background: #f1f3f6; }
+.help-step span { display: flex; flex-direction: column; gap: 2px; min-width: 0; }
+.help-step strong { font-size: 14px; font-weight: 650; }
+.help-step small { color: #5d626b; font-size: 12px; }
+.help-step svg { width: 18px; height: 18px; color: #8b9099; flex: none; }
+.help-diagnostics {
+  margin: 0; padding: 12px 14px; border-radius: 12px; background: #f7f8fa;
+  border: 1px solid #e8e9ec; color: #3c424c; font-size: 12px; line-height: 1.6;
+  white-space: pre-wrap; word-break: break-word; font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+}
+.help-sheet .secondary-button { min-height: 44px; }
 
 @media (max-width: 720px) {
   .timeline-summary { margin-inline-start: 0; gap: 12px; }
