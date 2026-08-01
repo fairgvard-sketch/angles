@@ -38,7 +38,13 @@ function StaffRow({ member, onEdit, onChangePin, editable, roleName }) {
             <button className="icon-button" onClick={() => onChangePin(member)} title="Change PIN" aria-label={`Change PIN for ${member.name}`}>
               <KeyRound />
             </button>
-            <button className="text-button" onClick={() => onEdit(member)}>Edit</button>
+            <button
+              className="text-button"
+              aria-label={`Edit ${member.name}`}
+              onClick={() => onEdit(member)}
+            >
+              Edit
+            </button>
           </>
         )}
       </span>
@@ -256,7 +262,12 @@ function RoleEditor({ role, onClose, onSaved }) {
             <div className="group-checks">
               {PERM_KEYS.map((key) => (
                 <label className="check-field small" key={key}>
-                  <input type="checkbox" checked={perms.has(key)} onChange={() => toggle(key)} />
+                  <input
+                    type="checkbox"
+                    checked={perms.has(key)}
+                    aria-label={`${PERM_LABELS[key]} — allowed for role ${name || 'new role'}`}
+                    onChange={() => toggle(key)}
+                  />
                   <span>{PERM_LABELS[key]}</span>
                 </label>
               ))}
@@ -410,7 +421,12 @@ function PermsTab({ locations }) {
         <div className="panel-heading">
           <div>
             <h2>What baristas can do</h2>
-            <p>Restricted actions ask for a manager or owner PIN on the register.</p>
+            <p>
+              This is the base level of the location: it applies to everyone
+              without a custom role. A custom role assigned to a person wins
+              over it, action by action. Restricted actions ask for a manager
+              or owner PIN on the register.
+            </p>
           </div>
           {saved && !saving && <span className="save-ok"><Check /> Saved</span>}
         </div>
@@ -422,10 +438,18 @@ function PermsTab({ locations }) {
             {PERM_KEYS.map((key) => {
               const level = permLevel(settings, key)
               return (
+                /* Это выбор одного из двух, а не две независимые кнопки:
+                   роль radiogroup и aria-checked говорят это скринридеру,
+                   а подпись называет действие — иначе он читает подряд
+                   «Everyone, Manager, Everyone, Manager». */
                 <div className="menu-row" key={key}>
-                  <span className="menu-name">{PERM_LABELS[key]}</span>
-                  <span className="perm-switch">
+                  <span className="menu-name" id={`perm-${key}`}>{PERM_LABELS[key]}</span>
+                  <span className="perm-switch" role="radiogroup" aria-labelledby={`perm-${key}`}>
                     <button
+                      type="button"
+                      role="radio"
+                      aria-checked={level === 'all'}
+                      aria-label={`${PERM_LABELS[key]}: everyone`}
                       className={level === 'all' ? 'is-active' : ''}
                       onClick={() => toggle(key, 'all')}
                       disabled={saving}
@@ -433,6 +457,10 @@ function PermsTab({ locations }) {
                       Everyone
                     </button>
                     <button
+                      type="button"
+                      role="radio"
+                      aria-checked={level === 'manager'}
+                      aria-label={`${PERM_LABELS[key]}: manager and owner only`}
                       className={level === 'manager' ? 'is-active' : ''}
                       onClick={() => toggle(key, 'manager')}
                       disabled={saving}
