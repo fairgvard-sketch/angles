@@ -1,4 +1,12 @@
 import { supabase } from './supabase'
+import { segmentParams } from './customers'
+// Чистые правила клиентской базы — в отдельном модуле под тесты
+export {
+  formatMoney, formatPhone, normalizePhoneInput, lastVisitLabel, formatDateTime,
+  SEGMENTS, SORTS, segmentParams, segmentSummary, parseTagsInput, TAG_LIMIT,
+  guestsToCsv, csvFileName, duplicateReason, mergePreview, mergeSources,
+  customerErrorText,
+} from './customers'
 
 /**
  * База клиентов лояльности для раздела «Customers». Данные из guests (031),
@@ -6,17 +14,19 @@ import { supabase } from './supabase'
  * PIN-сессии в вебе нет, как и в «Девайсах» (097).
  *
  * Гости скоупятся по организации, а не по точке: программа лояльности общая
- * на org. Поиск делает сервер (по цифрам телефона либо по имени), чтобы лимит
- * не срезал совпадения за пределами первой страницы.
+ * на org. Поиск и сегменты считает сервер (131), чтобы фильтр отвечал на
+ * вопрос «кто», а не «кто из первой страницы».
  */
 
-export async function fetchGuests(search = '') {
-  const { data, error } = await supabase.rpc('get_backoffice_guests', {
-    p_search: search.trim() || null,
-    p_limit: 200,
-    // Владельца бэкофиса сервер узнаёт по членству (114) — токен не нужен
-    p_staff_session: null,
-  })
+export async function fetchGuests(filters = {}) {
+  const { data, error } = await supabase.rpc('get_backoffice_guests', segmentParams(filters))
+  if (error) throw new Error(error.message)
+  return data ?? []
+}
+
+/** Метки, которые реально используются, с числом гостей (131) */
+export async function fetchGuestTags() {
+  const { data, error } = await supabase.rpc('get_guest_tags_web', { p_staff_session: null })
   if (error) throw new Error(error.message)
   return data ?? []
 }
@@ -34,32 +44,51 @@ export async function fetchGuestCard(guestId) {
   return data
 }
 
-/** Деньги приходят целыми агоротами (инвариант кассы) — форматируем в ₪ */
-export function formatMoney(agorot) {
-  return `₪${((agorot ?? 0) / 100).toFixed(2)}`
-}
-
-/** Телефон хранится одними цифрами: 0501234567 → 050-123-4567 */
-export function formatPhone(digits) {
-  if (!digits) return ''
-  return digits.length === 10
-    ? `${digits.slice(0, 3)}-${digits.slice(3, 6)}-${digits.slice(6)}`
-    : digits
-}
-
-/** «Последний визит»: Today / 3d ago / 2mo ago */
-export function lastVisitLabel(iso) {
-  if (!iso) return 'Never'
-  const days = Math.floor((Date.now() - new Date(iso).getTime()) / 86400000)
-  if (days <= 0) return 'Today'
-  if (days === 1) return 'Yesterday'
-  if (days < 30) return `${days}d ago`
-  if (days < 365) return `${Math.floor(days / 30)}mo ago`
-  return `${Math.floor(days / 365)}y ago`
-}
-
-export function formatDateTime(iso) {
-  return new Date(iso).toLocaleString('en-GB', {
-    day: '2-digit', month: 'short', hour: '2-digit', minute: '2-digit',
+/**
+ * Правка профиля. Единственный путь: колоночные гранты UPDATE отозваны
+ * (131), право проверяет сервер. NULL означает «не менять».
+ */
+export async function saveGuestProfile(guestId, { name, phone, notes, tags }) {
+  const { error } = await supabase.rpc('set_guest_profile', {
+    p_guest_id: guestId,
+    p_name: name ?? null,
+    p_phone: phone ?? null,
+    p_notes: notes ?? null,
+    p_tags: tags ?? null,
+    p_staff_session: null,
   })
+  if (error) throw new Error(error.message)
+}
+
+/** Подсказка о дублях: один номер в двух написаниях и одинаковые имена */
+export async function fetchDuplicates() {
+  const { data, error } = await supabase.rpc('find_guest_duplicates_web', {
+    p_limit: 50, p_staff_session: null,
+  })
+  if (error) throw new Error(error.message)
+  return data ?? []
+}
+
+/**
+ * Слияние: история переезжает к оставшемуся профилю, исходный остаётся
+ * указателем — старый номер продолжает узнавать человека (131).
+ */
+export async function mergeGuests(targetId, sourceId) {
+  const { data, error } = await supabase.rpc('merge_guests_web', {
+    p_target_id: targetId, p_source_id: sourceId, p_staff_session: null,
+  })
+  if (error) throw new Error(error.message)
+  return data
+}
+
+/**
+ * Стирание личных данных по просьбе клиента. Заказы и чеки остаются —
+ * это документы учёта; сервер сверяет введённый номер с профилем (131).
+ */
+export async function anonymizeGuest(guestId, confirmPhone) {
+  const { data, error } = await supabase.rpc('anonymize_guest_web', {
+    p_guest_id: guestId, p_confirm_phone: confirmPhone, p_staff_session: null,
+  })
+  if (error) throw new Error(error.message)
+  return data
 }
