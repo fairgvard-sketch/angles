@@ -115,8 +115,18 @@ export function tableOrderUrl(locationId, tableToken, slug) {
   return `${PUBLIC_MENU_ORIGIN}/order/${publicRef(locationId, slug)}?${params}`
 }
 
-export function reserveUrl(locationId, slug) {
-  return `${PUBLIC_MENU_ORIGIN}/reserve/${publicRef(locationId, slug)}`
+/**
+ * Ссылка на страницу брони. `src` — канал привода (Kassa 124): страница
+ * запоминает его и кладёт в бронь, поэтому в отчёте видно, что дал
+ * напечатанный QR, а что — ссылка из профиля.
+ *
+ * По умолчанию метки НЕТ: ссылка, которую владелец копирует и вставляет
+ * куда попало, не должна выдавать себя за QR. Метку получает только то,
+ * что мы генерируем сами.
+ */
+export function reserveUrl(locationId, slug, src = null) {
+  const base = `${PUBLIC_MENU_ORIGIN}/reserve/${publicRef(locationId, slug)}`
+  return src ? `${base}?src=${encodeURIComponent(src)}` : base
 }
 
 // ── Встраивание меню в сайт ресторана ────────────────────────

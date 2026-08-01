@@ -56,9 +56,14 @@ const TABS = [
  * Собран из отдельных элементов, а не из LinkBlock: здесь ссылка — главный
  * объект экрана, ей нужен свой заголовок-подпись и место под предупреждение
  * о выключенном канале, а QR стоит справа в меньшем размере.
+ *
+ * `qrUrl` отличается от `url` там, где напечатанный код нужно уметь
+ * отличить от ссылки в профиле (Kassa 124): гость видит одну и ту же
+ * страницу, но в отчёте это разные каналы. По умолчанию совпадают.
  */
-function ChannelHero({ title, hint, enabled, onToggle, url, qrName, offNote }) {
+function ChannelHero({ title, hint, enabled, onToggle, url, qrUrl, qrName, offNote }) {
   const [copyState, copy] = useCopy(url)
+  const codeUrl = qrUrl || url
 
   return (
     <section className="panel channel-hero">
@@ -95,7 +100,7 @@ function ChannelHero({ title, hint, enabled, onToggle, url, qrName, offNote }) {
             <button type="button" className="secondary-button" onClick={copy}>
               {copyState === 'copied' ? <><Check /> Copied</> : <><Copy /> Copy link</>}
             </button>
-            <button type="button" className="secondary-button" onClick={() => downloadQr(url, qrName)}>
+            <button type="button" className="secondary-button" onClick={() => downloadQr(codeUrl, qrName)}>
               <Download /> Download QR
             </button>
             <a className="secondary-button" href={url} target="_blank" rel="noreferrer">
@@ -109,7 +114,7 @@ function ChannelHero({ title, hint, enabled, onToggle, url, qrName, offNote }) {
       </div>
 
       <div className="channel-hero-qr">
-        <QrCanvas url={url} size={148} />
+        <QrCanvas url={codeUrl} size={148} />
       </div>
     </section>
   )
@@ -893,6 +898,7 @@ function ReserveTab({ locationId, settings, patch, slug, tz, openGroup, onOpenGr
         enabled={enabled}
         onToggle={(v) => patch({ enabled: v })}
         url={reserveUrl(locationId, slug)}
+        qrUrl={reserveUrl(locationId, slug, 'qr')}
         qrName="reserve"
         offNote="Bookings are paused — the guest page tells visitors reservations are closed."
       />
