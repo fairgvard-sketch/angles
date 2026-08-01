@@ -10,6 +10,8 @@ import TimelineDesk from './TimelineDesk'
 import WaitlistPanel from './WaitlistPanel'
 import FloorPlanEditor from './FloorPlanEditor'
 import ReserveAnalytics from './ReserveAnalytics'
+import LaunchChecklist from './LaunchChecklist'
+import { fetchLocationSlug } from './settings'
 
 /**
  * «Reservations» — веб-стол хостес (Kassa 102): подтверждение, отказ,
@@ -48,7 +50,11 @@ function ReservationCard({ reservation, busyAction, onAction }) {
           </small>
         </div>
         <span className={`order-status is-${reservation.status === 'confirmed' ? 'ready' : reservation.status}`}>
-          {seated ? 'Seated (POS)' : RESERVATION_STATUS_LABELS[reservation.status] ?? reservation.status}
+          {/* Тестовая бронь (126) занимает настоящий стол — её нельзя
+              спутать с гостевой, иначе хостес будет ждать никого. */}
+          {reservation.is_test
+            ? 'Test'
+            : seated ? 'Seated (POS)' : RESERVATION_STATUS_LABELS[reservation.status] ?? reservation.status}
         </span>
       </header>
       {reservation.note && <p className="order-note"><StickyNote /> {reservation.note}</p>}
@@ -85,7 +91,19 @@ export default function ReservationsDesk({ context }) {
   // Таймлайн — вид по умолчанию: владелец открывает раздел, чтобы увидеть
   // зал. Списки заявок остаются вторым видом, а не удаляются.
   const [view, setView] = useState('timeline')
+  // Слаг нужен только ссылке предпросмотра (126); отсутствие не мешает —
+  // длинная ссылка с id точки работает так же.
+  const [slug, setSlug] = useState(null)
   const knownIds = useRef(new Set())
+
+  useEffect(() => {
+    if (!locationId) return
+    let alive = true
+    fetchLocationSlug(locationId)
+      .then((s) => { if (alive) setSlug(s) })
+      .catch(() => { if (alive) setSlug(null) })
+    return () => { alive = false }
+  }, [locationId])
 
   const refresh = useCallback(async (withSound = false) => {
     if (!locationId) return
@@ -183,6 +201,17 @@ export default function ReservationsDesk({ context }) {
       </div>
 
       {error && <p className="form-error" role="alert">{error}</p>}
+
+      {/* Готовность к запуску — над всем остальным и только пока не
+          готово: ненастроенная точка не должна выглядеть работающей.
+          На аналитике не показываем: там нечего настраивать. */}
+      {locationId && view !== 'analytics' && (
+        <LaunchChecklist
+          locationId={locationId}
+          locationSlug={slug}
+          onGo={setView}
+        />
+      )}
 
       {view === 'timeline' && locationId && <TimelineDesk locationId={locationId} />}
       {view === 'waitlist' && locationId && <WaitlistPanel locationId={locationId} />}

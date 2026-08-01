@@ -325,7 +325,12 @@ function BookingSheet({
   return (
     <div className="sheet-backdrop" onClick={onClose} role="presentation">
       <div className="sheet" onClick={(e) => e.stopPropagation()} role="dialog" aria-modal="true">
-        <h3>{reservation.customer_name}</h3>
+        <h3>
+          {reservation.customer_name}
+          {/* Тестовая бронь (126): стол она держит настоящий, поэтому
+              метка обязана быть видна там, где хостес принимает решение. */}
+          {reservation.is_test && <span className="guest-fav is-warn"> Test</span>}
+        </h3>
         <p className="sheet-sub">
           {new Date(reservation.reserved_at).toLocaleString([], {
             weekday: 'short', day: 'numeric', month: 'short',

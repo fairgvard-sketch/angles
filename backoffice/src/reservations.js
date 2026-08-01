@@ -32,7 +32,7 @@ export const RESERVATION_ACTIONS = {
 }
 
 const SELECT_COLUMNS =
-  'id, status, customer_name, customer_phone, party_size, reserved_at, duration_min, note, reject_reason, order_id, table_id, created_at'
+  'id, status, customer_name, customer_phone, party_size, reserved_at, duration_min, note, reject_reason, order_id, table_id, created_at, is_test'
 
 /**
  * Актив: заявки new + подтверждённые визиты от начала сегодняшнего дня
@@ -103,7 +103,7 @@ export async function fetchTimelineReservations(locationId, fromMs, toMs) {
     .from('reservations')
     .select(
       'id, status, customer_name, customer_phone, party_size, reserved_at, '
-      + 'duration_min, note, order_id, arrived_at, table_id, hold_table_ids, zone_id, '
+      + 'duration_min, note, order_id, arrived_at, table_id, hold_table_ids, zone_id, is_test, '
       + 'tables_link:reservation_tables ( table_id, is_primary )'
     )
     .eq('location_id', locationId)
