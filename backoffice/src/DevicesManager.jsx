@@ -52,6 +52,15 @@ function DeviceRow({ device, busy, onRename, onArchive }) {
                 if (name.trim() && name.trim() !== device.name) onRename(name.trim())
                 else setName(device.name)
               }}
+              /* Отмена по уходу фокуса — только когда фокус покидает ФОРМУ.
+                 Прежний onBlur на поле срабатывал раньше клика по «Save»:
+                 форма размонтировалась, клик приземлялся в пустоту, и
+                 переименование молча не отправлялось. */
+              onBlur={(e) => {
+                if (e.currentTarget.contains(e.relatedTarget)) return
+                setEditing(false)
+                setName(device.name)
+              }}
             >
               <input
                 ref={inputRef}
@@ -59,9 +68,16 @@ function DeviceRow({ device, busy, onRename, onArchive }) {
                 maxLength={60}
                 aria-label={`Name for ${device.name}`}
                 onChange={(e) => setName(e.target.value)}
-                onBlur={() => { setEditing(false); setName(device.name) }}
               />
-              <button type="submit" className="text-button">Save</button>
+              <button
+                type="submit"
+                className="text-button"
+                /* Safari не фокусирует кнопки по клику, поэтому
+                   relatedTarget там пуст — не даём увести фокус вовсе. */
+                onMouseDown={(e) => e.preventDefault()}
+              >
+                Save
+              </button>
             </form>
           ) : (
             <strong>
