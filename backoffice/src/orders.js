@@ -1,7 +1,8 @@
 import { supabase } from './supabase'
+import { ACTIVE_STATUSES, DONE_STATUSES } from './orders-inbox'
 
 /**
- * Standalone-инбокс онлайн-заказов (Kassa 101).
+ * Сеть инбокса онлайн-заказов (Kassa 101).
  *
  * Чтение — прямой select по online_orders: RLS пускает членов организации
  * (JWT org_id, политика 050), запись — только RPC set_online_order_status_web
@@ -9,68 +10,43 @@ import { supabase } from './supabase'
  * конвертированные в POS-заказ, сервер не отдаёт под запись).
  *
  * Снапшот позиций и цен в items/total сделан в момент заявки и не меняется.
+ * Правила показа — в `orders-inbox.js`.
  */
-
-export const ACTIVE_STATUSES = ['new', 'accepted', 'preparing', 'ready']
-export const DONE_STATUSES = ['completed', 'rejected', 'cancelled']
-
-export const STATUS_LABELS = {
-  new: 'New',
-  accepted: 'Accepted',
-  preparing: 'Preparing',
-  ready: 'Ready',
-  completed: 'Completed',
-  rejected: 'Rejected',
-  cancelled: 'Cancelled',
-}
-
-/** Кнопки перевода статуса — зеркало переходов set_online_order_status_web. */
-export const NEXT_ACTIONS = {
-  new: [
-    { to: 'accepted', label: 'Accept', tone: 'primary' },
-    { to: 'rejected', label: 'Reject', tone: 'danger' },
-  ],
-  accepted: [
-    { to: 'preparing', label: 'Start preparing' },
-    { to: 'ready', label: 'Ready', tone: 'primary' },
-    { to: 'cancelled', label: 'Cancel', tone: 'danger' },
-  ],
-  preparing: [
-    { to: 'ready', label: 'Ready', tone: 'primary' },
-    { to: 'cancelled', label: 'Cancel', tone: 'danger' },
-  ],
-  ready: [
-    { to: 'completed', label: 'Complete', tone: 'primary' },
-    { to: 'cancelled', label: 'Cancel', tone: 'danger' },
-  ],
-}
 
 /**
- * Режим обслуживания точки — зеркало online_fulfilment_mode (101):
- * явная настройка сильнее дефолта по модулю pos.
+ * Колонки заявки. `pos:orders(daily_number)` — номер настоящего заказа на
+ * кассе: для pos-точки это единственный честный «хендофф», который можно
+ * показать, не выдумывая ссылку в интерфейс терминала.
  */
-export function fulfilmentMode(products, settings) {
-  const explicit = settings?.online_orders?.fulfilment
-  if (explicit === 'pos' || explicit === 'standalone') return explicit
-  const hasPos = !Array.isArray(products) || products.includes('pos')
-  return hasPos ? 'pos' : 'standalone'
-}
+const ORDER_COLUMNS =
+  'id, status, customer_name, customer_phone, order_type, delivery_address, note, items, '
+  + 'total, created_at, decided_at, pickup_at, reject_reason, order_id, table_id, table_label, '
+  + 'order_channel, pos:orders ( daily_number, status )'
 
-export async function fetchOnlineOrders(locationId) {
+/**
+ * Активные — все: незакрытая заявка не должна исчезать из инбокса по
+ * сроку давности, её надо развести по корзинам (см. `bucketOrders`).
+ * История — за окно, чтобы поиск по заказу недельной давности работал,
+ * а запрос не тянул всю таблицу.
+ */
+export async function fetchOnlineOrders(locationId, { historyFromIso = null, limit = 200 } = {}) {
+  let history = supabase
+    .from('online_orders')
+    .select(ORDER_COLUMNS)
+    .eq('location_id', locationId)
+    .in('status', DONE_STATUSES)
+    .order('created_at', { ascending: false })
+    .limit(limit)
+  if (historyFromIso) history = history.gte('created_at', historyFromIso)
+
   const [active, done] = await Promise.all([
     supabase
       .from('online_orders')
-      .select('id, status, customer_name, customer_phone, order_type, note, items, total, created_at, decided_at, reject_reason, order_id, table_id')
+      .select(ORDER_COLUMNS)
       .eq('location_id', locationId)
       .in('status', ACTIVE_STATUSES)
       .order('created_at', { ascending: true }),
-    supabase
-      .from('online_orders')
-      .select('id, status, customer_name, items, total, created_at, reject_reason')
-      .eq('location_id', locationId)
-      .in('status', DONE_STATUSES)
-      .order('created_at', { ascending: false })
-      .limit(20),
+    history,
   ])
   if (active.error) throw active.error
   if (done.error) throw done.error
@@ -86,27 +62,6 @@ export async function setOnlineOrderStatus(locationId, onlineId, status, reason 
   })
   if (error) throw error
   return data
-}
-
-/** Деньги — целые агороты (инвариант кассы); наружу — шекели. */
-export function formatAgorot(agorot) {
-  return `₪${((agorot ?? 0) / 100).toFixed(2).replace(/\.00$/, '')}`
-}
-
-/** Строки позиций из снапшота заявки: «2 × Латте · גדול · שיבולת שועל». */
-export function orderItemLines(items) {
-  if (!Array.isArray(items)) return []
-  return items.map((item, index) => {
-    const parts = [item.name]
-    if (item.variant_name) parts.push(item.variant_name)
-    for (const mod of item.mods ?? []) parts.push(mod.name)
-    return {
-      key: `${item.menu_item_id ?? 'i'}-${index}`,
-      qty: item.qty ?? 1,
-      text: parts.filter(Boolean).join(' · '),
-      total: item.line_total ?? 0,
-    }
-  })
 }
 
 /**

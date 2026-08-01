@@ -525,9 +525,13 @@ a { color: inherit; }
   .topbar-context { margin-right: auto; }
   /* Название точки в шапке телефона съедает всю строку — оставляем
      только сам выбор */
-  .topbar-location { max-width: 42vw; }
+  .topbar-location { max-width: 42vw; flex: none; }
   .topbar-location select { max-width: 100%; }
   .topbar-location.is-single { display: none; }
+  /* Метка developer-стенда на 390px наезжала на выбор точки. Точка
+     влияет на данные, метка — нет, поэтому уступает она. */
+  .topbar-context { min-width: 0; overflow: hidden; }
+  .developer-badge { display: none; }
   .content { padding: 34px 22px 60px; }
 }
 
@@ -901,11 +905,68 @@ a { color: inherit; }
 .order-line-total { flex: 0 0 auto; font-variant-numeric: tabular-nums; color: #5d626b; }
 .order-note { display: flex; gap: 6px; align-items: flex-start; margin: 0; padding: 8px 10px; border-radius: 8px; background: #f7f8f9; color: #5d626b; font-size: 13px; }
 .order-note svg { width: 14px; height: 14px; flex: 0 0 auto; margin-top: 1px; }
-.order-card-foot { display: flex; justify-content: space-between; align-items: center; gap: 10px; margin-top: auto; }
+/* Действий у заказа может быть три — даём футеру переноситься, иначе
+   сумма повисает посреди двух рядов кнопок. */
+.order-card-foot { display: flex; flex-wrap: wrap; justify-content: space-between; align-items: center; gap: 10px; margin-top: auto; }
+.order-card-foot .order-actions { flex: 1 1 auto; justify-content: flex-end; }
 .order-total { font-size: 17px; font-weight: 750; font-variant-numeric: tabular-nums; color: #111317; }
 .order-actions { display: flex; gap: 8px; flex-wrap: wrap; }
 .order-actions .primary-button.compact { height: 40px; padding: 0 16px; }
 .order-actions .secondary-button[data-danger] { color: #a02c2c; border-color: #e5c6c6; }
+.order-actions .primary-button[data-danger] { background: #a02c2c; }
+
+/* ── Инбокс заказов (Phase 3) ──────────────────────────────── */
+.order-toolbar {
+  display: flex; flex-wrap: wrap; align-items: center; gap: 8px; margin-bottom: 16px;
+}
+.order-search {
+  flex: 1 1 240px; min-width: 0; display: flex; align-items: center; gap: 8px;
+  min-height: 44px; padding: 0 12px; border: 1px solid #e2e4e8; border-radius: 10px; background: #fff;
+}
+.order-search svg { width: 17px; height: 17px; color: #8b9099; flex: none; }
+.order-search input { flex: 1 1 auto; min-width: 0; border: 0; background: transparent; font: inherit; font-size: 14px; }
+.order-search input:focus { outline: none; }
+.order-filter select {
+  min-height: 44px; padding: 0 10px; border: 1px solid #e2e4e8; border-radius: 10px;
+  background: #fff; color: #33363c; font: inherit; font-size: 14px;
+}
+.order-toolbar .text-button { min-height: 44px; }
+.order-toolbar .text-button svg { width: 15px; height: 15px; }
+/* Состояние живого канала: словом и точкой, не одним лишь цветом */
+.order-live {
+  display: inline-flex; align-items: center; gap: 6px; margin-inline-start: auto;
+  color: #5d626b; font-size: 12px; font-weight: 650; white-space: nowrap;
+}
+.order-live i { width: 8px; height: 8px; border-radius: 50%; background: #9ba0a8; }
+.order-live.is-live i { background: #1e9e5a; }
+.order-live.is-offline i { background: #d98324; }
+
+.order-bucket + .order-bucket { margin-top: 16px; }
+.order-bucket .panel-heading h2 { display: flex; align-items: center; gap: 8px; }
+.order-bucket .panel-heading svg { width: 18px; height: 18px; }
+.order-count {
+  min-width: 24px; padding: 1px 7px; border-radius: 999px;
+  background: #eceef1; color: #40444b; font-size: 12px; font-weight: 700; text-align: center;
+}
+.order-bucket.is-fresh .order-count { background: #16181d; color: #fff; }
+.order-bucket.is-stale .panel-heading svg { color: #b4720e; }
+.order-bucket.is-stale .order-count { background: #fdf0dc; color: #7a4d06; }
+
+.order-ref { font-variant-numeric: tabular-nums; font-weight: 700; color: #40444b; }
+.order-card-head small a { display: inline-flex; align-items: center; gap: 4px; color: inherit; }
+.order-tags { display: flex; flex-wrap: wrap; gap: 6px; }
+.order-tag {
+  padding: 3px 9px; border-radius: 999px; background: #f2f3f5;
+  color: #4a4f57; font-size: 12px; font-weight: 650;
+}
+/* Просроченный заказ виден и без цвета — по подписи с датой и рамке */
+.order-card.is-stale { border-color: #f0d9ad; background: #fffdf8; }
+.order-handoff {
+  display: flex; align-items: center; gap: 8px; margin: 0;
+  padding: 8px 10px; border-radius: 8px; background: #f2f5f9; color: #3c4654; font-size: 13px;
+}
+.order-handoff svg { width: 15px; height: 15px; flex: none; }
+.form-error .text-button { margin-inline-start: 10px; }
 
 /* Карточка модулей организации (100) на Home. */
 .product-list { display: grid; gap: 10px; }
