@@ -960,7 +960,7 @@ function ReservationSchedule({ schedule, tz, onChange }) {
   )
 }
 
-function ReserveTab({ locationId, settings, patch, slug, tz, openGroup, onOpenGroup }) {
+function ReserveTab({ locationId, settings, patch, slug, tz, businessAddress, openGroup, onOpenGroup }) {
   const enabled = reservationsEnabled(settings)
   const rsv = settings.reservations || {}
   const instant = rsv.instant === true
@@ -1170,9 +1170,19 @@ function ReserveTab({ locationId, settings, patch, slug, tz, openGroup, onOpenGr
               часов приёма и расходился с ними — страница писала «шабат
               закрыто» и предлагала субботние слоты. Гостю теперь показывается
               расписание из группы «Booking hours». */}
-          <Field label="Address">
+          {/* Адрес у точки один. Здесь только НЕОБЯЗАТЕЛЬНОЕ уточнение
+              для гостя («вход со двора»), а по умолчанию страница берёт
+              адрес заведения — два поля с одним смыслом расходились, и
+              гость видел пустоту при заполненных реквизитах. */}
+          <Field
+            label="Address shown to guests"
+            hint={businessAddress
+              ? 'Comes from Locations → Business address. Fill this in only to override it.'
+              : 'Set the business address in Locations — guests see it on the booking page.'}
+          >
             <input
               defaultValue={rsv.address || ''}
+              placeholder={businessAddress || 'Street, number, city'}
               onBlur={(e) => patch({ address: e.target.value.trim() || null })}
             />
           </Field>
@@ -1225,6 +1235,8 @@ export default function QrChannels({ context, locationId }) {
   const activeId = locationId || locations[0]?.id || null
   const [tab, setTab] = useState('online')
   const [settings, setSettings] = useState(null)
+  // Адрес заведения — канонический источник для гостевой страницы
+  const [businessAddress, setBusinessAddress] = useState('')
   const [tables, setTables] = useState([])
   const [slug, setSlug] = useState('')
   const [error, setError] = useState('')
@@ -1245,6 +1257,7 @@ export default function QrChannels({ context, locationId }) {
       .then(([data, tableRows, locationSlug]) => {
         if (!cancelled) {
           setSettings(data.settings || {})
+          setBusinessAddress(data.receipt_address || '')
           setTables(tableRows)
           setSlug(locationSlug)
         }
@@ -1349,6 +1362,7 @@ export default function QrChannels({ context, locationId }) {
           settings={settings}
           patch={makePatcher('reservations', saveReservations)}
           slug={slug}
+          businessAddress={businessAddress}
           tz={locations.find((l) => l.id === activeId)?.timezone || 'Asia/Jerusalem'}
           openGroup={openGroup}
           onOpenGroup={setOpenGroup}

@@ -1,4 +1,6 @@
 import { supabase } from './supabase'
+// Чистые правила (время точки, тексты ошибок) — в отдельном модуле
+export { deskErrorText, toLocalInput, fromLocalInput } from './reservations-time'
 
 /**
  * Веб-стол хостес (Kassa 102): полный цикл брони без POS.
@@ -165,6 +167,64 @@ export async function setReservationTables(locationId, id, tableIds) {
   if (error) throw new Error(error.message)
 }
 
+// ── Ручная бронь и правка визита (Kassa 120/127) ─────────────
+
+/**
+ * Завести визит из кабинета: телефонная бронь или walk-in.
+ *
+ * Стол и доступность считает сервер тем же алгоритмом, что и гостевая
+ * страница — клиент не решает, свободно ли место, иначе два хостес за
+ * разными экранами посадят на один стол двоих.
+ */
+export async function createReservation(locationId, {
+  name, phone = '', partySize = 2, at = null, note = null, tableIds = null, walkIn = false,
+}) {
+  const { data, error } = await supabase.rpc('create_reservation_web', {
+    p_location_id: locationId,
+    p_name: name,
+    p_phone: phone,
+    p_party_size: partySize,
+    p_at: at,
+    p_note: note,
+    p_table_ids: tableIds,
+    p_walk_in: walkIn,
+  })
+  if (error) throw new Error(error.message)
+  return data
+}
+
+/** Имя и телефон визита (127) — занятость они не меняют */
+export async function updateReservationGuest(locationId, id, { name, phone }) {
+  const { data, error } = await supabase.rpc('update_reservation_guest_web', {
+    p_location_id: locationId,
+    p_id: id,
+    p_name: name ?? null,
+    p_phone: phone ?? null,
+  })
+  if (error) throw new Error(error.message)
+  return data
+}
+
+/**
+ * Время, компания, заметка (120). Смена времени или длительности
+ * пересчитывает занятость на сервере — конфликт приходит как table_busy.
+ */
+export async function updateReservation(locationId, id, {
+  at = null, partySize = null, note = null, zoneId = null, duration = null,
+}) {
+  const { data, error } = await supabase.rpc('update_reservation_web', {
+    p_location_id: locationId,
+    p_id: id,
+    p_reserved_at: at,
+    p_party_size: partySize,
+    p_note: note,
+    p_zone_id: zoneId,
+    p_duration: duration,
+  })
+  if (error) throw new Error(error.message)
+  return data
+}
+
 /** Отметить посадку гостя без POS-заказа (120) */
 export async function markReservationArrived(locationId, id) {
   const { error } = await supabase.rpc('mark_reservation_arrived_web', {
@@ -172,17 +232,6 @@ export async function markReservationArrived(locationId, id) {
     p_id: id,
   })
   if (error) throw new Error(error.message)
-}
-
-/** Человеческий текст ошибок стола хостес */
-export function deskErrorText(message) {
-  const m = String(message || '')
-  if (m.includes('pos_mode')) return 'This booking is seated into a POS order — it is handled on the register.'
-  if (m.includes('table_busy')) return 'That table is taken for this time — pick another.'
-  if (m.includes('not_active')) return 'This booking is no longer active.'
-  if (m.includes('not_confirmed')) return 'Confirm the booking before seating the guest.'
-  if (m.includes('module_disabled')) return 'The Reserve product is not active for this account.'
-  return m
 }
 
 // ── Лист ожидания (Kassa 122) ────────────────────────────────

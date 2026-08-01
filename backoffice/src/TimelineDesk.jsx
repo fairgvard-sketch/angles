@@ -7,6 +7,7 @@ import {
 import {
   fetchReservationSettings, fetchTimelineReservations, fetchTimelineTables,
   markReservationArrived, setReservationTables, setReservationStatus, deskErrorText,
+  updateReservation, updateReservationGuest, toLocalInput, fromLocalInput,
 } from './reservations'
 import { supabase } from './supabase'
 
@@ -332,8 +333,19 @@ export default function TimelineDesk({ locationId }) {
         <BookingSheet
           reservation={detail}
           tables={tables}
+          tz={tz}
           busy={busy}
           onClose={() => setDetail(null)}
+          onEdit={(patch) => act(async () => {
+            // Контакты и «когда/сколько» — разные функции сервера: у
+            // второй пересчёт занятости, у первой его не нужно.
+            if (patch.name != null || patch.phone != null) {
+              await updateReservationGuest(locationId, detail.id, patch)
+            }
+            if (patch.at != null || patch.partySize != null || patch.note != null) {
+              await updateReservation(locationId, detail.id, patch)
+            }
+          })}
           onConfirm={() => act(() => setReservationStatus(locationId, detail.id, 'confirmed'))}
           onArrived={() => act(() => markReservationArrived(locationId, detail.id))}
           onCompleted={() => act(() => setReservationStatus(locationId, detail.id, 'completed'))}
@@ -351,7 +363,8 @@ export default function TimelineDesk({ locationId }) {
  * как назначение одного.
  */
 function BookingSheet({
-  reservation, tables, busy, onClose, onConfirm, onArrived, onCompleted, onNoShow, onTables,
+  reservation, tables, tz, busy, onClose, onConfirm, onArrived, onCompleted,
+  onNoShow, onTables, onEdit,
 }) {
   const linked = (reservation.tables_link ?? []).map((l) => l.table_id)
   const initial = linked.length > 0
@@ -362,8 +375,30 @@ function BookingSheet({
   const posSeated = reservation.order_id != null
   const active = reservation.status === 'new' || reservation.status === 'confirmed'
 
+  // Правка визита открывается по кнопке: обычно карточку открывают,
+  // чтобы посадить гостя, а не переписать его данные.
+  const [editing, setEditing] = useState(false)
+  const [form, setForm] = useState(() => ({
+    name: reservation.customer_name ?? '',
+    phone: reservation.customer_phone ?? '',
+    party: reservation.party_size ?? 2,
+    at: toLocalInput(new Date(reservation.reserved_at).getTime(), tz),
+    note: reservation.note ?? '',
+  }))
+
   const changed = picked.length !== initial.length
     || picked.some((id, i) => id !== initial[i])
+
+  function saveEdit() {
+    const at = fromLocalInput(form.at, tz)
+    onEdit({
+      name: form.name.trim() !== reservation.customer_name ? form.name.trim() : null,
+      phone: form.phone.trim() !== (reservation.customer_phone ?? '') ? form.phone.trim() : null,
+      partySize: Number(form.party) !== reservation.party_size ? Number(form.party) : null,
+      at: at && at !== new Date(reservation.reserved_at).toISOString() ? at : null,
+      note: form.note.trim() !== (reservation.note ?? '') ? form.note.trim() : null,
+    })
+  }
 
   return (
     <div className="sheet-backdrop" onClick={onClose} role="presentation">
@@ -391,6 +426,59 @@ function BookingSheet({
           <p className="form-hint">
             Seated into a POS order — this visit is handled on the register.
           </p>
+        )}
+
+        {active && !posSeated && !editing && (
+          <button type="button" className="secondary-button" onClick={() => setEditing(true)}>
+            Edit booking
+          </button>
+        )}
+
+        {active && !posSeated && editing && (
+          <div className="sheet-section">
+            <span className="sheet-section-title">Edit booking</span>
+            <div className="qr-grid">
+              <label className="qr-field">
+                <span>Guest name</span>
+                <input value={form.name} maxLength={120}
+                  onChange={(e) => setForm((f) => ({ ...f, name: e.target.value }))} />
+              </label>
+              <label className="qr-field">
+                <span>Phone</span>
+                <input type="tel" value={form.phone} maxLength={20}
+                  onChange={(e) => setForm((f) => ({ ...f, phone: e.target.value }))} />
+              </label>
+              <label className="qr-field">
+                <span>Guests</span>
+                <input type="number" min={1} max={50} value={form.party}
+                  onChange={(e) => setForm((f) => ({ ...f, party: e.target.value }))} />
+              </label>
+              <label className="qr-field">
+                <span>Date and time</span>
+                <input type="datetime-local" value={form.at}
+                  onChange={(e) => setForm((f) => ({ ...f, at: e.target.value }))} />
+              </label>
+            </div>
+            <label className="qr-field">
+              <span>Note</span>
+              <input value={form.note} maxLength={200}
+                onChange={(e) => setForm((f) => ({ ...f, note: e.target.value }))} />
+            </label>
+            {/* Время и компанию перепроверяет сервер: занятость решает он,
+                иначе перенос тихо создал бы двойную посадку. */}
+            <p className="form-hint">
+              Moving the visit or growing the party is re-checked against the
+              floor — a clash comes back as an error, not a double booking.
+            </p>
+            <div className="order-actions">
+              <button type="button" className="secondary-button" onClick={() => setEditing(false)}>
+                Cancel
+              </button>
+              <button type="button" className="primary-button compact" disabled={busy} onClick={saveEdit}>
+                {busy ? 'Saving…' : 'Save changes'}
+              </button>
+            </div>
+          </div>
         )}
 
         {active && !posSeated && (

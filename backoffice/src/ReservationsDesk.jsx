@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
-import { CalendarDays, Phone, RefreshCw, StickyNote, Users } from 'lucide-react'
+import { CalendarDays, DoorOpen, Phone, Plus, RefreshCw, StickyNote, Users } from 'lucide-react'
 import { supabase } from './supabase'
 import {
   RESERVATION_STATUS_LABELS, RESERVATION_ACTIONS,
@@ -11,7 +11,9 @@ import WaitlistPanel from './WaitlistPanel'
 import FloorPlanEditor from './FloorPlanEditor'
 import ReserveAnalytics from './ReserveAnalytics'
 import LaunchChecklist from './LaunchChecklist'
-import { fetchLocationSlug } from './settings'
+import BookingForm from './BookingForm'
+import { fetchLocationSlug, fetchLocation } from './settings'
+import { fetchTimelineTables } from './reservations'
 
 /**
  * «Reservations» — веб-стол хостес (Kassa 102): подтверждение, отказ,
@@ -94,6 +96,10 @@ export default function ReservationsDesk({ context, locationId, tab, onTabChange
   // Слаг нужен только ссылке предпросмотра (126); отсутствие не мешает —
   // длинная ссылка с id точки работает так же.
   const [slug, setSlug] = useState(null)
+  // Ручная бронь / walk-in (127): 'booking' | 'walk-in' | null
+  const [creating, setCreating] = useState(null)
+  const [tables, setTables] = useState([])
+  const [tz, setTz] = useState('Asia/Jerusalem')
   const knownIds = useRef(new Set())
 
   useEffect(() => {
@@ -102,6 +108,14 @@ export default function ReservationsDesk({ context, locationId, tab, onTabChange
     fetchLocationSlug(locationId)
       .then((s) => { if (alive) setSlug(s) })
       .catch(() => { if (alive) setSlug(null) })
+    // Столы и зона точки нужны форме ручной брони: стол хостес может
+    // назвать сам, а время вводится в часах ТОЧКИ, не браузера.
+    fetchTimelineTables(locationId)
+      .then((list) => { if (alive) setTables(list) })
+      .catch(() => { if (alive) setTables([]) })
+    fetchLocation(locationId)
+      .then((loc) => { if (alive) setTz(loc.timezone || 'Asia/Jerusalem') })
+      .catch(() => {})
     return () => { alive = false }
   }, [locationId])
 
@@ -175,12 +189,38 @@ export default function ReservationsDesk({ context, locationId, tab, onTabChange
         <p>Booking requests and today’s visits — confirm, complete or mark no-shows.</p>
       </section>
 
-      <div className="timeline-zones" style={{ marginBottom: 16 }}>
+      {/* Гость по телефону и гость с улицы — обычная работа хостес, а не
+          повод идти к кассе. Кнопки стоят над таблицей, а не в углу
+          карточки: их ищут первыми. */}
+      <div className="desk-actions">
+        <button
+          type="button"
+          className="primary-button compact"
+          disabled={!locationId}
+          onClick={() => setCreating('booking')}
+        >
+          <Plus /> New reservation
+        </button>
+        <button
+          type="button"
+          className="secondary-button"
+          disabled={!locationId}
+          onClick={() => setCreating('walk-in')}
+        >
+          <DoorOpen /> Walk-in
+        </button>
+      </div>
+
+      {/* Пять вкладок на 390px переносились в две строки, и активная
+          терялась. Полоса прокручивается, активная всегда видна. */}
+      <div className="desk-tabs" role="tablist" aria-label="Reservations view">
         {VIEWS.map(({ key, label }) => (
           <button
             key={key}
             type="button"
-            className={view === key ? 'primary-button compact' : 'secondary-button compact'}
+            role="tab"
+            aria-selected={view === key}
+            className={view === key ? 'is-active' : ''}
             onClick={() => setView(key)}
           >
             {label}
@@ -198,6 +238,17 @@ export default function ReservationsDesk({ context, locationId, tab, onTabChange
           locationId={locationId}
           locationSlug={slug}
           onGo={setView}
+        />
+      )}
+
+      {creating && locationId && (
+        <BookingForm
+          locationId={locationId}
+          tables={tables}
+          tz={tz}
+          mode={creating}
+          onClose={() => setCreating(null)}
+          onCreated={() => { setCreating(null); refresh() }}
         />
       )}
 

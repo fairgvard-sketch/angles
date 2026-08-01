@@ -1064,6 +1064,38 @@ a { color: inherit; }
   border-inline-end-style: dashed;
 }
 
+/* ── Стол хостес (Phase 4) ─────────────────────────────────── */
+.desk-actions { display: flex; flex-wrap: wrap; gap: 8px; margin-bottom: 14px; }
+.desk-actions button { min-height: 44px; }
+.desk-actions svg { width: 17px; height: 17px; }
+
+/* Полоса вкладок: на телефоне прокручивается, а не переносится */
+.desk-tabs {
+  display: flex; gap: 6px; margin-bottom: 16px; padding-bottom: 2px;
+  overflow-x: auto; overscroll-behavior-x: contain; scrollbar-width: none;
+}
+.desk-tabs::-webkit-scrollbar { display: none; }
+.desk-tabs button {
+  flex: 0 0 auto; min-height: 40px; padding: 0 14px;
+  border: 1px solid #e2e4e8; border-radius: 999px; background: #fff;
+  color: #5d626b; font: inherit; font-size: 14px; font-weight: 650; white-space: nowrap; cursor: pointer;
+}
+.desk-tabs button:hover { background: #f2f3f5; color: #16181d; }
+.desk-tabs button.is-active { background: #16181d; border-color: #16181d; color: #fff; }
+
+/* Чеклист запуска: свёрнут — одна строка, а не первый экран телефона */
+.launch-toggle {
+  display: flex; align-items: center; gap: 10px; min-height: 44px;
+  padding: 0; border: 0; background: transparent; text-align: start; cursor: pointer; font: inherit;
+}
+.launch-toggle > svg { width: 18px; height: 18px; color: #8b9099; flex: none; }
+.launch-toggle span { display: flex; flex-direction: column; gap: 2px; min-width: 0; }
+.launch-toggle strong { display: flex; align-items: center; gap: 8px; color: #16181d; font-size: 17px; }
+.launch-toggle strong svg { width: 18px; height: 18px; }
+.launch-toggle small { color: #777b83; font-size: 12px; }
+.launch-panel.is-collapsed { padding-bottom: 0; }
+.launch-panel.is-collapsed .panel-heading { border-bottom: 0; }
+
 .timeline-tablepick { display: flex; flex-wrap: wrap; gap: 6px; margin: 8px 0; }
 
 /* Лист карточки визита */

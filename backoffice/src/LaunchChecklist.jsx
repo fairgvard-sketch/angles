@@ -1,5 +1,7 @@
 import { useCallback, useEffect, useState } from 'react'
-import { Check, Circle, Copy, ExternalLink, RefreshCw, Rocket } from 'lucide-react'
+import {
+  Check, ChevronDown, ChevronRight, Circle, Copy, ExternalLink, RefreshCw, Rocket,
+} from 'lucide-react'
 import {
   LAUNCH_STEPS, fetchLaunchChecklist, fetchPreviewToken, createTestBooking,
   launchErrorText,
@@ -15,7 +17,12 @@ import { useCopy } from './qr-blocks'
  * проверял никто, и тумблер честно открывал гостю страницу пустого зала.
  *
  * Блок исчезает сам, когда всё готово и приём включён: чеклист нужен
- * первую неделю, а не навсегда. Пока не готово — он первый на экране.
+ * первую неделю, а не навсегда.
+ *
+ * Свёрнут по умолчанию: он стоит над КАЖДОЙ вкладкой броней и на
+ * телефоне занимал весь первый экран — хостес пролистывал его каждый
+ * раз, когда открывал таймлайн в час пик. Развёрнутое состояние
+ * запоминается по точке.
  */
 
 function Step({ step, onGo }) {
@@ -37,7 +44,18 @@ function Step({ step, onGo }) {
   )
 }
 
+const OPEN_KEY = 'angle.launch.open'
+
+function readOpen(locationId) {
+  try {
+    return window.localStorage.getItem(`${OPEN_KEY}.${locationId}`) === '1'
+  } catch {
+    return false
+  }
+}
+
 export default function LaunchChecklist({ locationId, locationSlug, onGo }) {
+  const [open, setOpen] = useState(() => readOpen(locationId))
   const [data, setData] = useState(null)
   const [preview, setPreview] = useState('')
   const [busy, setBusy] = useState(false)
@@ -60,6 +78,15 @@ export default function LaunchChecklist({ locationId, locationSlug, onGo }) {
   }, [locationId])
 
   useEffect(() => { setData(null); setPreview(''); setNote(''); reload() }, [reload])
+  useEffect(() => { setOpen(readOpen(locationId)) }, [locationId])
+
+  function toggle() {
+    setOpen((prev) => {
+      const next = !prev
+      try { window.localStorage.setItem(`${OPEN_KEY}.${locationId}`, next ? '1' : '0') } catch { /* приватный режим */ }
+      return next
+    })
+  }
 
   async function openPreview() {
     setBusy(true)
@@ -101,20 +128,27 @@ export default function LaunchChecklist({ locationId, locationSlug, onGo }) {
   if (data.accepting && done === steps.length) return null
 
   return (
-    <section className="panel launch-panel">
+    <section className={`panel launch-panel${open ? '' : ' is-collapsed'}`}>
       <div className="panel-heading">
-        <div>
-          <h2><Rocket /> Ready to launch</h2>
-          <p>
-            {done} of {steps.length} done
-            {!data.accepting && ' · bookings are still paused'}
-          </p>
-        </div>
-        <button type="button" className="icon-button" onClick={reload} aria-label="Refresh">
-          <RefreshCw />
+        <button type="button" className="launch-toggle" aria-expanded={open} onClick={toggle}>
+          {open ? <ChevronDown /> : <ChevronRight />}
+          <span>
+            <strong><Rocket /> Ready to launch</strong>
+            <small>
+              {done} of {steps.length} done
+              {!data.accepting && ' · bookings are still paused'}
+            </small>
+          </span>
         </button>
+        {open && (
+          <button type="button" className="icon-button" onClick={reload} aria-label="Refresh checklist">
+            <RefreshCw />
+          </button>
+        )}
       </div>
 
+      {!open ? null : (
+      <>
       <div className="launch-list">
         {steps.map((step) => <Step key={step.key} step={step} onGo={onGo} />)}
       </div>
@@ -146,6 +180,8 @@ export default function LaunchChecklist({ locationId, locationSlug, onGo }) {
         page — guests never get it. A test booking is real: it holds a table and shows
         on the timeline, but stays out of the reports.
       </p>
+      </>
+      )}
     </section>
   )
 }
