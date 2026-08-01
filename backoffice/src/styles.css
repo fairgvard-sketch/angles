@@ -946,3 +946,40 @@ a { color: inherit; }
 /* Неявки гостя (Kassa 121): красная метка среди нейтральных — единственное,
    что в этом блоке требует внимания хостес. */
 .guest-fav.is-warn { background: #fdf1f0; color: #9b2c22; }
+
+/* ── План зала в кабинете (Kassa 123) ────────────────────────
+   Строка стола двухстрочная: имя и признак («можно объединять»,
+   «не обслуживается»). `.menu-name small` здесь не годится — он
+   красный и предназначен для предупреждений, а это нейтральная
+   характеристика стола. */
+.floor-row { grid-template-columns: minmax(0, 1fr) auto; }
+.floor-table-name { min-width: 0; display: flex; flex-direction: column; gap: 2px; }
+.floor-table-name strong { font-size: 14px; font-weight: 600; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.floor-table-name small { color: #868b93; font-size: 12px; font-weight: 500; }
+.floor-seats { display: inline-flex; align-items: center; gap: 5px; font-size: 14px; font-weight: 700; font-variant-numeric: tabular-nums; color: #3c4148; }
+.floor-seats svg { width: 15px; height: 15px; color: #868b93; }
+.menu-row.is-off .floor-seats { color: #9297a0; }
+
+/* Заведение зоны: имя и параметры набора столов одним блоком —
+   типичный первый шаг нового клиента Reserve. */
+.floor-add-zone { display: grid; gap: 12px; }
+.floor-add-zone .inline-add { display: flex; }
+.floor-add-zone .inline-add input { flex: 1; min-width: 0; }
+.floor-add-options { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 12px; }
+.floor-add-options label { display: flex; flex-direction: column; gap: 6px; font-size: 13px; color: #5d626b; }
+.floor-add-options input, .floor-add-options select { height: 40px; padding: 0 12px; border: 1px solid #cfd2d8; border-radius: 7px; font-size: 14px; background: #fff; }
+.floor-add-options input:focus, .floor-add-options select:focus { outline: none; border-color: #1b1e24; }
+.floor-add-zone .form-hint { margin: 0; }
+
+/* Простой стола — действие карточки, не пункт списка */
+.floor-service-toggle { display: flex; align-items: center; justify-content: space-between; gap: 12px; width: 100%; padding: 12px 14px; border: 1px solid #e8e9ec; border-radius: 10px; background: #fff; text-align: left; cursor: pointer; }
+.floor-service-toggle:hover { background: #fafafa; }
+.floor-service-toggle:disabled { opacity: .6; cursor: default; }
+.floor-service-toggle > span { display: flex; flex-direction: column; gap: 3px; min-width: 0; }
+.floor-service-toggle strong { font-size: 14px; font-weight: 650; color: #16181d; }
+.floor-service-toggle small { color: #868b93; font-size: 12px; }
+.floor-service-toggle svg { width: 18px; height: 18px; flex: 0 0 18px; color: #868b93; }
+
+@media (max-width: 720px) {
+  .floor-add-options { grid-template-columns: 1fr 1fr; }
+}

@@ -8,6 +8,7 @@ import {
 import { playNewOrderChime } from './orders'
 import TimelineDesk from './TimelineDesk'
 import WaitlistPanel from './WaitlistPanel'
+import FloorPlanEditor from './FloorPlanEditor'
 
 /**
  * «Reservations» — веб-стол хостес (Kassa 102): подтверждение, отказ,
@@ -17,7 +18,18 @@ import WaitlistPanel from './WaitlistPanel'
  *
  * Новые заявки приходят realtime-подпиской (публикация 053) со звуком;
  * страховка — поллинг раз в 60 секунд.
+ *
+ * Вид «Floor plan» (123) стоит здесь же, а не в настройках: пустой
+ * таймлайн чинится столами, и путь от проблемы к её причине должен быть
+ * в один тап, без похода в другой раздел.
  */
+
+const VIEWS = [
+  { key: 'timeline', label: 'Timeline' },
+  { key: 'list', label: 'List' },
+  { key: 'waitlist', label: 'Waitlist' },
+  { key: 'floor', label: 'Floor plan' },
+]
 
 function ReservationCard({ reservation, busyAction, onAction }) {
   const seated = reservation.order_id != null
@@ -154,14 +166,14 @@ export default function ReservationsDesk({ context }) {
       )}
 
       <div className="timeline-zones" style={{ marginBottom: 16 }}>
-        {['timeline', 'list', 'waitlist'].map((v) => (
+        {VIEWS.map(({ key, label }) => (
           <button
-            key={v}
+            key={key}
             type="button"
-            className={view === v ? 'primary-button compact' : 'secondary-button compact'}
-            onClick={() => setView(v)}
+            className={view === key ? 'primary-button compact' : 'secondary-button compact'}
+            onClick={() => setView(key)}
           >
-            {v === 'timeline' ? 'Timeline' : v === 'list' ? 'List' : 'Waitlist'}
+            {label}
           </button>
         ))}
       </div>
@@ -170,6 +182,7 @@ export default function ReservationsDesk({ context }) {
 
       {view === 'timeline' && locationId && <TimelineDesk locationId={locationId} />}
       {view === 'waitlist' && locationId && <WaitlistPanel locationId={locationId} />}
+      {view === 'floor' && locationId && <FloorPlanEditor locationId={locationId} />}
 
       {view === 'list' && (
       <section className="panel form-panel">
