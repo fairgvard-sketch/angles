@@ -1475,3 +1475,15 @@ a { color: inherit; }
 /* Пустой экран дублей — с выходом: после слияния последней пары
    владелец оставался на экране без кнопки возврата. */
 .section-placeholder .primary-button { margin-top: 14px; }
+
+/* ── Отчётность: охват, сравнение периодов (Kassa 133) ───────
+   Число без периода, точек, зоны и валюты проверить нельзя —
+   строка охвата стоит прямо под заголовком раздела. */
+.scope-line { margin: 6px 0 0; color: #777b83; font-size: 13px; }
+.stat-delta { display: inline-flex; align-items: baseline; gap: 5px; font-size: 12px; font-weight: 750; }
+.stat-delta small { font-weight: 500; color: #868b93; }
+.stat-delta.is-up { color: #2f7d54; }
+.stat-delta.is-down { color: #b4453c; }
+.stat-delta.is-flat { color: #777b83; }
+.ov-hero-delta { display: flex; flex-wrap: wrap; align-items: baseline; gap: 10px; margin: 6px 0 0; }
+.ov-hero-prev { color: #868b93; font-size: 13px; font-variant-numeric: tabular-nums; }

@@ -1,4 +1,9 @@
 import { supabase } from './supabase'
+// Чистые правила отчётности — в отдельном модуле под тесты
+export {
+  previousRange, PREVIOUS_LABEL, delta, rangeLabel, scopeLine,
+  channelLabel, orderTypeLabel, salesToCsv, salesFileName,
+} from './reporting'
 
 /**
  * Отчёт «Продажи» для владельца. Данные те же, что видит касса
@@ -89,14 +94,19 @@ export function methodLabel(method) {
   return METHOD_LABELS[method] || method
 }
 
-export async function fetchSalesReport(from, to) {
-  const tz = Intl.DateTimeFormat().resolvedOptions().timeZone || 'Asia/Jerusalem'
+/**
+ * Отчёт за период. Охват по точкам считает сервер (133): пустой список
+ * означает «все точки», и это же он потом называет в блоке scope.
+ */
+export async function fetchSalesReport(from, to, { locationIds = [], tz } = {}) {
+  const zone = tz || Intl.DateTimeFormat().resolvedOptions().timeZone || 'Asia/Jerusalem'
   const { data, error } = await supabase.rpc('sales_report', {
     p_from: from.toISOString(),
     p_to: to.toISOString(),
-    p_tz: tz,
+    p_tz: zone,
     // Владельца бэкофиса сервер узнаёт по членству (089) — токен не нужен
     p_staff_session: null,
+    p_location_ids: locationIds.length ? locationIds : null,
   })
   if (error) throw new Error(error.message)
   return data

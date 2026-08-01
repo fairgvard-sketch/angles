@@ -1013,7 +1013,7 @@ function Dashboard({ session, context, onReloadContext }) {
           {view === 'reservations' && (
             <ReservationsDesk context={context} {...scopedProps} tab={route.tab} onTabChange={changeTab} />
           )}
-          {view === 'sales' && <SalesOverview organizationName={context.organization?.name} />}
+          {view === 'sales' && <SalesOverview context={context} />}
           {view === 'activity' && <ActivityManager context={context} />}
           {view === 'locations' && <LocationSettings context={context} {...scopedProps} />}
           {view === 'menu' && <MenuManager context={context} {...scopedProps} />}

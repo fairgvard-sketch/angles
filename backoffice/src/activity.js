@@ -1,5 +1,10 @@
 import { supabase } from './supabase'
 import { formatMoney, methodLabel } from './sales'
+import { activityParams } from './reporting'
+// Чистые правила журнала — в отдельном модуле под тесты
+export {
+  ACTIVITY_TYPES, activityParams, activityToCsv, activityFileName,
+} from './reporting'
 
 /**
  * Лента активности кассы для дашборда. События (открытие/закрытие смены,
@@ -10,13 +15,12 @@ import { formatMoney, methodLabel } from './sales'
  * во float только для показа.
  */
 
-export async function fetchActivity({ limit = 50, before = null, locationId = null } = {}) {
-  const { data, error } = await supabase.rpc('get_activity_feed', {
-    p_limit: limit,
-    p_before: before,
-    p_location_id: locationId,
-    p_staff_session: null,
-  })
+/**
+ * Журнал событий. Все фильтры уходят на сервер (133) — иначе они
+ * отбирали бы уже загруженную страницу, а не журнал.
+ */
+export async function fetchActivity(filters = {}) {
+  const { data, error } = await supabase.rpc('get_activity_feed', activityParams(filters))
   if (error) throw new Error(error.message)
   return data ?? []
 }
