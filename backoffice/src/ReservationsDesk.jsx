@@ -260,7 +260,7 @@ export default function ReservationsDesk({ context, locationId, tab, onTabChange
       {view === 'analytics' && <ReserveAnalytics locations={context.locations || []} />}
 
       {view === 'list' && (
-      <section className="panel form-panel">
+      <section className="panel form-panel reservation-list-panel">
         <div className="panel-heading">
           <div>
             <h2>Requests</h2>
@@ -290,7 +290,7 @@ export default function ReservationsDesk({ context, locationId, tab, onTabChange
       )}
 
       {view === 'list' && (
-      <section className="panel form-panel">
+      <section className="panel form-panel reservation-list-panel">
         <div className="panel-heading">
           <div><h2>Upcoming & today</h2><p>Confirmed visits from today onwards.</p></div>
         </div>
@@ -314,7 +314,7 @@ export default function ReservationsDesk({ context, locationId, tab, onTabChange
       )}
 
       {view === 'list' && history.length > 0 && (
-        <section className="panel form-panel">
+        <section className="panel form-panel reservation-list-panel">
           <div className="panel-heading">
             <div><h2>Recent history</h2><p>Completed, no-show, rejected and cancelled bookings.</p></div>
           </div>

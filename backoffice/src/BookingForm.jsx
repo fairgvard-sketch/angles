@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from 'react'
+import { useEffect, useMemo, useRef, useState } from 'react'
 import { X } from 'lucide-react'
 import { createReservation, deskErrorText, fromLocalInput, toLocalInput } from './reservations'
 
@@ -24,6 +24,22 @@ export default function BookingForm({ locationId, tables, tz, mode, onClose, onC
   const [picked, setPicked] = useState([])
   const [busy, setBusy] = useState(false)
   const [error, setError] = useState('')
+
+  const tableGroups = useMemo(() => {
+    const groups = new Map()
+    for (const table of tables.filter((item) => !item.blocked)) {
+      const key = table.zoneId ?? '__none__'
+      if (!groups.has(key)) {
+        groups.set(key, {
+          id: key,
+          name: table.zoneName || 'No zone',
+          tables: [],
+        })
+      }
+      groups.get(key).tables.push(table)
+    }
+    return [...groups.values()]
+  }, [tables])
 
   useEffect(() => {
     firstRef.current?.focus()
@@ -117,31 +133,50 @@ export default function BookingForm({ locationId, tables, tz, mode, onClose, onC
         </label>
 
         <div className="sheet-section">
-          <span className="sheet-section-title">Table</span>
+          <span className="sheet-section-title">Table assignment</span>
           <p className="form-hint">
-            Leave empty and the free table is picked for you — the same way it
-            works for guests booking online.
+            Automatic is safest. Choose one or more tables only when you need
+            to override the server’s free-table selection.
           </p>
-          <div className="timeline-tablepick">
-            {tables.filter((t) => !t.blocked).map((t) => (
-              <button
-                key={t.id}
-                type="button"
-                className={picked.includes(t.id) ? 'primary-button compact' : 'secondary-button compact'}
-                aria-pressed={picked.includes(t.id)}
-                onClick={() => setPicked((cur) => (
-                  cur.includes(t.id) ? cur.filter((x) => x !== t.id) : [...cur, t.id]
-                ))}
-              >
-                {t.label}
-              </button>
+          <button
+            type="button"
+            className={`table-choice table-choice-auto${picked.length === 0 ? ' is-active' : ''}`}
+            aria-pressed={picked.length === 0}
+            onClick={() => setPicked([])}
+          >
+            <strong>Automatic</strong>
+            <small>Best available table</small>
+          </button>
+          <div className="booking-table-groups">
+            {tableGroups.map((group) => (
+              <section className="booking-table-group" key={group.id}>
+                <span className="booking-zone-name">{group.name}</span>
+                <div className="booking-table-pick">
+                  {group.tables.map((table) => (
+                    <button
+                      key={table.id}
+                      type="button"
+                      className={`table-choice${picked.includes(table.id) ? ' is-active' : ''}`}
+                      aria-pressed={picked.includes(table.id)}
+                      onClick={() => setPicked((cur) => (
+                        cur.includes(table.id)
+                          ? cur.filter((id) => id !== table.id)
+                          : [...cur, table.id]
+                      ))}
+                    >
+                      <strong>{table.label}</strong>
+                      <small>{table.seats} seats</small>
+                    </button>
+                  ))}
+                </div>
+              </section>
             ))}
           </div>
         </div>
 
         {error && <p className="form-error" role="alert">{error}</p>}
 
-        <div className="order-actions">
+        <div className="order-actions booking-form-actions">
           <button type="button" className="secondary-button" onClick={onClose}>Cancel</button>
           <button type="submit" className="primary-button compact" disabled={busy}>
             {busy ? 'Saving…' : (walkIn ? 'Seat the guest' : 'Create booking')}

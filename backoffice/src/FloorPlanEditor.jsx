@@ -196,6 +196,10 @@ function AddZoneForm({ locationId, zoneCount, tableCount, onDone, onError }) {
 
   return (
     <div className="floor-add-zone">
+      <div className="floor-add-copy">
+        <strong>Add a zone</strong>
+        <small>Create its first tables in the same step.</small>
+      </div>
       <div className="inline-add">
         <input
           placeholder="Zone name (Main room, Terrace, Bar)"
@@ -293,14 +297,14 @@ export default function FloorPlanEditor({ locationId }) {
     <>
       {error && <p className="form-error" role="alert">{error}</p>}
 
-      <section className="panel form-panel">
+      <section className="panel form-panel floor-plan-panel">
         <div className="panel-heading">
           <div>
-            <h2>Floor plan</h2>
+            <h2>Tables & zones</h2>
             <p>
               {tables.length === 0
                 ? 'Add your rooms and tables — bookings need them to be seated.'
-                : `${tables.length} tables · ${seatTotal} seats · ${zones.length} zones`}
+                : `${tables.length} tables · ${seatTotal} seats · ${zones.length} zones. Edit any table below.`}
             </p>
           </div>
         </div>
@@ -318,7 +322,7 @@ export default function FloorPlanEditor({ locationId }) {
       )}
 
       {groups.map(({ zone, tables: rows }) => (
-        <section className="panel" key={zone?.id ?? 'loose'}>
+        <section className="panel floor-zone-panel" key={zone?.id ?? 'loose'}>
           <div className="panel-heading">
             <div>
               <h2>{zone ? zone.name : 'Without a zone'}</h2>

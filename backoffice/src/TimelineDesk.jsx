@@ -21,8 +21,7 @@ import { supabase } from './supabase'
  * `_web`-RPC (120): право даёт членство, а не PIN.
  */
 
-const HOUR_PX = 120
-const LABEL_W = 128
+const HOUR_PX = 96
 
 const STATE_CLASS = {
   pending: 'is-pending',
@@ -154,22 +153,51 @@ export default function TimelineDesk({ locationId }) {
     [date, tz, meta.schedule, bookings]
   )
   const rows = useMemo(() => buildRows(tables, bookings, win), [tables, bookings, win])
-  const zones = useMemo(() => groupByZone(rows), [rows])
+  // Отключённые столы не являются частью текущей работы хостес. Раньше
+  // они занимали целые пустые строки и создавали впечатление, что зал
+  // больше и свободнее, чем он есть. Строку сохраняем только если на
+  // таком столе осталась бронь выбранного дня — её нельзя потерять.
+  const operationalRows = useMemo(
+    () => rows.filter((row) => !row.table.blocked || row.blocks.length > 0),
+    [rows]
+  )
+  const hiddenTableCount = rows.length - operationalRows.length
+  const zones = useMemo(() => groupByZone(operationalRows), [operationalRows])
   const visibleZones = zoneFilter === null ? zones : zones.filter((z) => z.id === zoneFilter)
-  const summary = useMemo(() => occupancySummary(rows, nowMs), [rows, nowMs])
+  const summary = useMemo(() => occupancySummary(operationalRows, nowMs), [operationalRows, nowMs])
   const ticks = useMemo(() => hourTicks(win, tz), [win, tz])
   const markerPct = date === todayStr ? nowMarkerPct(nowMs, win) : null
   const trackWidth = Math.max(720, ((win.endMs - win.startMs) / 3_600_000) * HOUR_PX)
 
   const scrollRef = useRef(null)
   const scrolledFor = useRef(null)
+  const scrollToCurrent = useCallback((smooth = true) => {
+    const el = scrollRef.current
+    if (!el || markerPct === null) return
+    el.scrollTo({
+      left: Math.max(0, (markerPct / 100) * trackWidth - el.clientWidth / 3),
+      behavior: smooth ? 'smooth' : 'auto',
+    })
+  }, [markerPct, trackWidth])
+
   useEffect(() => {
     if (scrolledFor.current === date || markerPct === null) return
-    const el = scrollRef.current
-    if (!el) return
     scrolledFor.current = date
-    el.scrollLeft = Math.max(0, (markerPct / 100) * trackWidth - el.clientWidth / 3)
-  }, [date, markerPct, trackWidth])
+    scrollToCurrent(false)
+  }, [date, markerPct, scrollToCurrent])
+
+  useEffect(() => {
+    if (zoneFilter !== null && !zones.some((zone) => zone.id === zoneFilter)) {
+      setZoneFilter(null)
+    }
+  }, [zoneFilter, zones])
+
+  function panTimeline(direction) {
+    scrollRef.current?.scrollBy({
+      left: direction * Math.max(240, scrollRef.current.clientWidth * 0.72),
+      behavior: 'smooth',
+    })
+  }
 
   async function act(fn) {
     setBusy(true)
@@ -186,11 +214,11 @@ export default function TimelineDesk({ locationId }) {
   }
 
   return (
-    <section className="panel form-panel">
+    <section className="panel form-panel timeline-panel">
       <div className="panel-heading">
         <div>
-          <h2>Floor timeline</h2>
-          <p>Tables down the side, time across — one look tells you the next few hours.</p>
+          <h2>Table availability</h2>
+          <p>Each row is a table. Move through the day horizontally and select a booking for details.</p>
         </div>
         <button type="button" className="icon-button" aria-label="Refresh" onClick={load}>
           <RefreshCw />
@@ -198,52 +226,87 @@ export default function TimelineDesk({ locationId }) {
       </div>
 
       <div className="timeline-controls">
-        <div className="timeline-daynav">
-          <button type="button" className="secondary-button compact" aria-label="Previous day"
-            onClick={() => setDate((d) => shiftDate(d, -1))}><ChevronLeft /></button>
-          <button
-            type="button"
-            className={date === todayStr ? 'primary-button compact' : 'secondary-button compact'}
-            onClick={() => setDate(todayStr)}
-          >
-            Today
-          </button>
-          <button type="button" className="secondary-button compact" aria-label="Next day"
-            onClick={() => setDate((d) => shiftDate(d, 1))}><ChevronRight /></button>
-          <input type="date" value={date} onChange={(e) => e.target.value && setDate(e.target.value)} />
+        <div className="timeline-filter-group">
+          <span className="timeline-control-label">Date</span>
+          <div className="timeline-daynav">
+            <button type="button" className="secondary-button compact timeline-arrow" aria-label="Previous day"
+              onClick={() => setDate((d) => shiftDate(d, -1))}><ChevronLeft /></button>
+            <input aria-label="Timeline date" type="date" value={date}
+              onChange={(e) => e.target.value && setDate(e.target.value)} />
+            <button type="button" className="secondary-button compact timeline-arrow" aria-label="Next day"
+              onClick={() => setDate((d) => shiftDate(d, 1))}><ChevronRight /></button>
+            <button
+              type="button"
+              className={`timeline-filter-button${date === todayStr ? ' is-active' : ''}`}
+              onClick={() => setDate(todayStr)}
+            >
+              Today
+            </button>
+          </div>
         </div>
 
         {zones.length > 1 && (
-          <div className="timeline-zones">
-            <button
-              type="button"
-              className={zoneFilter === null ? 'primary-button compact' : 'secondary-button compact'}
-              onClick={() => setZoneFilter(null)}
-            >
-              All zones
-            </button>
-            {zones.map((z) => (
+          <div className="timeline-filter-group timeline-zone-filter">
+            <span className="timeline-control-label">Zone</span>
+            <div className="timeline-zones">
               <button
-                key={z.id ?? 'none'}
                 type="button"
-                className={zoneFilter === z.id ? 'primary-button compact' : 'secondary-button compact'}
-                onClick={() => setZoneFilter(z.id)}
+                className={`timeline-filter-button${zoneFilter === null ? ' is-active' : ''}`}
+                onClick={() => setZoneFilter(null)}
               >
-                {z.name ?? 'No zone'}
+                All
               </button>
-            ))}
+              {zones.map((z) => (
+                <button
+                  key={z.id ?? 'none'}
+                  type="button"
+                  className={`timeline-filter-button${zoneFilter === z.id ? ' is-active' : ''}`}
+                  onClick={() => setZoneFilter(z.id)}
+                >
+                  {z.name ?? 'No zone'}
+                </button>
+              ))}
+            </div>
           </div>
         )}
 
         <div className="timeline-summary">
-          <span><small>Tables busy</small><strong>{summary.busyTables}/{summary.totalTables}</strong></span>
+          <span><small>Busy now</small><strong>{summary.busyTables}/{summary.totalTables}</strong></span>
           <span><small>Seats free</small><strong>{summary.freeSeats}</strong></span>
-          <span><small>Arriving within the hour</small><strong>{summary.soon}</strong></span>
+          <span><small>Next hour</small><strong>{summary.soon}</strong></span>
           {summary.pending > 0 && (
             <span className="is-accent"><small>Pending</small><strong>{summary.pending}</strong></span>
           )}
         </div>
       </div>
+
+      <div className="timeline-guide">
+        <div className="timeline-legend" aria-label="Booking statuses">
+          <span><i className="is-pending" />Pending</span>
+          <span><i className="is-confirmed" />Confirmed</span>
+          <span><i className="is-arrived" />Seated</span>
+          <span><i className="is-done" />Completed</span>
+        </div>
+        <div className="timeline-pan" aria-label="Move through timeline">
+          <button type="button" className="text-button" onClick={() => panTimeline(-1)}>
+            <ChevronLeft /> Earlier
+          </button>
+          {markerPct !== null && (
+            <button type="button" className="text-button" onClick={() => scrollToCurrent()}>
+              Now
+            </button>
+          )}
+          <button type="button" className="text-button" onClick={() => panTimeline(1)}>
+            Later <ChevronRight />
+          </button>
+        </div>
+      </div>
+
+      {hiddenTableCount > 0 && (
+        <p className="timeline-hidden-note">
+          {hiddenTableCount} out-of-service table{hiddenTableCount === 1 ? '' : 's'} hidden from this operational view.
+        </p>
+      )}
 
       {error && <p className="form-error" role="alert">{error}</p>}
 
@@ -255,15 +318,21 @@ export default function TimelineDesk({ locationId }) {
         </p>
       ) : (
         <div className="timeline-scroll" ref={scrollRef}>
-          <div style={{ width: LABEL_W + trackWidth }}>
+          <div
+            className="timeline-canvas"
+            style={{ '--timeline-track-width': `${trackWidth}px` }}
+          >
             <div className="timeline-ruler">
-              <div className="timeline-label" style={{ width: LABEL_W }} />
-              <div className="timeline-track" style={{ width: trackWidth }}>
+              <div className="timeline-label" />
+              <div className="timeline-track">
                 {ticks.map((tick) => (
                   <span key={tick.ts} className="timeline-tick" style={{ left: `${tick.leftPct}%` }}>
                     {tick.label}
                   </span>
                 ))}
+                {markerPct !== null && (
+                  <span className="timeline-now-label" style={{ left: `${markerPct}%` }}>Now</span>
+                )}
               </div>
             </div>
 
@@ -271,21 +340,20 @@ export default function TimelineDesk({ locationId }) {
               <div key={zone.id ?? 'none'}>
                 {zones.length > 1 && (
                   <div className="timeline-zonerow">
-                    <div className="timeline-label" style={{ width: LABEL_W }}>
+                    <div className="timeline-label">
                       {zone.name ?? 'No zone'}
                     </div>
-                    <div style={{ width: trackWidth }} />
+                    <div className="timeline-track-spacer" />
                   </div>
                 )}
                 {zone.rows.map((row) => (
                   <div key={row.table.id} className="timeline-row">
-                    <div className="timeline-label" style={{ width: LABEL_W }}>
+                    <div className="timeline-label">
                       <strong>{row.table.label}</strong>
                       <small>{row.table.seats} seats</small>
                     </div>
                     <div
                       className={`timeline-track${row.table.blocked ? ' is-blocked' : ''}`}
-                      style={{ width: trackWidth }}
                     >
                       {ticks.map((tick) => (
                         <span key={tick.ts} className="timeline-grid" style={{ left: `${tick.leftPct}%` }} />
