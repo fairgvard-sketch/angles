@@ -22,6 +22,10 @@ export default function ItemEditor({ context, item, categories, stations, modifi
   const [available, setAvailable] = useState(item.is_available ?? true)
   const [askModifiers, setAskModifiers] = useState(item.ask_modifiers ?? false)
   const [imageUrl, setImageUrl] = useState(item.image_url || '')
+  // Артикул: по нему ищут в каталоге и сверяются с поставщиком. Колонка
+  // menu_items.sku есть с 007, save_menu_item её пишет — поля в кабинете
+  // не было, и поиск по артикулу обещал то, чего негде задать.
+  const [sku, setSku] = useState(item.sku || '')
   const [variants, setVariants] = useState(
     (item.item_variants || []).slice().sort((a, b) => a.sort_order - b.sort_order)
       .map((v) => ({ name: v.name, price: priceInput(v.price), is_default: v.is_default }))
@@ -88,6 +92,7 @@ export default function ItemEditor({ context, item, categories, stations, modifi
         station_id: stationId || null,
         price: basePrice,
         image_url: imageUrl || null,
+        sku: sku.trim() || null,
         is_available: available,
         ask_modifiers: askModifiers,
         variants: parsedVariants,
@@ -131,6 +136,17 @@ export default function ItemEditor({ context, item, categories, stations, modifi
           </div>
 
           <div className="field-row">
+            <label><span>SKU</span>
+              <input
+                value={sku}
+                onChange={(e) => setSku(e.target.value)}
+                maxLength={64}
+                placeholder="COF-1"
+                autoCapitalize="characters"
+                autoCorrect="off"
+                spellCheck={false}
+              />
+            </label>
             <label><span>Station (kitchen/bar)</span>
               <select value={stationId} onChange={(e) => setStationId(e.target.value)}>
                 <option value="">—</option>

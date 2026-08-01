@@ -120,6 +120,10 @@ function itemPayload(input) {
     is_available: input.is_available,
     is_favorite: input.is_favorite ?? false,
     ask_modifiers: input.ask_modifiers ?? false,
+    // Ключ шлём всегда: сервер (129) трогает поле только когда оно
+    // прислано, а редактор кабинета им управляет.
+    sku: input.sku ?? null,
+    // cost/stock кабинет не редактирует — ключей нет, сервер их сохранит
   }
 }
 

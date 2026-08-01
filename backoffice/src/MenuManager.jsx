@@ -99,6 +99,9 @@ function ItemRow({ item, index, total, selecting, selected, onToggleSelect, onOp
       >
         <span className="menu-name">
           {item.name}
+          {/* Артикул виден прямо в строке: иначе поиск по нему нечем
+              проверить и незачем использовать. */}
+          {item.sku && <small className="menu-sku"> · {item.sku}</small>}
           {!item.is_available && <small> · hidden</small>}
           {/* Пробел подписан словом, а не только цветом */}
           {gaps.length > 0 && (
