@@ -402,6 +402,41 @@ a { color: inherit; }
 .menu-delete-row:hover { background: #fdf7f7; color: #b4453c; }
 .menu-delete-row svg { width: 15px; height: 15px; }
 .menu-groups { display: grid; gap: 10px; }
+/* ── Каталог: поиск, выбор, порядок (Phase 5) ──────────────── */
+.catalog-filters { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; margin-bottom: 12px; }
+.catalog-count { margin-inline-start: auto; color: #777b83; font-size: 12px; font-weight: 650; white-space: nowrap; }
+.bulk-bar {
+  display: flex; flex-wrap: wrap; align-items: center; gap: 8px;
+  margin-bottom: 14px; padding: 10px 12px;
+  border: 1px solid #e2e4e8; border-radius: 12px; background: #f7f8fa;
+}
+.bulk-bar button, .bulk-bar select { min-height: 40px; }
+.bulk-count { font-size: 13px; font-weight: 700; color: #16181d; }
+/* Строка позиции: чекбокс и стрелки порядка не должны толкать название */
+.menu-row-wrap { display: flex; align-items: center; gap: 4px; border-bottom: 1px solid #edeef0; }
+.menu-row-wrap:last-child { border-bottom: 0; }
+.menu-row-wrap.is-selected { background: #f2f6ff; }
+.menu-row-wrap .menu-row { flex: 1 1 auto; min-width: 0; border-bottom: 0; }
+.menu-select { display: grid; place-items: center; width: 44px; height: 44px; flex: none; cursor: pointer; }
+.menu-select input { width: 18px; height: 18px; }
+.menu-order { display: flex; flex: none; padding-inline-end: 12px; }
+.menu-order .icon-button { width: 34px; height: 34px; }
+.menu-order .icon-button svg { width: 15px; height: 15px; }
+.menu-order .icon-button:disabled { opacity: .35; cursor: default; }
+.menu-gap { color: #9b6a10; }
+/* Предпросмотр массовой правки */
+.bulk-list { display: grid; gap: 2px; max-height: 46vh; overflow-y: auto; }
+.bulk-row {
+  display: flex; align-items: center; justify-content: space-between; gap: 12px;
+  padding: 8px 10px; border-radius: 8px; background: #f7f8fa; font-size: 13px;
+}
+.bulk-row.is-noop { opacity: .5; }
+.bulk-name { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; color: #16181d; }
+.bulk-name small { color: #777b83; }
+.bulk-change { flex: none; display: inline-flex; align-items: center; gap: 6px; color: #5d626b; }
+.bulk-change svg { width: 14px; height: 14px; }
+.bulk-change strong { color: #16181d; }
+
 .menu-list { display: grid; }
 .menu-row { display: grid; grid-template-columns: minmax(0, 1fr) auto; align-items: center; gap: 12px; min-height: 52px; padding: 8px 22px; border-bottom: 1px solid #edeef0; }
 .menu-row:has(.icon-button) { grid-template-columns: minmax(0, 1fr) auto 40px; }

@@ -40,7 +40,7 @@ export async function fetchCategories() {
 export async function fetchItems() {
   const { data, error } = await supabase
     .from('menu_items')
-    .select('id, category_id, station_id, name, description, price, image_url, is_available, is_favorite, ask_modifiers, sort_order, item_variants (id, name, price, is_default, sort_order), menu_item_modifier_groups (group_id, sort_order)')
+    .select('id, category_id, station_id, name, description, price, image_url, is_available, is_favorite, ask_modifiers, sku, sort_order, item_variants (id, name, price, is_default, sort_order), menu_item_modifier_groups (group_id, sort_order)')
     .order('sort_order')
   if (error) throw new Error(error.message)
   return data
@@ -141,6 +141,39 @@ export async function saveItem(input, id = null) {
 export async function deleteItem(id) {
   const { error } = await supabase.from('menu_items').delete().eq('id', id)
   if (error) throw new Error(error.message)
+}
+
+/**
+ * Массовая правка выбранных позиций (Kassa 128).
+ *
+ * Отдельная функция, а не цикл по saveItem: saveItem пересоздаёт
+ * варианты и связки модификаторов, то есть «снять с продажи десять
+ * товаров» переписало бы им состав. И это одна транзакция — половина
+ * применённой переоценки хуже непринятой.
+ */
+export async function bulkUpdateItems(ids, action, params = {}) {
+  const { error } = await supabase.rpc('bulk_update_menu_items', {
+    p_ids: ids,
+    p_action: action,
+    p_available: params.available ?? null,
+    p_category_id: params.categoryId ?? null,
+    p_percent: params.percent ?? null,
+    p_delta: params.delta ?? null,
+    p_staff_session: null,
+  })
+  if (error) throw new Error(error.message)
+}
+
+/** Человеческий текст ошибок массовой правки */
+export function bulkErrorText(message) {
+  const m = String(message || '')
+  if (m.includes('foreign_items')) return 'Some of the selected items are no longer yours — reload the catalogue.'
+  if (m.includes('invalid_category')) return 'That category no longer exists.'
+  if (m.includes('too_many')) return 'Too many items at once — select up to 500.'
+  if (m.includes('no_items')) return 'Nothing is selected.'
+  if (m.includes('invalid_percent')) return 'Price change must be between −90% and +500%.'
+  if (m.includes('permission') || m.includes('denied')) return 'Your role cannot change the catalogue.'
+  return m
 }
 
 export async function reorderItems(orderedIds) {

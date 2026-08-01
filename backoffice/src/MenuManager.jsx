@@ -1,5 +1,8 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
-import { ChevronDown, ChevronRight, Plus, Trash2, X } from 'lucide-react'
+import {
+  ArrowDown, ArrowRight, ArrowUp, CheckSquare, ChevronDown, ChevronRight,
+  Plus, Search, Trash2, X,
+} from 'lucide-react'
 import {
   agorotToShekels, shekelsToAgorot,
   fetchCategories, fetchItems, fetchModifierGroups, fetchStations,
@@ -8,7 +11,11 @@ import {
   createModifierGroup, updateModifierGroup, deleteModifierGroup,
   createModifier, updateModifier, deleteModifier,
   createStation, updateStation, deleteStation,
+  bulkUpdateItems, bulkErrorText, reorderItems,
 } from './menu'
+import {
+  GAP_LABELS, bulkPreview, changedCount, filterItems, itemGaps, moveInOrder,
+} from './catalog'
 import ItemEditor from './ItemEditor'
 import { hasCapability } from './navigation'
 
@@ -67,6 +74,108 @@ function CollapsibleHead({ collapsed, onToggle, title, subtitle, action }) {
   )
 }
 
+/**
+ * Строка позиции. Чекбокс появляется только в режиме выбора: обычная
+ * работа — открыть карточку, а не отмечать галочки.
+ *
+ * Стрелки порядка — вместо перетаскивания: пальцем и с клавиатуры оно
+ * одинаково недоступно, а поменять местами два блюда владельцу нужно.
+ */
+function ItemRow({ item, index, total, selecting, selected, onToggleSelect, onOpen, onMove }) {
+  const gaps = itemGaps(item)
+  const label = `${item.name}, ${money(item.price)}${item.is_available ? '' : ', hidden'}`
+  return (
+    <div className={`menu-row-wrap${selected ? ' is-selected' : ''}`}>
+      {selecting && (
+        <label className="menu-select">
+          <input type="checkbox" checked={selected} onChange={onToggleSelect} />
+          <span className="visually-hidden">Select {item.name}</span>
+        </label>
+      )}
+      <button
+        className={`menu-row as-button ${item.is_available ? '' : 'is-off'}`}
+        aria-label={`Edit ${label}`}
+        onClick={onOpen}
+      >
+        <span className="menu-name">
+          {item.name}
+          {!item.is_available && <small> · hidden</small>}
+          {/* Пробел подписан словом, а не только цветом */}
+          {gaps.length > 0 && (
+            <small className="menu-gap"> · {gaps.map((g) => GAP_LABELS[g]).join(', ')}</small>
+          )}
+        </span>
+        <span className="menu-price">{money(item.price)}</span>
+      </button>
+      <div className="menu-order">
+        <button
+          type="button"
+          className="icon-button"
+          disabled={index === 0}
+          aria-label={`Move ${item.name} up`}
+          onClick={() => onMove('up')}
+        >
+          <ArrowUp />
+        </button>
+        <button
+          type="button"
+          className="icon-button"
+          disabled={index === total - 1}
+          aria-label={`Move ${item.name} down`}
+          onClick={() => onMove('down')}
+        >
+          <ArrowDown />
+        </button>
+      </div>
+    </div>
+  )
+}
+
+/**
+ * Обязательный шаг перед массовой правкой: что именно изменится и во
+ * что. Без него владелец узнаёт о переоценке всего меню по выручке.
+ */
+function BulkReview({ rows, action, busy, error, onCancel, onApply }) {
+  const changing = changedCount(rows)
+  const titles = {
+    availability: 'Change availability',
+    category: 'Move to another category',
+    price: 'Change prices',
+  }
+  return (
+    <div className="sheet-backdrop" onClick={onCancel} role="presentation">
+      <div className="sheet" onClick={(e) => e.stopPropagation()} role="dialog" aria-modal="true" aria-labelledby="bulk-title">
+        <h3 id="bulk-title">{titles[action]}</h3>
+        <p className="sheet-sub">
+          {changing} of {rows.length} selected items change. The rest already look like this.
+        </p>
+        <div className="bulk-list">
+          {rows.map((row) => (
+            <div key={row.id} className={`bulk-row${row.changes ? '' : ' is-noop'}`}>
+              <span className="bulk-name">{row.name}{row.note && <small> · {row.note}</small>}</span>
+              <span className="bulk-change">
+                {row.from} <ArrowRight aria-hidden /> <strong>{row.to}</strong>
+              </span>
+            </div>
+          ))}
+        </div>
+        {error && <p className="form-error" role="alert">{error}</p>}
+        <div className="order-actions">
+          <button type="button" className="secondary-button" onClick={onCancel}>Cancel</button>
+          <button
+            type="button"
+            className="primary-button compact"
+            disabled={busy || changing === 0}
+            onClick={onApply}
+          >
+            {busy ? 'Applying…' : `Apply to ${changing} item${changing === 1 ? '' : 's'}`}
+          </button>
+        </div>
+      </div>
+    </div>
+  )
+}
+
 // ── Вкладка «Товары» ─────────────────────────────────────────
 function ItemsTab({ context, locationId, data, reload }) {
   const [editorItem, setEditorItem] = useState(null) // {} = новый, {id...} = правка
@@ -77,15 +186,88 @@ function ItemsTab({ context, locationId, data, reload }) {
   const [catLoc, setCatLoc] = useState(locationId || context.locations?.[0]?.id || '')
   const [error, setError] = useState('')
 
+  // Поиск и фильтры
+  const [query, setQuery] = useState('')
+  const [catFilter, setCatFilter] = useState('all')
+  const [availability, setAvailability] = useState('all')
+  const [stateFilter, setStateFilter] = useState('all')
+  // Массовая правка
+  const [selecting, setSelecting] = useState(false)
+  const [selected, setSelected] = useState(new Set())
+  const [pending, setPending] = useState(null) // { action, params, rows }
+  const [busy, setBusy] = useState(false)
+
+  const filtersOn = query.trim() !== '' || catFilter !== 'all'
+    || availability !== 'all' || stateFilter !== 'all'
+
+  const withVariants = useMemo(
+    () => data.items.map((i) => ({ ...i, variantCount: (i.item_variants ?? []).length })),
+    [data.items]
+  )
+  const visible = useMemo(
+    () => filterItems(withVariants, data.categories, {
+      query, categoryId: catFilter, availability, state: stateFilter,
+    }),
+    [withVariants, data.categories, query, catFilter, availability, stateFilter]
+  )
+
+  function toggleSelected(id) {
+    setSelected((prev) => {
+      const next = new Set(prev)
+      if (next.has(id)) next.delete(id); else next.add(id)
+      return next
+    })
+  }
+
+  function askBulk(action, params) {
+    setError('')
+    setPending({
+      action,
+      params,
+      rows: bulkPreview(withVariants, data.categories, selected, action, params, money),
+    })
+  }
+
+  async function applyBulk() {
+    setBusy(true)
+    try {
+      await bulkUpdateItems([...selected], pending.action, pending.params)
+      setPending(null)
+      setSelecting(false)
+      setSelected(new Set())
+      await reload()
+    } catch (e) {
+      setError(bulkErrorText(e.message))
+    } finally {
+      setBusy(false)
+    }
+  }
+
+  /**
+   * Порядок внутри категории. Сервер принимает полный список id, поэтому
+   * отправляем порядок всей категории, а не «поменять два местами».
+   */
+  async function moveItem(list, id, direction) {
+    const ids = moveInOrder(list.map((i) => i.id), id, direction)
+    try {
+      await reorderItems(ids)
+      await reload()
+    } catch (e) {
+      setError(e.message)
+    }
+  }
+
   const byCat = useMemo(() => {
     const map = new Map(data.categories.map((c) => [c.id, { ...c, items: [] }]))
     const orphans = []
-    for (const it of data.items) {
+    for (const it of visible) {
       const bucket = map.get(it.category_id)
       if (bucket) bucket.items.push(it); else orphans.push(it)
     }
-    return { list: [...map.values()], orphans }
-  }, [data])
+    // Пустые категории при активном фильтре только шумят
+    const list = [...map.values()].filter((c) => c.items.length > 0 || !filtersOn)
+    return { list, orphans }
+  }, [data.categories, visible, filtersOn])
 
   async function addCategory() {
     if (!catName.trim()) return
@@ -105,13 +287,75 @@ function ItemsTab({ context, locationId, data, reload }) {
     () => byCat.list.map((c) => c.id).concat(byCat.orphans.length ? ['__orphans__'] : []),
     [byCat]
   )
-  const { isCollapsed, toggle, collapseAll, expandAll, anyCollapsed } = useCollapsed(allCatIds)
+  const {
+    isCollapsed: isCollapsedByUser, toggle, collapseAll, expandAll, anyCollapsed,
+  } = useCollapsed(allCatIds)
+  // При активном поиске/фильтре категории раскрыты принудительно: иначе
+  // найденное лежит внутри свёрнутой категории, и поиск выглядит как
+  // «ничего не нашлось».
+  const isCollapsed = (id) => !filtersOn && isCollapsedByUser(id)
 
   return (
     <>
+      {/* Поиск и фильтры выше кнопок создания: чаще ищут существующее,
+          чем заводят новое. Скрыть позицию на телефоне — путь в три
+          касания: найти, выбрать, «Hide». */}
+      <div className="catalog-filters">
+        <label className="order-search">
+          <Search aria-hidden />
+          <span className="visually-hidden">Search the catalogue</span>
+          <input
+            type="search"
+            value={query}
+            placeholder="Name, SKU, description or category"
+            onChange={(e) => setQuery(e.target.value)}
+          />
+        </label>
+        <label className="order-filter">
+          <span className="visually-hidden">Category</span>
+          <select value={catFilter} onChange={(e) => setCatFilter(e.target.value)}>
+            <option value="all">Any category</option>
+            {data.categories.map((c) => <option key={c.id} value={c.id}>{c.name}</option>)}
+          </select>
+        </label>
+        <label className="order-filter">
+          <span className="visually-hidden">Availability</span>
+          <select value={availability} onChange={(e) => setAvailability(e.target.value)}>
+            <option value="all">On sale and hidden</option>
+            <option value="available">On sale</option>
+            <option value="hidden">Hidden</option>
+          </select>
+        </label>
+        <label className="order-filter">
+          <span className="visually-hidden">Completeness</span>
+          <select value={stateFilter} onChange={(e) => setStateFilter(e.target.value)}>
+            <option value="all">Complete and not</option>
+            <option value="incomplete">Needs attention</option>
+          </select>
+        </label>
+        {filtersOn && (
+          <button
+            type="button"
+            className="text-button"
+            onClick={() => { setQuery(''); setCatFilter('all'); setAvailability('all'); setStateFilter('all') }}
+          >
+            <X /> Clear
+          </button>
+        )}
+        <span className="catalog-count">{visible.length} of {data.items.length}</span>
+      </div>
+
       <div className="menu-toolbar">
         <button className="primary-button narrow" onClick={() => setEditorItem({})}>
           <Plus /> New item
+        </button>
+        <button
+          type="button"
+          className={selecting ? 'primary-button narrow' : 'secondary-button'}
+          aria-pressed={selecting}
+          onClick={() => { setSelecting((v) => !v); setSelected(new Set()) }}
+        >
+          <CheckSquare /> {selecting ? 'Done selecting' : 'Select'}
         </button>
         {!addingCat ? (
           <button className="secondary-button" onClick={() => setAddingCat(true)}>
@@ -140,7 +384,57 @@ function ItemsTab({ context, locationId, data, reload }) {
         )}
       </div>
 
+      {selecting && (
+        <div className="bulk-bar" role="group" aria-label="Bulk actions">
+          <span className="bulk-count">{selected.size} selected</span>
+          <button
+            type="button"
+            className="secondary-button"
+            onClick={() => setSelected(new Set(visible.map((i) => i.id)))}
+          >
+            Select all shown
+          </button>
+          <button type="button" className="secondary-button" disabled={selected.size === 0}
+            onClick={() => askBulk('availability', { available: false })}>Hide</button>
+          <button type="button" className="secondary-button" disabled={selected.size === 0}
+            onClick={() => askBulk('availability', { available: true })}>Put on sale</button>
+          <label className="order-filter">
+            <span className="visually-hidden">Move to category</span>
+            <select
+              value=""
+              disabled={selected.size === 0}
+              onChange={(e) => e.target.value && askBulk('category', { categoryId: e.target.value })}
+            >
+              <option value="">Move to…</option>
+              {data.categories.map((c) => <option key={c.id} value={c.id}>{c.name}</option>)}
+            </select>
+          </label>
+          <label className="order-filter">
+            <span className="visually-hidden">Change prices</span>
+            <select
+              value=""
+              disabled={selected.size === 0}
+              onChange={(e) => e.target.value && askBulk('price', { percent: Number(e.target.value) })}
+            >
+              <option value="">Change price…</option>
+              <option value="10">+10%</option>
+              <option value="5">+5%</option>
+              <option value="-5">−5%</option>
+              <option value="-10">−10%</option>
+            </select>
+          </label>
+        </div>
+      )}
+
       {error && <p className="form-error" role="alert">{error}</p>}
+
+      {visible.length === 0 && (
+        <section className="panel form-panel">
+          <p className="empty-state">
+            {filtersOn ? 'Nothing matches these filters.' : 'The catalogue is empty — add the first item.'}
+          </p>
+        </section>
+      )}
 
       <div className="menu-groups">
         {byCat.list.map((cat) => {
@@ -159,13 +453,24 @@ function ItemsTab({ context, locationId, data, reload }) {
                 <div className="menu-list">
                   {cat.items.length === 0
                     ? <p className="empty-state">No items.</p>
-                    : cat.items.map((it) => (
-                      <button className={`menu-row as-button ${it.is_available ? '' : 'is-off'}`} key={it.id} onClick={() => setEditorItem(it)}>
-                        <span className="menu-name">{it.name}{!it.is_available && <small> · hidden</small>}</span>
-                        <span className="menu-price">{money(it.price)}</span>
-                      </button>
+                    : cat.items.map((it, index) => (
+                      <ItemRow
+                        key={it.id}
+                        item={it}
+                        index={index}
+                        total={cat.items.length}
+                        selecting={selecting}
+                        selected={selected.has(it.id)}
+                        onToggleSelect={() => toggleSelected(it.id)}
+                        onOpen={() => setEditorItem(it)}
+                        onMove={(dir) => moveItem(cat.items, it.id, dir)}
+                      />
                     ))}
-                  <button className="menu-delete-row" onClick={() => removeCategory(cat.id)}>
+                  <button
+                    className="menu-delete-row"
+                    aria-label={`Delete category ${cat.name}`}
+                    onClick={() => removeCategory(cat.id)}
+                  >
                     <Trash2 /> Delete category
                   </button>
                 </div>
@@ -185,11 +490,18 @@ function ItemsTab({ context, locationId, data, reload }) {
               />
               {!collapsed && (
                 <div className="menu-list">
-                  {byCat.orphans.map((it) => (
-                    <button className="menu-row as-button" key={it.id} onClick={() => setEditorItem(it)}>
-                      <span className="menu-name">{it.name}</span>
-                      <span className="menu-price">{money(it.price)}</span>
-                    </button>
+                  {byCat.orphans.map((it, index) => (
+                    <ItemRow
+                      key={it.id}
+                      item={it}
+                      index={index}
+                      total={byCat.orphans.length}
+                      selecting={selecting}
+                      selected={selected.has(it.id)}
+                      onToggleSelect={() => toggleSelected(it.id)}
+                      onOpen={() => setEditorItem(it)}
+                      onMove={(dir) => moveItem(byCat.orphans, it.id, dir)}
+                    />
                   ))}
                 </div>
               )}
@@ -197,6 +509,17 @@ function ItemsTab({ context, locationId, data, reload }) {
           )
         })()}
       </div>
+
+      {pending && (
+        <BulkReview
+          rows={pending.rows}
+          action={pending.action}
+          busy={busy}
+          error={error}
+          onCancel={() => setPending(null)}
+          onApply={applyBulk}
+        />
+      )}
 
       {editorItem && (
         <ItemEditor
@@ -253,7 +576,57 @@ function ModifiersTab({ context, data, reload }) {
           </button>
         )}
       </div>
+      {selecting && (
+        <div className="bulk-bar" role="group" aria-label="Bulk actions">
+          <span className="bulk-count">{selected.size} selected</span>
+          <button
+            type="button"
+            className="secondary-button"
+            onClick={() => setSelected(new Set(visible.map((i) => i.id)))}
+          >
+            Select all shown
+          </button>
+          <button type="button" className="secondary-button" disabled={selected.size === 0}
+            onClick={() => askBulk('availability', { available: false })}>Hide</button>
+          <button type="button" className="secondary-button" disabled={selected.size === 0}
+            onClick={() => askBulk('availability', { available: true })}>Put on sale</button>
+          <label className="order-filter">
+            <span className="visually-hidden">Move to category</span>
+            <select
+              value=""
+              disabled={selected.size === 0}
+              onChange={(e) => e.target.value && askBulk('category', { categoryId: e.target.value })}
+            >
+              <option value="">Move to…</option>
+              {data.categories.map((c) => <option key={c.id} value={c.id}>{c.name}</option>)}
+            </select>
+          </label>
+          <label className="order-filter">
+            <span className="visually-hidden">Change prices</span>
+            <select
+              value=""
+              disabled={selected.size === 0}
+              onChange={(e) => e.target.value && askBulk('price', { percent: Number(e.target.value) })}
+            >
+              <option value="">Change price…</option>
+              <option value="10">+10%</option>
+              <option value="5">+5%</option>
+              <option value="-5">−5%</option>
+              <option value="-10">−10%</option>
+            </select>
+          </label>
+        </div>
+      )}
+
       {error && <p className="form-error" role="alert">{error}</p>}
+
+      {visible.length === 0 && (
+        <section className="panel form-panel">
+          <p className="empty-state">
+            {filtersOn ? 'Nothing matches these filters.' : 'The catalogue is empty — add the first item.'}
+          </p>
+        </section>
+      )}
 
       <div className="menu-groups">
         {data.modifierGroups.length === 0 && <p className="empty-state">No modifier groups yet.</p>}
