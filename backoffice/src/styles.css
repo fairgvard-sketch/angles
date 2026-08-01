@@ -1064,6 +1064,13 @@ a { color: inherit; }
   border-inline-end-style: dashed;
 }
 
+/* Адрес гостевой страницы: факт важнее поля ввода */
+.address-field { display: grid; gap: 6px; }
+.address-effective { margin: 0; color: #40444b; font-size: 13px; }
+.address-effective strong { color: #16181d; }
+.address-effective.is-empty { color: #9b6a10; }
+.address-field .text-button { justify-self: start; min-height: 36px; }
+
 /* ── Стол хостес (Phase 4) ─────────────────────────────────── */
 .desk-actions { display: flex; flex-wrap: wrap; gap: 8px; margin-bottom: 14px; }
 .desk-actions button { min-height: 44px; }

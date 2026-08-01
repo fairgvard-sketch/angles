@@ -161,11 +161,15 @@ export function Toggle({ label, hint, checked, onChange, disabled }) {
   )
 }
 
-export function Field({ label, children }) {
+export function Field({ label, hint, children }) {
   return (
     <label className="qr-field">
       <span>{label}</span>
       {children}
+      {/* Подпись под полем раньше молча терялась: компонент принимал
+          только label, а вызывающий думал, что объяснил владельцу, откуда
+          берётся значение. */}
+      {hint && <small>{hint}</small>}
     </label>
   )
 }

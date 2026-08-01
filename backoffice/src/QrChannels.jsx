@@ -960,6 +960,47 @@ function ReservationSchedule({ schedule, tz, onChange }) {
   )
 }
 
+/**
+ * Адрес на странице брони.
+ *
+ * Источник правды — адрес заведения (Locations → Business address); в
+ * настройках брони живёт только необязательное переопределение. Сервер
+ * так и резолвит: `settings.reservations.address || receipt_address`.
+ * Экран обязан показывать этот же результат, иначе владелец не увидит,
+ * что гостю показывается не то.
+ */
+function AddressField({ override, businessAddress, onChange }) {
+  const effective = override.trim() || businessAddress
+  const overridden = override.trim() !== ''
+  return (
+    <div className="address-field">
+      <Field
+        label="Address shown to guests"
+        hint={businessAddress
+          ? 'Comes from Locations → Business address. Fill this in only to override it.'
+          : 'Set the business address in Locations — guests see it on the booking page.'}
+      >
+        <input
+          key={override}
+          defaultValue={override}
+          placeholder={businessAddress || 'Street, number, city'}
+          onBlur={(e) => onChange(e.target.value.trim() || null)}
+        />
+      </Field>
+      <p className={`address-effective${effective ? '' : ' is-empty'}`}>
+        {effective
+          ? <>Guests see: <strong>{effective}</strong>{overridden ? ' (override)' : ' (business address)'}</>
+          : 'Guests see no address — fill in the business address in Locations.'}
+      </p>
+      {overridden && businessAddress && (
+        <button type="button" className="text-button" onClick={() => onChange(null)}>
+          Use the business address instead
+        </button>
+      )}
+    </div>
+  )
+}
+
 function ReserveTab({ locationId, settings, patch, slug, tz, businessAddress, openGroup, onOpenGroup }) {
   const enabled = reservationsEnabled(settings)
   const rsv = settings.reservations || {}
@@ -1170,22 +1211,16 @@ function ReserveTab({ locationId, settings, patch, slug, tz, businessAddress, op
               часов приёма и расходился с ними — страница писала «шабат
               закрыто» и предлагала субботние слоты. Гостю теперь показывается
               расписание из группы «Booking hours». */}
-          {/* Адрес у точки один. Здесь только НЕОБЯЗАТЕЛЬНОЕ уточнение
-              для гостя («вход со двора»), а по умолчанию страница берёт
-              адрес заведения — два поля с одним смыслом расходились, и
-              гость видел пустоту при заполненных реквизитах. */}
-          <Field
-            label="Address shown to guests"
-            hint={businessAddress
-              ? 'Comes from Locations → Business address. Fill this in only to override it.'
-              : 'Set the business address in Locations — guests see it on the booking page.'}
-          >
-            <input
-              defaultValue={rsv.address || ''}
-              placeholder={businessAddress || 'Street, number, city'}
-              onBlur={(e) => patch({ address: e.target.value.trim() || null })}
-            />
-          </Field>
+          {/* Адрес у точки один. Плейсхолдера мало: он не виден гостю и
+              не спасает от мусора, уже лежащего в переопределении —
+              у живой точки там оказалась подпись поля «כתובת העסק», и
+              гость видел её вместо улицы. Поэтому показываем ФАКТ:
+              что именно откроется у гостя, и чем это задано. */}
+          <AddressField
+            override={rsv.address || ''}
+            businessAddress={businessAddress}
+            onChange={(value) => patch({ address: value })}
+          />
           <Field label="Google review link">
             <input
               defaultValue={rsv.google_review || ''}
