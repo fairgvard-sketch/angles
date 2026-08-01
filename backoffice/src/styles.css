@@ -983,3 +983,19 @@ a { color: inherit; }
 @media (max-width: 720px) {
   .floor-add-options { grid-template-columns: 1fr 1fr; }
 }
+
+/* ── Воронка и полосовые списки отчёта (Kassa 125) ───────────
+   Ширина полосы — доля от вершины воронки, а не от предыдущего шага:
+   владельцу важно «сколько дошло до конца», а не «сколько выжило на
+   этом шаге». */
+.funnel-list { display: grid; padding: 4px 0; }
+.funnel-row { display: grid; grid-template-columns: minmax(96px, 0.9fr) minmax(0, 2fr) auto; align-items: center; gap: 12px; min-height: 44px; padding: 6px 22px; }
+.funnel-label { font-size: 14px; color: #3c4148; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.funnel-track { height: 8px; border-radius: 999px; background: #f0f1f3; overflow: hidden; }
+.funnel-fill { display: block; height: 100%; border-radius: 999px; background: #16181d; min-width: 2px; }
+.funnel-value { font-size: 14px; font-weight: 700; font-variant-numeric: tabular-nums; text-align: end; white-space: nowrap; }
+.funnel-value small { display: block; font-size: 11px; font-weight: 500; color: #868b93; }
+
+@media (max-width: 720px) {
+  .funnel-row { grid-template-columns: minmax(80px, 1fr) minmax(0, 1.2fr) auto; gap: 8px; padding: 6px 16px; }
+}

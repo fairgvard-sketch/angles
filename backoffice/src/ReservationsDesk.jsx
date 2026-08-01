@@ -9,6 +9,7 @@ import { playNewOrderChime } from './orders'
 import TimelineDesk from './TimelineDesk'
 import WaitlistPanel from './WaitlistPanel'
 import FloorPlanEditor from './FloorPlanEditor'
+import ReserveAnalytics from './ReserveAnalytics'
 
 /**
  * «Reservations» — веб-стол хостес (Kassa 102): подтверждение, отказ,
@@ -29,6 +30,7 @@ const VIEWS = [
   { key: 'list', label: 'List' },
   { key: 'waitlist', label: 'Waitlist' },
   { key: 'floor', label: 'Floor plan' },
+  { key: 'analytics', label: 'Analytics' },
 ]
 
 function ReservationCard({ reservation, busyAction, onAction }) {
@@ -155,7 +157,9 @@ export default function ReservationsDesk({ context }) {
         <p>Booking requests and today’s visits — confirm, complete or mark no-shows.</p>
       </section>
 
-      {locations.length > 1 && (
+      {/* У аналитики свой выбор точек — сразу нескольких. Два разных
+          переключателя точки на одном экране спорили бы друг с другом. */}
+      {locations.length > 1 && view !== 'analytics' && (
         <div className="qr-field location-picker">
           <select value={locationId} onChange={(event) => setLocationId(event.target.value)}>
             {locations.map((location) => (
@@ -183,6 +187,7 @@ export default function ReservationsDesk({ context }) {
       {view === 'timeline' && locationId && <TimelineDesk locationId={locationId} />}
       {view === 'waitlist' && locationId && <WaitlistPanel locationId={locationId} />}
       {view === 'floor' && locationId && <FloorPlanEditor locationId={locationId} />}
+      {view === 'analytics' && <ReserveAnalytics locations={locations} />}
 
       {view === 'list' && (
       <section className="panel form-panel">
