@@ -22,6 +22,9 @@ import {
   X,
 } from 'lucide-react'
 import { isSupabaseConfigured, supabase } from './supabase'
+import {
+  NAV_ITEMS, hasCapability, productState, visibleNavigation,
+} from './navigation'
 import SalesOverview from './SalesOverview'
 import LocationSettings from './LocationSettings'
 import MenuManager from './MenuManager'
@@ -33,75 +36,24 @@ import DevicesManager from './DevicesManager'
 import GuestsManager from './GuestsManager'
 import ActivityManager, { ActivityCard } from './ActivityManager'
 
-const navigation = [
-  { id: 'overview', label: 'Home', icon: LayoutDashboard },
-  { id: 'orders', label: 'Orders', icon: ShoppingBag },
-  { id: 'reservations', label: 'Reservations', icon: CalendarDays },
-  { id: 'sales', label: 'Overview', icon: BarChart3 },
-  { id: 'activity', label: 'Activity', icon: Activity },
-  { id: 'locations', label: 'Locations', icon: Store },
-  { id: 'menu', label: 'Menu & catalogue', icon: MenuIcon },
-  { id: 'team', label: 'Team', icon: Users },
-  { id: 'guests', label: 'Customers', icon: UserRound },
-  { id: 'online', label: 'QR menu', icon: QrCode },
-  { id: 'devices', label: 'Devices', icon: MonitorSmartphone },
-  { id: 'reports', label: 'Reports', icon: BarChart3 },
-  { id: 'integrations', label: 'Integrations', icon: CreditCard },
-]
-
-// ── Продукты и capabilities (100/103/105) ────────────────────
 /**
- * Навигация строится из ЭФФЕКТИВНЫХ capabilities контекста (105), а не из
- * сырого ключа продукта: ANGLE Orders даёт публичное меню без покупки Menu,
- * поэтому раздел каталога виден по catalog_manage, а не по products.
- * Это только видимость — авторизация остаётся на сервере (RLS + RPC-гейты,
- * module_disabled). Контекст без поля capabilities (функция до 105) —
- * фолбэк на прежнюю продуктовую логику.
+ * Иконки разделов. Список разделов и правила видимости живут в
+ * `navigation.js` (чистый модуль под тесты), здесь — только оформление.
  */
-export function hasProduct(products, product) {
-  return !Array.isArray(products) || products.includes(product)
-}
-
-export function hasCapability(context, capability) {
-  const caps = context?.capabilities
-  if (!Array.isArray(caps)) {
-    // Старый контекст: приближение по продуктам (как до 105)
-    const products = context?.products
-    if (!Array.isArray(products)) return true
-    const has = (p) => products.includes(p)
-    switch (capability) {
-      case 'catalog_manage': return has('pos') || has('menu') || has('online_orders')
-      case 'public_menu': return has('menu') || has('online_orders')
-      case 'online_orders':
-      case 'orders_desk': return has('online_orders')
-      case 'public_reservations':
-      case 'reservations_desk': return has('reservations')
-      default: return has('pos')
-    }
-  }
-  return caps.includes(capability)
-}
-
-export function visibleNavigation(context) {
-  const products = context?.products
-  if (!Array.isArray(products) && !Array.isArray(context?.capabilities)) return navigation
-  const can = (c) => hasCapability(context, c)
-  return navigation.filter(({ id }) => {
-    if (id === 'overview' || id === 'locations') return true
-    if (id === 'menu') return can('catalog_manage')
-    if (id === 'online') {
-      return can('public_menu') || can('online_orders')
-        || can('public_reservations') || can('reservations_desk')
-    }
-    // Инбокс заказов (101): capability orders_desk — pos-точки видят его
-    // read-only, их цикл живёт на кассе.
-    if (id === 'orders') return can('orders_desk')
-    // Веб-стол хостес (102): reservations_desk, работает и у POS-точек
-    if (id === 'reservations') return can('reservations_desk')
-    if (id === 'sales') return can('pos_reports')
-    // activity/team/devices/reports/integrations — POS-контур
-    return can('pos_operate')
-  })
+const NAV_ICONS = {
+  overview: LayoutDashboard,
+  orders: ShoppingBag,
+  reservations: CalendarDays,
+  sales: BarChart3,
+  activity: Activity,
+  locations: Store,
+  menu: MenuIcon,
+  team: Users,
+  guests: UserRound,
+  online: QrCode,
+  devices: MonitorSmartphone,
+  reports: BarChart3,
+  integrations: CreditCard,
 }
 
 function Brand({ compact = false }) {
@@ -326,12 +278,15 @@ function Sidebar({ items, active, onNavigate, open, onClose, email }) {
           </div>
         </div>
         <nav className="side-nav" aria-label="Back office">
-          {items.map(({ id, label, icon: Icon }) => (
-            <button key={id} className={active === id ? 'active' : ''} onClick={() => { onNavigate(id); onClose() }}>
-              <Icon />
-              <span>{label}</span>
-            </button>
-          ))}
+          {items.map(({ id, label }) => {
+            const Icon = NAV_ICONS[id]
+            return (
+              <button key={id} className={active === id ? 'active' : ''} onClick={() => { onNavigate(id); onClose() }}>
+                {Icon && <Icon />}
+                <span>{label}</span>
+              </button>
+            )
+          })}
         </nav>
         <div className="sidebar-bottom">
           <button><CircleHelp /><span>Help</span></button>
@@ -374,19 +329,6 @@ const PRODUCT_META = [
   { id: 'reservations', label: 'ANGLE Reserve', detail: 'Table bookings and host desk' },
   { id: 'pos', label: 'ANGLE POS', detail: 'The register, shifts and receipts' },
 ]
-
-export function productState(context, productId) {
-  const products = Array.isArray(context?.products) ? context.products : []
-  const requests = Array.isArray(context?.product_requests) ? context.product_requests : []
-  const sources = context?.product_sources || {}
-  if (products.includes(productId)) {
-    return sources[productId] === 'developer' ? 'developer' : 'active'
-  }
-  // Orders включает публичное меню технически — вторая покупка не нужна
-  if (productId === 'menu' && products.includes('online_orders')) return 'included'
-  if (requests.includes(productId)) return 'pending'
-  return 'addon'
-}
 
 function ProductRow({ context, product, onReloadContext }) {
   const [busy, setBusy] = useState(false)
@@ -528,8 +470,8 @@ function Overview({ context, onNavigate, onReloadContext }) {
 }
 
 function SectionPage({ section, context }) {
-  const item = navigation.find((entry) => entry.id === section) || navigation[0]
-  const Icon = item.icon
+  const item = NAV_ITEMS.find((entry) => entry.id === section) || NAV_ITEMS[0]
+  const Icon = NAV_ICONS[item.id]
   const descriptions = {
     locations: 'Business details, opening hours and settings for each location.',
     menu: 'Catalogue, categories, prices, sizes and modifiers used by the POS.',
@@ -585,7 +527,7 @@ function Dashboard({ session, context, onReloadContext }) {
   // Capabilities (105): скрытая секция недостижима и из state (например,
   // после перезагрузки контекста) — молча возвращаем на Home.
   const nav = noProducts
-    ? navigation.filter(({ id }) => id === 'overview')
+    ? NAV_ITEMS.filter(({ id }) => id === 'overview')
     : visibleNavigation(context)
   const activeSection = active === 'settings' || nav.some((item) => item.id === active) ? active : 'overview'
   const isDeveloper = context.account_type === 'developer'

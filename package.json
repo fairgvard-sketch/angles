@@ -4,7 +4,8 @@
   "private": true,
   "type": "module",
   "scripts": {
-    "build": "node scripts/build-site.mjs && vite build --config backoffice/vite.config.js"
+    "build": "node scripts/build-site.mjs && vite build --config backoffice/vite.config.js",
+    "test": "node --test backoffice/src/*.test.js"
   },
   "dependencies": {
     "@supabase/supabase-js": "^2.57.4",
