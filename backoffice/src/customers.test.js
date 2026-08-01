@@ -135,6 +135,9 @@ test('предпросмотр слияния называет объём пер
   assert.match(text, /4 visits/)
   assert.match(text, /₪140\.00/)
   assert.match(text, /old number keeps working/i)
+  // Метки и заметки объединяются: удалённая метка вернётся из второго
+  // профиля, и владелец должен знать это ДО нажатия
+  assert.match(text, /Tags and notes of both profiles are combined/i)
 })
 
 test('исходники — все, кроме выбранного основным', () => {

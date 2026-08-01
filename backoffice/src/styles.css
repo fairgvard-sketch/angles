@@ -1471,3 +1471,7 @@ a { color: inherit; }
   .guest-editor-actions { flex-direction: column-reverse; }
   .guest-editor-actions button { width: 100%; }
 }
+
+/* Пустой экран дублей — с выходом: после слияния последней пары
+   владелец оставался на экране без кнопки возврата. */
+.section-placeholder .primary-button { margin-top: 14px; }

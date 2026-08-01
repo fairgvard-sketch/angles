@@ -212,7 +212,8 @@ export function mergePreview(target, source) {
   const name = target.name || formatPhone(target.phone)
   return `Everything from ${source.name || formatPhone(source.phone)} moves to ${name}: `
     + `${visits} visits and ${formatMoney(spent)} in total. `
-    + `The old number keeps working — it will lead to this profile.`
+    + `Tags and notes of both profiles are combined, and the old number keeps `
+    + `working — it will lead to this profile.`
 }
 
 /** Кандидаты группы, кроме выбранного основным */

@@ -592,7 +592,10 @@ export default function GuestsManager({ context }) {
           </select>
         </label>
 
-        {duplicates.length > 0 && (
+        {/* Пока экран дублей открыт, кнопка остаётся: после слияния
+            последней пары список подсказок пустеет, и без неё владелец
+            оставался на экране без выхода. */}
+        {(duplicates.length > 0 || view === 'duplicates') && (
           <button
             type="button"
             className={view === 'duplicates' ? 'primary-button compact' : 'secondary-button'}
@@ -656,27 +659,44 @@ export default function GuestsManager({ context }) {
       {error && <p className="form-error" role="alert">{error}</p>}
 
       {view === 'duplicates' ? (
-        <section className="panel">
-          <div className="panel-heading">
+        duplicates.length === 0 ? (
+          <section className="section-placeholder panel">
+            <span className="section-icon"><GitMerge /></span>
             <div>
-              <h2>{duplicates.length} possible duplicate{duplicates.length === 1 ? '' : 's'}</h2>
-              <p>
-                The same person can have two profiles — one number written two
-                ways, or a second phone. Choose which profile to keep.
-              </p>
+              <h2>No duplicates left</h2>
+              <p>Every profile here looks like a different person.</p>
+              <button
+                type="button"
+                className="primary-button compact"
+                onClick={() => setView('list')}
+              >
+                Back to customers
+              </button>
             </div>
-          </div>
-          <div className="dup-list">
-            {duplicates.map((group) => (
-              <DuplicateGroup
-                key={`${group.reason}:${group.key}`}
-                group={group}
-                busy={merging !== null}
-                onMerge={runMerge}
-              />
-            ))}
-          </div>
-        </section>
+          </section>
+        ) : (
+          <section className="panel">
+            <div className="panel-heading">
+              <div>
+                <h2>{duplicates.length} possible duplicate{duplicates.length === 1 ? '' : 's'}</h2>
+                <p>
+                  The same person can have two profiles — one number written two
+                  ways, or a second phone. Choose which profile to keep.
+                </p>
+              </div>
+            </div>
+            <div className="dup-list">
+              {duplicates.map((group) => (
+                <DuplicateGroup
+                  key={`${group.reason}:${group.key}`}
+                  group={group}
+                  busy={merging !== null}
+                  onMerge={runMerge}
+                />
+              ))}
+            </div>
+          </section>
+        )
       ) : loading && !guests ? (
         <p className="empty-state">Loading…</p>
       ) : total === 0 ? (
