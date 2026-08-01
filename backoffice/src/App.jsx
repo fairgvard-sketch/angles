@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useRef, useState } from 'react'
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import {
   Activity,
   BarChart3,
@@ -15,7 +15,6 @@ import {
   MonitorSmartphone,
   MoreHorizontal,
   QrCode,
-  Settings,
   ShoppingBag,
   Store,
   UserRound,
@@ -24,8 +23,9 @@ import {
 } from 'lucide-react'
 import { isSupabaseConfigured, supabase } from './supabase'
 import {
-  NAV_ITEMS, hasCapability, productState, visibleNavigation,
+  NAV_ITEMS, groupedNavigation, hasCapability, isLocationScoped, productState,
 } from './navigation'
+import { DEFAULT_VIEW, parseRoute, routeToUrl, sameRoute } from './routing'
 import SalesOverview from './SalesOverview'
 import LocationSettings from './LocationSettings'
 import MenuManager from './MenuManager'
@@ -397,11 +397,74 @@ function HelpPanel({ context, email, onNavigate, onClose }) {
   )
 }
 
-function Sidebar({ items, active, onNavigate, open, onClose, onHelp, email }) {
-  function openSettings() {
-    onNavigate('settings')
+/**
+ * Меню аккаунта (Phase 2): Account, Help и выход живут у имени
+ * владельца, а не среди операционных разделов. Раньше «Settings» с одной
+ * лишь почтой стоял в списке модулей и читался как настройки бизнеса.
+ */
+function AccountMenu({ email, active, onNavigate, onHelp, onSignOut, onClose }) {
+  const ref = useRef(null)
+  const [open, setOpen] = useState(false)
+
+  useEffect(() => {
+    if (!open) return undefined
+    function onDocClick(event) {
+      if (!ref.current?.contains(event.target)) setOpen(false)
+    }
+    function onKey(event) {
+      if (event.key === 'Escape') setOpen(false)
+    }
+    document.addEventListener('mousedown', onDocClick)
+    document.addEventListener('keydown', onKey)
+    return () => {
+      document.removeEventListener('mousedown', onDocClick)
+      document.removeEventListener('keydown', onKey)
+    }
+  }, [open])
+
+  function pick(action) {
+    setOpen(false)
     onClose()
+    action()
   }
+
+  return (
+    <div className="account-menu" ref={ref}>
+      <button
+        type="button"
+        className={`account-chip${open ? ' is-open' : ''}`}
+        aria-haspopup="menu"
+        aria-expanded={open}
+        onClick={() => setOpen((v) => !v)}
+      >
+        <span className="avatar">{email?.slice(0, 1).toUpperCase() || 'A'}</span>
+        <span className="account-email">{email}</span>
+        <MoreHorizontal />
+      </button>
+      {open && (
+        <div className="account-popover" role="menu">
+          <button
+            type="button"
+            role="menuitem"
+            className={active === 'settings' ? 'active' : ''}
+            onClick={() => pick(() => onNavigate('settings'))}
+          >
+            <UserRound /><span>Account</span>
+          </button>
+          <button type="button" role="menuitem" onClick={() => pick(onHelp)}>
+            <CircleHelp /><span>Help</span>
+          </button>
+          <button type="button" role="menuitem" className="is-danger" onClick={() => pick(onSignOut)}>
+            <LogOut /><span>Sign out</span>
+          </button>
+        </div>
+      )}
+    </div>
+  )
+}
+
+function Sidebar({ nav, active, onNavigate, open, onClose, onHelp, onSignOut, email }) {
+  const go = (id) => { onNavigate(id); onClose() }
 
   return (
     <>
@@ -417,29 +480,43 @@ function Sidebar({ items, active, onNavigate, open, onClose, onHelp, email }) {
             >
               <CircleHelp />
             </button>
-            <button className="icon-button sidebar-mobile-action" aria-label="Settings" onClick={openSettings}><Settings /></button>
             <button className="icon-button sidebar-close" onClick={onClose} aria-label="Close navigation"><X /></button>
           </div>
         </div>
         <nav className="side-nav" aria-label="Back office">
-          {items.map(({ id, label }) => {
+          {nav.primary.map(({ id, label }) => {
             const Icon = NAV_ICONS[id]
             return (
-              <button key={id} className={active === id ? 'active' : ''} onClick={() => { onNavigate(id); onClose() }}>
+              <button key={id} className={active === id ? 'active' : ''} onClick={() => go(id)}>
                 {Icon && <Icon />}
                 <span>{label}</span>
               </button>
             )
           })}
+          {nav.groups.map((group) => (
+            <div className="side-nav-group" key={group.id} role="group" aria-labelledby={`nav-${group.id}`}>
+              <p className="side-nav-title" id={`nav-${group.id}`}>{group.label}</p>
+              {group.items.map(({ id, label }) => {
+                const Icon = NAV_ICONS[id]
+                return (
+                  <button key={id} className={active === id ? 'active' : ''} onClick={() => go(id)}>
+                    {Icon && <Icon />}
+                    <span>{label}</span>
+                  </button>
+                )
+              })}
+            </div>
+          ))}
         </nav>
         <div className="sidebar-bottom">
-          <button onClick={() => { onHelp(); onClose() }}><CircleHelp /><span>Help</span></button>
-          <button className={active === 'settings' ? 'active' : ''} onClick={openSettings}><Settings /><span>Settings</span></button>
-          <div className="account-chip">
-            <span className="avatar">{email?.slice(0, 1).toUpperCase() || 'A'}</span>
-            <span className="account-email">{email}</span>
-            <MoreHorizontal />
-          </div>
+          <AccountMenu
+            email={email}
+            active={active}
+            onNavigate={onNavigate}
+            onHelp={onHelp}
+            onSignOut={onSignOut}
+            onClose={onClose}
+          />
         </div>
       </aside>
     </>
@@ -554,37 +631,96 @@ function ActivationHome({ context, onReloadContext }) {
   )
 }
 
+/**
+ * Быстрые действия Dashboard (Phase 2): каждое привязано к capability и
+ * подписано тем, что даёт. Menu-only владельцу нечего делать в разделе
+ * команды, а Reserve-only — в каталоге.
+ */
+const QUICK_ACTIONS = [
+  {
+    view: 'orders', capability: 'orders_desk', icon: ShoppingBag,
+    title: 'Order inbox', detail: 'What guests ordered and where it stands',
+  },
+  {
+    view: 'reservations', capability: 'reservations_desk', icon: CalendarDays,
+    title: 'Host desk', detail: 'Today’s bookings, tables and waitlist',
+  },
+  {
+    view: 'sales', capability: 'pos_reports', icon: BarChart3,
+    title: 'Sales', detail: 'Revenue, orders and top items',
+  },
+  {
+    view: 'menu', capability: 'catalog_manage', icon: MenuIcon,
+    title: 'Catalogue', detail: 'Prices, items and modifiers',
+  },
+  {
+    view: 'online', capability: 'public_menu', icon: QrCode,
+    title: 'QR Menu & Online', detail: 'Guest link, ordering and table booking',
+  },
+  {
+    view: 'team', capability: 'pos_operate', icon: Users,
+    title: 'Team access', detail: 'Roles, PINs and permissions',
+  },
+]
+
+/**
+ * Описание кабинета словами клиента, а не набором продуктов ANGLE.
+ * Standalone-клиенту нельзя говорить, что его организация «подключена к
+ * ANGLE POS»: у него нет кассы, и это выглядит как чужой аккаунт.
+ */
+function overviewIntro(context) {
+  const pos = hasCapability(context, 'pos_operate')
+  const orders = hasCapability(context, 'orders_desk')
+  const reserve = hasCapability(context, 'reservations_desk')
+  const menu = hasCapability(context, 'public_menu')
+  if (pos) return 'Everything that configures and supports your registers, in one place.'
+  const parts = []
+  if (menu) parts.push('menu')
+  if (orders) parts.push('online orders')
+  if (reserve) parts.push('table bookings')
+  if (parts.length === 0) return 'Your business settings, in one place.'
+  const list = parts.length > 1
+    ? `${parts.slice(0, -1).join(', ')} and ${parts[parts.length - 1]}`
+    : parts[0]
+  // Про кассу не упоминаем вовсе — даже отрицанием: клиент без неё не
+  // должен гадать, чего ему не хватает.
+  return `Your ${list} — set up and run from here.`
+}
+
 function Overview({ context, onNavigate, onReloadContext }) {
   const counts = context.counts || {}
   const locations = context.locations || []
   // Capabilities (105): menu-only клиенту не показываем staff/девайсы/кассу.
   const pos = hasCapability(context, 'pos_operate')
-  const catalog = hasCapability(context, 'catalog_manage')
+  const actions = QUICK_ACTIONS.filter((action) => hasCapability(context, action.capability))
   return (
     <>
       <section className="page-heading">
         <p className="eyebrow">YOUR BUSINESS</p>
         <h1>{context.organization?.name || 'ANGLE business'}</h1>
-        <p>{pos
-          ? 'Everything that configures and supports your POS, in one place.'
-          : 'Your menu, guest pages and settings, in one place.'}</p>
+        <p>{overviewIntro(context)}</p>
       </section>
 
       <section className="stats-grid" aria-label="Business overview">
         <Stat icon={Store} label="Locations" value={counts.locations ?? 0} detail="Business locations" />
         {pos && <Stat icon={Users} label="Team" value={counts.staff ?? 0} detail="Active staff profiles" />}
-        {pos && <Stat icon={MonitorSmartphone} label="Devices" value={counts.devices ?? 0} detail="Connected POS devices" />}
+        {pos && <Stat icon={MonitorSmartphone} label="Devices" value={counts.devices ?? 0} detail="Connected registers" />}
       </section>
 
       <div className="overview-grid">
         <section className="panel location-panel">
           <div className="panel-heading">
-            <div><h2>Locations</h2><p>Configuration shared with every connected register.</p></div>
+            <div>
+              <h2>Locations</h2>
+              <p>{pos
+                ? 'Configuration shared with every connected register.'
+                : 'Address, hours and guest-facing details for each location.'}</p>
+            </div>
             <button className="text-button" onClick={() => onNavigate('locations')}>View all <ChevronRight /></button>
           </div>
           <div className="location-list">
             {locations.map((location) => (
-              <button className="location-row" key={location.id} onClick={() => onNavigate('locations')}>
+              <button className="location-row" key={location.id} onClick={() => onNavigate('locations', location.id)}>
                 <span className="location-mark"><Building2 /></span>
                 <span><strong>{location.name}</strong><small>{location.timezone} · {location.currency}</small></span>
                 <span className="status"><i /> Active</span>
@@ -598,10 +734,11 @@ function Overview({ context, onNavigate, onReloadContext }) {
         <section className="panel quick-panel">
           <div className="panel-heading"><div><h2>Quick access</h2><p>Common owner tasks.</p></div></div>
           <div className="quick-list">
-            {hasCapability(context, 'pos_reports') && <button onClick={() => onNavigate('sales')}><BarChart3 /><span><strong>Sales overview</strong><small>Revenue, orders and top items</small></span><ChevronRight /></button>}
-            {catalog && <button onClick={() => onNavigate('menu')}><MenuIcon /><span><strong>Menu & catalogue</strong><small>Prices, items and modifiers</small></span><ChevronRight /></button>}
-            <button onClick={() => onNavigate('online')}><QrCode /><span><strong>QR menu</strong><small>Guest link, ordering and table booking</small></span><ChevronRight /></button>
-            {pos && <button onClick={() => onNavigate('team')}><Users /><span><strong>Team access</strong><small>Roles, PINs and permissions</small></span><ChevronRight /></button>}
+            {actions.map(({ view, icon: Icon, title, detail }) => (
+              <button key={view} onClick={() => onNavigate(view)}>
+                <Icon /><span><strong>{title}</strong><small>{detail}</small></span><ChevronRight />
+              </button>
+            ))}
           </div>
         </section>
       </div>
@@ -682,20 +819,151 @@ function AccountSettingsPage({ email, onSignOut }) {
   )
 }
 
+/**
+ * Выбранная точка — общий контекст (Phase 2).
+ *
+ * Раньше каждый раздел выбирал точку сам и начинал с первой в списке:
+ * владелец сети, перейдя из броней в каталог, молча оказывался в другой
+ * точке. Теперь выбор один на кабинет, живёт в адресе (ссылка открывает
+ * ту же точку) и переживает перезагрузку.
+ */
+const LOCATION_STORAGE_KEY = 'angle.backoffice.location'
+
+function readStoredLocation() {
+  try {
+    return window.localStorage.getItem(LOCATION_STORAGE_KEY)
+  } catch {
+    return null
+  }
+}
+
+function storeLocation(id) {
+  try {
+    if (id) window.localStorage.setItem(LOCATION_STORAGE_KEY, id)
+  } catch {
+    // Приватный режим — выбор просто не переживёт перезагрузку
+  }
+}
+
+function LocationPicker({ locations, locationId, onChange }) {
+  const current = locations.find((l) => l.id === locationId)
+  if (locations.length === 0) return null
+  if (locations.length === 1) {
+    return <span className="topbar-location is-single"><Building2 /> {current?.name ?? locations[0].name}</span>
+  }
+  return (
+    <label className="topbar-location">
+      <Building2 aria-hidden />
+      <span className="visually-hidden">Location</span>
+      <select value={locationId ?? ''} onChange={(event) => onChange(event.target.value)}>
+        {locations.map((location) => (
+          <option key={location.id} value={location.id}>{location.name}</option>
+        ))}
+      </select>
+    </label>
+  )
+}
+
 function Dashboard({ session, context, onReloadContext }) {
-  const [active, setActive] = useState('overview')
   const [drawer, setDrawer] = useState(false)
   const [help, setHelp] = useState(false)
   // Организация без активного продукта (104): стабильный экран выбора/
   // ожидания активации вместо пустых операционных разделов.
   const noProducts = Array.isArray(context.products) && context.products.length === 0
-  // Capabilities (105): скрытая секция недостижима и из state (например,
-  // после перезагрузки контекста) — молча возвращаем на Home.
-  const nav = noProducts
-    ? NAV_ITEMS.filter(({ id }) => id === 'overview')
-    : visibleNavigation(context)
-  const activeSection = active === 'settings' || nav.some((item) => item.id === active) ? active : 'overview'
+  const nav = useMemo(() => (noProducts
+    ? { primary: NAV_ITEMS.filter(({ id }) => id === 'overview'), groups: [] }
+    : groupedNavigation(context)), [context, noProducts])
+
+  const locations = useMemo(() => context.locations || [], [context])
+  // settings — экран аккаунта: он не в списке разделов, но адресуем
+  const allowedViews = useMemo(
+    () => [...nav.primary, ...nav.groups.flatMap((g) => g.items)].map((i) => i.id).concat('settings'),
+    [nav]
+  )
+
+  // Стартовое состояние берётся из адреса: ссылка и перезагрузка
+  // открывают тот же экран, что и был.
+  const [route, setRoute] = useState(() => {
+    const parsed = parseRoute(window.location.search)
+    return {
+      view: parsed.view,
+      locationId: parsed.locationId || readStoredLocation(),
+      tab: parsed.tab,
+    }
+  })
+
+  // Раздел, недоступный этому аккаунту (устаревшая ссылка, смена
+  // продуктов) — не ошибка: молча возвращаем на Dashboard.
+  const view = allowedViews.includes(route.view) ? route.view : DEFAULT_VIEW
+  const locationId = locations.some((l) => l.id === route.locationId)
+    ? route.locationId
+    : (locations[0]?.id ?? null)
+  const scoped = isLocationScoped(view)
   const isDeveloper = context.account_type === 'developer'
+
+  /**
+   * Текущий маршрут дублируется в ref: запись в history — побочный
+   * эффект, и делать его внутри апдейтера состояния нельзя. React
+   * вызывает апдейтер дважды (StrictMode), и каждый переход добавлял в
+   * историю ДВЕ записи — Назад возвращал на тот же экран.
+   */
+  const routeRef = useRef(route)
+
+  const applyRoute = useCallback((next, mode = 'push') => {
+    if (sameRoute(routeRef.current, next)) return
+    routeRef.current = next
+    const url = routeToUrl(next, window.location.pathname)
+    if (mode === 'replace') window.history.replaceState({ ...next }, '', url)
+    else window.history.pushState({ ...next }, '', url)
+    setRoute(next)
+  }, [])
+
+  // Адрес всегда отражает то, что на экране; кривой приводим в порядок
+  // заменой записи, чтобы Назад не возвращал в него же.
+  useEffect(() => {
+    const current = { view, locationId, tab: route.tab }
+    routeRef.current = current
+    const url = routeToUrl(current, window.location.pathname)
+    if (url !== window.location.pathname + window.location.search) {
+      window.history.replaceState({ ...current }, '', url)
+    }
+  }, [view, locationId, route.tab])
+
+  // Назад/Вперёд браузера меняют раздел, а не выкидывают из кабинета
+  useEffect(() => {
+    function onPopState() {
+      const parsed = parseRoute(window.location.search)
+      const next = { view: parsed.view, locationId: parsed.locationId, tab: parsed.tab }
+      routeRef.current = next
+      setRoute(next)
+      setDrawer(false)
+    }
+    window.addEventListener('popstate', onPopState)
+    return () => window.removeEventListener('popstate', onPopState)
+  }, [])
+
+  const navigate = useCallback((nextView, nextLocationId = null) => {
+    const prev = routeRef.current
+    applyRoute({
+      view: nextView,
+      locationId: nextLocationId ?? prev.locationId,
+      // Вкладка принадлежит разделу: уходя из него, её нельзя тащить
+      tab: nextView === prev.view ? prev.tab : null,
+    })
+  }, [applyRoute])
+
+  const changeLocation = useCallback((nextId) => {
+    storeLocation(nextId)
+    applyRoute({ ...routeRef.current, locationId: nextId })
+  }, [applyRoute])
+
+  // Вкладка внутри раздела — уточнение того же экрана, а не новый шаг:
+  // иначе Назад из «Waitlist» вело бы в «Timeline», а не в прошлый раздел.
+  const changeTab = useCallback((nextTab) => {
+    applyRoute({ ...routeRef.current, tab: nextTab }, 'replace')
+  }, [applyRoute])
+
+  useEffect(() => { if (locationId) storeLocation(locationId) }, [locationId])
 
   // Полноэкранное меню открыто — фон под ним не скроллится
   useEffect(() => {
@@ -709,15 +977,18 @@ function Dashboard({ session, context, onReloadContext }) {
     await supabase.auth.signOut()
   }
 
+  const scopedProps = { locationId, onLocationChange: changeLocation }
+
   return (
     <div className="app-shell">
       <Sidebar
-        items={nav}
-        active={activeSection}
-        onNavigate={setActive}
+        nav={nav}
+        active={view}
+        onNavigate={navigate}
         open={drawer}
         onClose={() => setDrawer(false)}
         onHelp={() => setHelp(true)}
+        onSignOut={signOut}
         email={session.user.email}
       />
       <div className="app-main">
@@ -728,33 +999,37 @@ function Dashboard({ session, context, onReloadContext }) {
             <small>{context.member?.role}</small>
             {isDeveloper && <span className="developer-badge">Developer workspace</span>}
           </div>
+          {/* Точка показывается там, где от неё зависят данные — и нигде
+              больше: в Team или Customers она вводила бы в заблуждение. */}
+          {scoped && !noProducts && (
+            <LocationPicker locations={locations} locationId={locationId} onChange={changeLocation} />
+          )}
         </header>
         <main className="content">
-          {activeSection === 'overview' && (noProducts
+          {view === 'overview' && (noProducts
             ? <ActivationHome context={context} onReloadContext={onReloadContext} />
-            : <Overview context={context} onNavigate={setActive} onReloadContext={onReloadContext} />)}
-          {activeSection === 'orders' && <OrdersInbox context={context} />}
-          {activeSection === 'reservations' && <ReservationsDesk context={context} />}
-          {activeSection === 'sales' && <SalesOverview organizationName={context.organization?.name} />}
-          {activeSection === 'activity' && <ActivityManager context={context} />}
-          {activeSection === 'locations' && <LocationSettings context={context} />}
-          {activeSection === 'menu' && <MenuManager context={context} />}
-          {activeSection === 'team' && <TeamManager context={context} />}
-          {activeSection === 'online' && <QrChannels context={context} />}
-          {activeSection === 'devices' && <DevicesManager context={context} />}
-          {activeSection === 'guests' && <GuestsManager context={context} />}
-          {activeSection === 'settings' && <AccountSettingsPage email={session.user.email} onSignOut={signOut} />}
-          {!['overview', 'orders', 'reservations', 'sales', 'activity', 'locations', 'menu', 'team', 'online', 'devices', 'guests'].includes(activeSection) && (
-            activeSection !== 'settings'
-              && <SectionPage section={activeSection} context={context} onNavigate={setActive} />
+            : <Overview context={context} onNavigate={navigate} onReloadContext={onReloadContext} />)}
+          {view === 'orders' && <OrdersInbox context={context} {...scopedProps} />}
+          {view === 'reservations' && (
+            <ReservationsDesk context={context} {...scopedProps} tab={route.tab} onTabChange={changeTab} />
           )}
+          {view === 'sales' && <SalesOverview organizationName={context.organization?.name} />}
+          {view === 'activity' && <ActivityManager context={context} />}
+          {view === 'locations' && <LocationSettings context={context} {...scopedProps} />}
+          {view === 'menu' && <MenuManager context={context} {...scopedProps} />}
+          {view === 'team' && <TeamManager context={context} />}
+          {view === 'online' && <QrChannels context={context} {...scopedProps} />}
+          {view === 'devices' && <DevicesManager context={context} />}
+          {view === 'guests' && <GuestsManager context={context} />}
+          {view === 'settings' && <AccountSettingsPage email={session.user.email} onSignOut={signOut} />}
+          {PLANNED_SECTIONS[view] && <SectionPage section={view} context={context} onNavigate={navigate} />}
         </main>
       </div>
       {help && (
         <HelpPanel
           context={context}
           email={session.user.email}
-          onNavigate={setActive}
+          onNavigate={navigate}
           onClose={() => setHelp(false)}
         />
       )}

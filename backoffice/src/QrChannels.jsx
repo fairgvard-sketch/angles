@@ -1,7 +1,7 @@
 import { useEffect, useRef, useState } from 'react'
 import {
   AlertTriangle, Check, Clock, Copy, Download, ExternalLink, Image, LayoutGrid,
-  QrCode, RefreshCw, ShoppingBag, Smartphone, Store, Table, Code2,
+  QrCode, RefreshCw, ShoppingBag, Smartphone, Table, Code2,
   CalendarClock, Contact, Ban,
 } from 'lucide-react'
 import { fetchLocation, fetchLocationSlug, fetchTables, saveLocationSlug } from './settings'
@@ -657,8 +657,8 @@ function OnlineTab({ context, locationId, settings, tables, patch, slug, onSlugS
           onChange={(backgroundUrl) => patch({ background_url: backgroundUrl })}
         />
         <p className="form-hint">
-          The header image is managed from the register under
-          Settings → Service → Online orders.
+          The header image comes from this location’s settings — Locations →
+          Online orders.
         </p>
       </SettingGroup>
 
@@ -695,7 +695,9 @@ function OnlineTab({ context, locationId, settings, tables, patch, slug, onSlugS
             </div>
           </>
         ) : (
-          <p className="empty-state compact">No active tables yet. Create tables in the register first.</p>
+          <p className="empty-state compact">
+            No active tables yet. Add them in Reservations → Tables &amp; zones.
+          </p>
         )}
       </SettingGroup>
 
@@ -976,7 +978,7 @@ function ReserveTab({ locationId, settings, patch, slug, tz, openGroup, onOpenGr
     <>
       <ChannelHero
         title="Table reservations"
-        hint="Guests book a table from the link; the register confirms."
+        hint="Guests book a table from the link; you confirm at the host desk."
         enabled={enabled}
         onToggle={(v) => patch({ enabled: v })}
         url={reserveUrl(locationId, slug)}
@@ -1102,14 +1104,14 @@ function ReserveTab({ locationId, settings, patch, slug, tz, openGroup, onOpenGr
         {...group('confirm')}
         icon={LayoutGrid}
         title="Confirmation"
-        hint="Confirm automatically or let the register decide."
-        value={instant ? 'Instant' : 'By the register'}
+        hint="Confirm automatically or decide each booking yourself."
+        value={instant ? 'Instant' : 'Manual'}
       >
         {enabled ? (
           <>
             <Toggle
               label="Confirm instantly"
-              hint="The server picks a free table and confirms without the register."
+              hint="A free table is picked and the guest is confirmed straight away."
               checked={instant}
               onChange={(v) => patch({ instant: v })}
             />
@@ -1197,8 +1199,8 @@ function ReserveTab({ locationId, settings, patch, slug, tz, openGroup, onOpenGr
           </Field>
         </div>
         <p className="form-hint">
-          Header image and the map pin are set from the register, under
-          Settings → Service → Reservations.
+          Header image and the map pin come from this location’s settings —
+          Locations → Reservations.
         </p>
       </SettingGroup>
     </>
@@ -1218,9 +1220,9 @@ function pickKeys(source, delta) {
   return result
 }
 
-export default function QrChannels({ context }) {
+export default function QrChannels({ context, locationId }) {
   const locations = context?.locations || []
-  const [activeId, setActiveId] = useState(locations[0]?.id || null)
+  const activeId = locationId || locations[0]?.id || null
   const [tab, setTab] = useState('online')
   const [settings, setSettings] = useState(null)
   const [tables, setTables] = useState([])
@@ -1288,7 +1290,7 @@ export default function QrChannels({ context }) {
       <>
         <section className="page-heading compact-heading">
           <p className="eyebrow">{context.organization?.name}</p>
-          <h1>QR menu</h1>
+          <h1>QR Menu &amp; Online</h1>
         </section>
         <p className="empty-state">No locations are linked to this account.</p>
       </>
@@ -1299,26 +1301,9 @@ export default function QrChannels({ context }) {
     <>
       <section className="page-heading compact-heading">
         <p className="eyebrow">{context.organization?.name}</p>
-        <h1>QR menu</h1>
+        <h1>QR Menu &amp; Online</h1>
         <p>The pages your guests open by scanning a code — ordering and table booking.</p>
       </section>
-
-      {locations.length > 1 && (
-        <div className="location-tabs" role="tablist" aria-label="Location">
-          {locations.map((loc) => (
-            <button
-              key={loc.id}
-              type="button"
-              role="tab"
-              aria-selected={loc.id === activeId}
-              className={loc.id === activeId ? 'is-active' : ''}
-              onClick={() => setActiveId(loc.id)}
-            >
-              <Store /> {loc.name}
-            </button>
-          ))}
-        </div>
-      )}
 
       <div className="menu-tabs location-tabs" role="tablist" aria-label="Channel">
         {TABS.map((item) => (

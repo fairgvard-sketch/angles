@@ -10,6 +10,7 @@ import {
   createStation, updateStation, deleteStation,
 } from './menu'
 import ItemEditor from './ItemEditor'
+import { hasCapability } from './navigation'
 
 /**
  * Меню в бэкофисе — паритет с POS: товары (создание/правка/удаление, варианты,
@@ -67,11 +68,13 @@ function CollapsibleHead({ collapsed, onToggle, title, subtitle, action }) {
 }
 
 // ── Вкладка «Товары» ─────────────────────────────────────────
-function ItemsTab({ context, data, reload }) {
+function ItemsTab({ context, locationId, data, reload }) {
   const [editorItem, setEditorItem] = useState(null) // {} = новый, {id...} = правка
   const [addingCat, setAddingCat] = useState(false)
   const [catName, setCatName] = useState('')
-  const [catLoc, setCatLoc] = useState(context.locations?.[0]?.id || '')
+  // Каталог общий, но новая категория принадлежит точке: по умолчанию —
+  // та, с которой владелец работает в кабинете.
+  const [catLoc, setCatLoc] = useState(locationId || context.locations?.[0]?.id || '')
   const [error, setError] = useState('')
 
   const byCat = useMemo(() => {
@@ -118,7 +121,11 @@ function ItemsTab({ context, data, reload }) {
           <div className="inline-add">
             <input placeholder="Category name" value={catName} onChange={(e) => setCatName(e.target.value)} autoFocus />
             {context.locations?.length > 1 && (
-              <select value={catLoc} onChange={(e) => setCatLoc(e.target.value)}>
+              <select
+                value={catLoc}
+                aria-label="Location for the new category"
+                onChange={(e) => setCatLoc(e.target.value)}
+              >
                 {context.locations.map((l) => <option key={l.id} value={l.id}>{l.name}</option>)}
               </select>
             )}
@@ -328,7 +335,7 @@ function StationsTab({ context, data, reload }) {
   )
 }
 
-export default function MenuManager({ context }) {
+export default function MenuManager({ context, locationId }) {
   const [tab, setTab] = useState('items')
   const [data, setData] = useState(null)
   const [loading, setLoading] = useState(true)
@@ -355,8 +362,14 @@ export default function MenuManager({ context }) {
     <>
       <section className="page-heading compact-heading">
         <p className="eyebrow">{context.organization?.name}</p>
-        <h1>Menu & catalogue</h1>
-        <p>Everything the register sells. Changes apply immediately.</p>
+        <h1>Catalogue</h1>
+        {/* Menu-only клиенту нельзя говорить про кассу: у него её нет,
+            и каталог для него — то, что видит гость. */}
+        <p>
+          {hasCapability(context, 'pos_operate')
+            ? 'Everything your registers and guest pages sell. Changes apply immediately.'
+            : 'Everything your guest pages show. Changes apply immediately.'}
+        </p>
       </section>
 
       <div className="period-switch menu-tabs" role="tablist" aria-label="Menu section">
@@ -374,7 +387,7 @@ export default function MenuManager({ context }) {
         <p className="empty-state">Loading…</p>
       ) : (
         <>
-          {tab === 'items' && <ItemsTab context={context} data={data} reload={reload} />}
+          {tab === 'items' && <ItemsTab context={context} locationId={locationId} data={data} reload={reload} />}
           {tab === 'modifiers' && <ModifiersTab context={context} data={data} reload={reload} />}
           {tab === 'stations' && <StationsTab context={context} data={data} reload={reload} />}
         </>

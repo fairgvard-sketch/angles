@@ -75,9 +75,7 @@ function OrderCard({ order, standalone, busyAction, onAction }) {
   )
 }
 
-export default function OrdersInbox({ context }) {
-  const locations = context.locations || []
-  const [locationId, setLocationId] = useState(locations[0]?.id || '')
+export default function OrdersInbox({ context, locationId }) {
   const [settings, setSettings] = useState(null)
   const [orders, setOrders] = useState(null)
   const [error, setError] = useState('')
@@ -173,16 +171,6 @@ export default function OrdersInbox({ context }) {
             : 'Online orders for this location are handled on the register; this list is read-only.'}
         </p>
       </section>
-
-      {locations.length > 1 && (
-        <div className="qr-field location-picker">
-          <select value={locationId} onChange={(event) => setLocationId(event.target.value)}>
-            {locations.map((location) => (
-              <option key={location.id} value={location.id}>{location.name}</option>
-            ))}
-          </select>
-        </div>
-      )}
 
       {error && <p className="form-error" role="alert">{error}</p>}
 

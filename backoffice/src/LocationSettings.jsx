@@ -1,10 +1,11 @@
 import { useEffect, useState } from 'react'
-import { Check, Download, Store } from 'lucide-react'
+import { Check, Download } from 'lucide-react'
 import {
   fetchLocation, patchLocationSettings, updateLocationConfig, runUfExport,
 } from './settings'
 import { fetchCategories, updateCategory } from './menu'
 import { agorotToInput, inputToAgorot } from './online'
+import { hasCapability } from './navigation'
 
 /**
  * Настройки точки в бэкофисе — теперь единственное место, где правится
@@ -71,9 +72,9 @@ function shekels(agorot) {
   return `₪${(agorot / 100).toLocaleString('he-IL', { minimumFractionDigits: 2 })}`
 }
 
-export default function LocationSettings({ context }) {
+export default function LocationSettings({ context, locationId }) {
   const locations = context?.locations || []
-  const [activeId, setActiveId] = useState(locations[0]?.id || null)
+  const activeId = locationId || locations[0]?.id || null
   const [tab, setTab] = useState('general')
   const [location, setLocation] = useState(null)
   const [loading, setLoading] = useState(false)
@@ -108,25 +109,12 @@ export default function LocationSettings({ context }) {
       <section className="page-heading compact-heading">
         <p className="eyebrow">{context.organization?.name}</p>
         <h1>Locations</h1>
-        <p>Business details, taxes, loyalty and register defaults — shared with every connected register.</p>
+        <p>
+          {hasCapability(context, 'pos_operate')
+            ? 'Business details, taxes, loyalty and register defaults — shared with every connected register.'
+            : 'Business details, taxes and the address guests see on your public pages.'}
+        </p>
       </section>
-
-      {locations.length > 1 && (
-        <div className="location-tabs" role="tablist" aria-label="Location">
-          {locations.map((loc) => (
-            <button
-              key={loc.id}
-              type="button"
-              role="tab"
-              aria-selected={loc.id === activeId}
-              className={loc.id === activeId ? 'is-active' : ''}
-              onClick={() => setActiveId(loc.id)}
-            >
-              <Store /> {loc.name}
-            </button>
-          ))}
-        </div>
-      )}
 
       <div className="location-tabs settings-topic-tabs" role="tablist" aria-label="Settings topic">
         {TABS.map((t) => (

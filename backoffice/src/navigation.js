@@ -11,25 +11,54 @@
  */
 
 /**
+ * Группы навигации (Phase 2). Плоский список из тринадцати пунктов не
+ * отвечал на вопрос «где искать»: работа смены, аналитика и настройка
+ * лежали вперемешку. Группы называются глаголом владельца, а не
+ * внутренним модулем.
+ *
+ * Account и Help живут в меню аккаунта (аватар), а не в списке разделов:
+ * их ищут у своего имени, а не среди операционных экранов.
+ */
+export const NAV_GROUPS = [
+  { id: 'work', label: 'Work' },
+  { id: 'insights', label: 'Insights' },
+  { id: 'manage', label: 'Manage' },
+  { id: 'channels', label: 'Channels' },
+  { id: 'system', label: 'System' },
+]
+
+/**
  * `planned: true` — раздела ещё нет. Такой пункт виден только в
  * developer-аккаунте и открывает честное «в планах»: обычный клиент не
  * должен находить в меню обещание, за которым ничего не стоит.
+ *
+ * `scoped: true` — раздел работает с ОДНОЙ точкой: для него в шапке
+ * показывается выбранная точка, иначе владелец сети не понимает, чьи
+ * это цифры.
  */
 export const NAV_ITEMS = [
-  { id: 'overview', label: 'Home' },
-  { id: 'orders', label: 'Orders' },
-  { id: 'reservations', label: 'Reservations' },
-  { id: 'sales', label: 'Overview' },
-  { id: 'activity', label: 'Activity' },
-  { id: 'locations', label: 'Locations' },
-  { id: 'menu', label: 'Menu & catalogue' },
-  { id: 'team', label: 'Team' },
-  { id: 'guests', label: 'Customers' },
-  { id: 'online', label: 'QR menu' },
-  { id: 'devices', label: 'Devices' },
-  { id: 'reports', label: 'Reports', planned: true },
-  { id: 'integrations', label: 'Integrations', planned: true },
+  { id: 'overview', label: 'Dashboard', group: null },
+  { id: 'orders', label: 'Orders', group: 'work', scoped: true },
+  { id: 'reservations', label: 'Reservations', group: 'work', scoped: true },
+  { id: 'sales', label: 'Sales', group: 'insights' },
+  { id: 'activity', label: 'Activity', group: 'insights' },
+  { id: 'guests', label: 'Customers', group: 'insights' },
+  { id: 'reports', label: 'Reports', group: 'insights', planned: true },
+  // Каталог организационный: товары общие для точек, точка нужна только
+  // как значение по умолчанию для новой категории — переключатель в шапке
+  // обещал бы фильтрацию, которой нет.
+  { id: 'menu', label: 'Catalogue', group: 'manage' },
+  { id: 'locations', label: 'Locations', group: 'manage', scoped: true },
+  { id: 'team', label: 'Team', group: 'manage' },
+  { id: 'online', label: 'QR Menu & Online', group: 'channels', scoped: true },
+  { id: 'integrations', label: 'Integrations', group: 'channels', planned: true },
+  { id: 'devices', label: 'Devices', group: 'system' },
 ]
+
+/** Раздел работает с одной точкой — её надо показывать и переключать */
+export function isLocationScoped(view) {
+  return NAV_ITEMS.some((item) => item.id === view && item.scoped)
+}
 
 export function isDeveloperAccount(context) {
   return context?.account_type === 'developer'
@@ -92,6 +121,23 @@ export function visibleNavigation(context) {
     // activity/team/devices/guests — POS-контур
     return can('pos_operate')
   })
+}
+
+/**
+ * Разделы, разложенные по группам. Пустая группа не рендерится: заголовок
+ * без пунктов — это обещание раздела, которого у аккаунта нет.
+ */
+export function groupedNavigation(context) {
+  const items = visibleNavigation(context)
+  return {
+    primary: items.filter((item) => !item.group),
+    groups: NAV_GROUPS
+      .map((group) => ({
+        ...group,
+        items: items.filter((item) => item.group === group.id),
+      }))
+      .filter((group) => group.items.length > 0),
+  }
 }
 
 /**

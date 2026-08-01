@@ -31,7 +31,7 @@ const VIEWS = [
   { key: 'timeline', label: 'Timeline' },
   { key: 'list', label: 'List' },
   { key: 'waitlist', label: 'Waitlist' },
-  { key: 'floor', label: 'Floor plan' },
+  { key: 'floor', label: 'Tables & zones' },
   { key: 'analytics', label: 'Analytics' },
 ]
 
@@ -82,15 +82,15 @@ function ReservationCard({ reservation, busyAction, onAction }) {
   )
 }
 
-export default function ReservationsDesk({ context }) {
-  const locations = context.locations || []
-  const [locationId, setLocationId] = useState(locations[0]?.id || '')
+export default function ReservationsDesk({ context, locationId, tab, onTabChange }) {
   const [data, setData] = useState(null)
   const [error, setError] = useState('')
   const [busy, setBusy] = useState(null) // { id, to }
   // Таймлайн — вид по умолчанию: владелец открывает раздел, чтобы увидеть
-  // зал. Списки заявок остаются вторым видом, а не удаляются.
-  const [view, setView] = useState('timeline')
+  // зал. Вкладка живёт в адресе (Phase 2): ссылку на лист ожидания можно
+  // прислать, а Назад возвращает на предыдущую.
+  const view = VIEWS.some((v) => v.key === tab) ? tab : 'timeline'
+  const setView = (key) => onTabChange?.(key === 'timeline' ? null : key)
   // Слаг нужен только ссылке предпросмотра (126); отсутствие не мешает —
   // длинная ссылка с id точки работает так же.
   const [slug, setSlug] = useState(null)
@@ -175,18 +175,6 @@ export default function ReservationsDesk({ context }) {
         <p>Booking requests and today’s visits — confirm, complete or mark no-shows.</p>
       </section>
 
-      {/* У аналитики свой выбор точек — сразу нескольких. Два разных
-          переключателя точки на одном экране спорили бы друг с другом. */}
-      {locations.length > 1 && view !== 'analytics' && (
-        <div className="qr-field location-picker">
-          <select value={locationId} onChange={(event) => setLocationId(event.target.value)}>
-            {locations.map((location) => (
-              <option key={location.id} value={location.id}>{location.name}</option>
-            ))}
-          </select>
-        </div>
-      )}
-
       <div className="timeline-zones" style={{ marginBottom: 16 }}>
         {VIEWS.map(({ key, label }) => (
           <button
@@ -216,7 +204,9 @@ export default function ReservationsDesk({ context }) {
       {view === 'timeline' && locationId && <TimelineDesk locationId={locationId} />}
       {view === 'waitlist' && locationId && <WaitlistPanel locationId={locationId} />}
       {view === 'floor' && locationId && <FloorPlanEditor locationId={locationId} />}
-      {view === 'analytics' && <ReserveAnalytics locations={locations} />}
+      {/* Аналитика намеренно смотрит на всю организацию: сравнение точек
+          и есть её смысл, поэтому выбранная точка тут не сужает данные. */}
+      {view === 'analytics' && <ReserveAnalytics locations={context.locations || []} />}
 
       {view === 'list' && (
       <section className="panel form-panel">
