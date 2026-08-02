@@ -334,6 +334,38 @@ before(async () => {
     )
   `, { stubSupabase: true })
 
+  await bundle('drawer', `
+    import { useState } from 'react'
+    import { createRoot } from 'react-dom/client'
+    import Drawer from './ui/Drawer'
+    import { Button } from './ui/Button'
+
+    function Page() {
+      const [open, setOpen] = useState(false)
+      return (
+        <main className="content">
+          <button id="opener" className="secondary-button" onClick={() => setOpen(true)}>
+            Open the visit
+          </button>
+          <button id="behind" className="secondary-button">behind the drawer</button>
+          <div className="tall">page content</div>
+          {open && (
+            <Drawer
+              title="Мири Леви"
+              subtitle="Sun 2 Aug 19:00 · 2 guests"
+              onClose={() => setOpen(false)}
+              footer={<Button onClick={() => setOpen(false)}>Close</Button>}
+            >
+              <input id="field-a" aria-label="Guest name" />
+              <input id="field-b" aria-label="Phone" />
+            </Drawer>
+          )}
+        </main>
+      )
+    }
+    createRoot(document.getElementById('root')).render(<Page />)
+  `)
+
   await bundle('preview', `
     import { createRoot } from 'react-dom/client'
     import { GuestPreview } from './QrChannels'
@@ -479,6 +511,69 @@ describe('dashboard', { skip }, () => {
     assert.match(state.sales, /—/, 'упавший показатель честно пуст, а не нулевой')
     assert.match(state.partial, /could not be loaded/, 'отказ назван, а не спрятан')
     assert.ok(state.attention > 0, 'список внимания продолжает работать')
+    await page.close()
+  })
+})
+
+describe('боковая панель', { skip }, () => {
+  /**
+   * Панель деталей должна вести себя как диалог: Escape закрывает, Tab
+   * не уводит на фон, фокус возвращается туда, откуда открыли. Ни один
+   * из самодельных листов кабинета этого не делал.
+   */
+  const openDrawer = async () => {
+    const page = await browser.newPage()
+    await page.setViewport({ width: 1440, height: 900 })
+    await page.goto(`${appOrigin}/drawer`, { waitUntil: 'networkidle0' })
+    await page.click('#opener')
+    await page.waitForSelector('.drawer')
+    return page
+  }
+
+  it('объявляется диалогом и забирает фокус себе', async () => {
+    const page = await openDrawer()
+    const state = await page.evaluate(() => {
+      const drawer = document.querySelector('.drawer')
+      return {
+        role: drawer.getAttribute('role'),
+        modal: drawer.getAttribute('aria-modal'),
+        named: document.getElementById(drawer.getAttribute('aria-labelledby'))?.textContent,
+        active: document.activeElement === drawer,
+      }
+    })
+    assert.equal(state.role, 'dialog')
+    assert.equal(state.modal, 'true')
+    assert.match(state.named, /Мири Леви/)
+    assert.ok(state.active, 'фокус должен войти в панель')
+    await page.close()
+  })
+
+  it('Tab не выходит за панель', async () => {
+    const page = await openDrawer()
+    const seen = []
+    for (let i = 0; i < 6; i++) {
+      await page.keyboard.press('Tab')
+      seen.push(await page.evaluate(() => {
+        const el = document.activeElement
+        return { id: el.id || el.getAttribute('aria-label') || el.tagName, inside: Boolean(el.closest('.drawer')) }
+      }))
+    }
+    assert.ok(seen.every((s) => s.inside), `фокус ушёл наружу: ${JSON.stringify(seen)}`)
+    await page.close()
+  })
+
+  it('Escape закрывает и возвращает фокус на кнопку', async () => {
+    const page = await openDrawer()
+    await page.keyboard.press('Escape')
+    await new Promise((resolve) => setTimeout(resolve, 200))
+    const after = await page.evaluate(() => ({
+      open: Boolean(document.querySelector('.drawer')),
+      active: document.activeElement?.id,
+      scrollLocked: document.body.style.overflow === 'hidden',
+    }))
+    assert.equal(after.open, false)
+    assert.equal(after.active, 'opener')
+    assert.equal(after.scrollLocked, false)
     await page.close()
   })
 })

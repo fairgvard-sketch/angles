@@ -12,6 +12,7 @@ import FloorPlanEditor from './FloorPlanEditor'
 import ReserveAnalytics from './ReserveAnalytics'
 import LaunchChecklist from './LaunchChecklist'
 import BookingForm from './BookingForm'
+import Tabs from './ui/Tabs'
 import { fetchLocationSlug, fetchLocation } from './settings'
 import { fetchTimelineTables } from './reservations'
 import { PageHeader } from './ui/Layout'
@@ -214,20 +215,13 @@ export default function ReservationsDesk({ context, locationId, tab, onTabChange
 
       {/* Пять вкладок на 390px переносились в две строки, и активная
           терялась. Полоса прокручивается, активная всегда видна. */}
-      <div className="desk-tabs" role="tablist" aria-label="Reservations view">
-        {VIEWS.map(({ key, label }) => (
-          <button
-            key={key}
-            type="button"
-            role="tab"
-            aria-selected={view === key}
-            className={view === key ? 'is-active' : ''}
-            onClick={() => setView(key)}
-          >
-            {label}
-          </button>
-        ))}
-      </div>
+      <Tabs
+        className="desk-tabs"
+        label="Reservations view"
+        items={VIEWS}
+        value={view}
+        onChange={setView}
+      />
 
       {error && <p className="form-error" role="alert">{error}</p>}
 
@@ -246,6 +240,9 @@ export default function ReservationsDesk({ context, locationId, tab, onTabChange
         <BookingForm
           locationId={locationId}
           tables={tables}
+          /* Подсказки при конфликте считаются из того же списка визитов,
+             который уже показан на экране */
+          bookings={data?.active ?? []}
           tz={tz}
           mode={creating}
           onClose={() => setCreating(null)}

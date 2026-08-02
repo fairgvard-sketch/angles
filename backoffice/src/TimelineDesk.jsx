@@ -10,6 +10,8 @@ import {
   updateReservation, updateReservationGuest, toLocalInput, fromLocalInput,
 } from './reservations'
 import { supabase } from './supabase'
+import Drawer from './ui/Drawer'
+import { Button } from './ui/Button'
 
 /**
  * Таймлайн хостес в кабинете (Kassa 119/120): столы по вертикали, время
@@ -468,23 +470,27 @@ function BookingSheet({
     })
   }
 
+  const when = new Date(reservation.reserved_at).toLocaleString([], {
+    weekday: 'short', day: 'numeric', month: 'short',
+    hour: '2-digit', minute: '2-digit',
+  })
+  const state = STATE_LABEL[blockState(reservation.status, reservation.arrived_at, reservation.order_id)]
+
   return (
-    <div className="sheet-backdrop" onClick={onClose} role="presentation">
-      <div className="sheet" onClick={(e) => e.stopPropagation()} role="dialog" aria-modal="true">
-        <h3>
+    <Drawer
+      labelledBy="booking-sheet-title"
+      title={(
+        <>
           {reservation.customer_name}
           {/* Тестовая бронь (126): стол она держит настоящий, поэтому
               метка обязана быть видна там, где хостес принимает решение. */}
           {reservation.is_test && <span className="guest-fav is-warn"> Test</span>}
-        </h3>
-        <p className="sheet-sub">
-          {new Date(reservation.reserved_at).toLocaleString([], {
-            weekday: 'short', day: 'numeric', month: 'short',
-            hour: '2-digit', minute: '2-digit',
-          })}
-          {' · '}{reservation.party_size} guests
-          {' · '}{STATE_LABEL[blockState(reservation.status, reservation.arrived_at, reservation.order_id)]}
-        </p>
+        </>
+      )}
+      subtitle={`${when} · ${reservation.party_size} guests · ${state}`}
+      onClose={onClose}
+      footer={<Button onClick={onClose}>Close</Button>}
+    >
         {reservation.customer_phone && (
           <p className="sheet-sub"><a href={`tel:${reservation.customer_phone}`}>{reservation.customer_phone}</a></p>
         )}
@@ -607,8 +613,6 @@ function BookingSheet({
           </>
         )}
 
-        <button type="button" className="secondary-button" onClick={onClose}>Close</button>
-      </div>
-    </div>
+    </Drawer>
   )
 }

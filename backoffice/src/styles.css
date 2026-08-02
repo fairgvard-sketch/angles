@@ -1448,6 +1448,63 @@ a { color: inherit; }
 }
 
 /* Лист карточки визита */
+/*
+ * ── Боковая панель ───────────────────────────────────────────
+ *
+ * Детали и правка открываются сбоку, а не по центру: список и сетка
+ * зала остаются видимыми, и решение принимается рядом с ними. На
+ * телефоне ширины для этого нет — там панель занимает почти весь экран
+ * снизу, как обычный лист.
+ */
+.drawer-backdrop {
+  position: fixed; inset: 0; z-index: 50; background: rgb(0 0 0 / 32%);
+  display: flex; justify-content: flex-end;
+}
+.drawer {
+  width: min(440px, 100%); height: 100%; display: flex; flex-direction: column;
+  background: var(--c-surface); border-inline-start: 1px solid var(--c-border-panel);
+  box-shadow: var(--shadow-pop); outline: none;
+  animation: drawer-in .18s ease-out;
+}
+.drawer-head {
+  display: flex; align-items: flex-start; justify-content: space-between; gap: var(--sp-3);
+  padding: var(--sp-4) var(--sp-4) var(--sp-3);
+  border-bottom: 1px solid var(--c-border-soft);
+}
+.drawer-head h3 { margin: 0; font-size: 18px; }
+.drawer-sub { margin: var(--sp-1) 0 0; color: var(--c-text-muted); font-size: 13px; }
+.drawer-body {
+  flex: 1 1 auto; min-height: 0; overflow-y: auto; overscroll-behavior: contain;
+  padding: var(--sp-4); display: flex; flex-direction: column; gap: var(--sp-3);
+}
+.drawer-foot {
+  flex: none; display: flex; flex-wrap: wrap; justify-content: flex-end; gap: var(--sp-2);
+  padding: var(--sp-3) var(--sp-4);
+  border-top: 1px solid var(--c-border-soft); background: var(--c-surface);
+}
+@keyframes drawer-in { from { transform: translateX(16px); opacity: .6; } to { transform: none; opacity: 1; } }
+@media (prefers-reduced-motion: reduce) {
+  .drawer { animation: none; }
+}
+@media (max-width: 640px) {
+  .drawer-backdrop { align-items: flex-end; }
+  .drawer {
+    width: 100%; height: auto; max-height: 92svh;
+    border-inline-start: 0; border-radius: 16px 16px 0 0;
+    animation-name: sheet-up;
+  }
+}
+
+/* Ошибка конкретного поля — под ним, а не общим списком внизу формы */
+.field-error { color: var(--c-danger); font-size: 12px; font-weight: 650; }
+.qr-field input[aria-invalid="true"] { border-color: var(--c-danger); }
+.drawer-form { display: flex; flex-direction: column; gap: var(--sp-3); }
+
+/* Подсказки после отказа сервера: свободные столы и ближайшее время */
+.conflict-hint { display: grid; gap: var(--sp-2); }
+.conflict-hint .form-hint { margin: 0; }
+.conflict-options { display: flex; flex-wrap: wrap; gap: var(--sp-2); }
+
 .sheet-backdrop {
   position: fixed; inset: 0; z-index: 50; background: rgb(0 0 0 / 40%);
   display: flex; align-items: flex-end; justify-content: center;
