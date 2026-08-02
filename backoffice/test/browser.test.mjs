@@ -120,6 +120,10 @@ const SUPABASE_STUB = `
       if (name === 'sales_report' && window.__BREAK_SALES__) {
         return { data: null, error: { message: 'sales are unavailable' } }
       }
+      // Сервер отказывает по занятости — форма обязана предложить выход
+      if (name === 'create_reservation_web') {
+        return { data: null, error: { message: 'table_busy' } }
+      }
       return { data: RPC[name] ? RPC[name]() : null, error: null }
     },
     from: (table) => {
@@ -366,6 +370,34 @@ before(async () => {
     createRoot(document.getElementById('root')).render(<Page />)
   `)
 
+  await bundle('booking-conflict', `
+    import { createRoot } from 'react-dom/client'
+    import BookingForm from './BookingForm'
+
+    const tables = [
+      { id: 't1', label: '1', seats: 2, blocked: false, zoneId: 'z1', zoneName: 'Зал' },
+      { id: 't2', label: '2', seats: 4, blocked: false, zoneId: 'z1', zoneName: 'Зал' },
+    ]
+    // Стол 1 занят на 19:00, стол 2 свободен — значит вариант есть
+    const bookings = [{
+      id: 'b1', status: 'confirmed', table_id: 't1', duration_min: 90,
+      reserved_at: new Date(new Date().setHours(19, 0, 0, 0)).toISOString(),
+    }]
+    createRoot(document.getElementById('root')).render(
+      <main className="content">
+        <BookingForm
+          locationId="loc-1"
+          tables={tables}
+          bookings={bookings}
+          tz="Asia/Jerusalem"
+          mode="booking"
+          onClose={() => {}}
+          onCreated={() => {}}
+        />
+      </main>
+    )
+  `, { stubSupabase: true })
+
   await bundle('preview', `
     import { createRoot } from 'react-dom/client'
     import { GuestPreview } from './QrChannels'
@@ -511,6 +543,73 @@ describe('dashboard', { skip }, () => {
     assert.match(state.sales, /—/, 'упавший показатель честно пуст, а не нулевой')
     assert.match(state.partial, /could not be loaded/, 'отказ назван, а не спрятан')
     assert.ok(state.attention > 0, 'список внимания продолжает работать')
+    await page.close()
+  })
+})
+
+describe('конфликт брони', { skip }, () => {
+  /**
+   * Приёмка Phase 4 нашла ровно это: после выбора свободного стола или
+   * времени сообщение «That table is taken…» оставалось на экране и
+   * противоречило тому, что в форме уже выбрано другое.
+   */
+  const openForm = async () => {
+    const page = await browser.newPage()
+    await page.setViewport({ width: 1440, height: 900 })
+    await page.goto(`${appOrigin}/booking-conflict`, { waitUntil: 'networkidle0' })
+    await page.waitForSelector('.drawer')
+    await page.type('input[required]', 'Мири')
+    await page.evaluate(() => {
+      document.querySelector('button[type="submit"]').click()
+    })
+    await page.waitForSelector('.conflict-hint')
+    return page
+  }
+
+  it('отказ сервера объясняется вариантами', async () => {
+    const page = await openForm()
+    const state = await page.evaluate(() => ({
+      error: document.querySelector('.form-error')?.textContent ?? null,
+      options: [...document.querySelectorAll('.conflict-options button')].map((b) => b.textContent),
+      // Введённое не должно потеряться
+      name: document.querySelector('input[required]').value,
+    }))
+    assert.match(state.error, /taken|free table/i)
+    assert.ok(state.options.length > 0, 'должен быть хотя бы один вариант')
+    assert.equal(state.name, 'Мири')
+    await page.close()
+  })
+
+  it('выбор варианта убирает устаревшее сообщение', async () => {
+    const page = await openForm()
+    await page.evaluate(() => {
+      document.querySelector('.conflict-options button').click()
+    })
+    await new Promise((resolve) => setTimeout(resolve, 200))
+    const after = await page.evaluate(() => ({
+      error: document.querySelector('.form-error')?.textContent ?? null,
+      hint: document.querySelector('.conflict-hint'),
+      name: document.querySelector('input[required]').value,
+    }))
+    assert.equal(after.error, null, 'сообщение про занятый стол обязано исчезнуть')
+    assert.equal(after.hint, null)
+    assert.equal(after.name, 'Мири', 'введённое остаётся')
+    await page.close()
+  })
+
+  it('правка времени тоже снимает старый отказ', async () => {
+    const page = await openForm()
+    await page.evaluate(() => {
+      const input = document.querySelector('input[type="datetime-local"]')
+      const setter = Object.getOwnPropertyDescriptor(window.HTMLInputElement.prototype, 'value').set
+      setter.call(input, '2026-08-03T20:30')
+      input.dispatchEvent(new Event('input', { bubbles: true }))
+    })
+    await new Promise((resolve) => setTimeout(resolve, 200))
+    assert.equal(
+      await page.evaluate(() => document.querySelector('.form-error')?.textContent ?? null),
+      null,
+    )
     await page.close()
   })
 })

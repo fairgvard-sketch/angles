@@ -13,6 +13,7 @@ import ReserveAnalytics from './ReserveAnalytics'
 import LaunchChecklist from './LaunchChecklist'
 import BookingForm from './BookingForm'
 import Tabs from './ui/Tabs'
+import ConfirmDialog from './ui/ConfirmDialog'
 import { fetchLocationSlug, fetchLocation } from './settings'
 import { fetchTimelineTables } from './reservations'
 import { PageHeader } from './ui/Layout'
@@ -100,6 +101,8 @@ export default function ReservationsDesk({ context, locationId, tab, onTabChange
   const [slug, setSlug] = useState(null)
   // Ручная бронь / walk-in (127): 'booking' | 'walk-in' | null
   const [creating, setCreating] = useState(null)
+  // Спрашиваем причину отказа/отмены: { reservation, to }
+  const [asking, setAsking] = useState(null)
   const [tables, setTables] = useState([])
   const [tz, setTz] = useState('Asia/Jerusalem')
   const knownIds = useRef(new Set())
@@ -160,14 +163,22 @@ export default function ReservationsDesk({ context, locationId, tab, onTabChange
     }
   }, [locationId, refresh])
 
-  async function act(reservation, to) {
+  /**
+   * Отказ и отмена спрашивают причину — её видит гость.
+   *
+   * Раньше это был `window.prompt`: он не поддерживается в части
+   * браузеров («prompt() is not supported»), и тогда причина молча
+   * терялась. Теперь это диалог кабинета с полем, Escape и фокусом.
+   */
+  async function act(reservation, to, reason = null) {
+    if ((to === 'rejected' || to === 'cancelled') && !asking) {
+      setAsking({ reservation, to })
+      return
+    }
     setBusy({ id: reservation.id, to })
     try {
-      // Пустая причина допустима; отмена диалога не отменяет действие.
-      const reason = (to === 'rejected' || to === 'cancelled')
-        ? (window.prompt('Reason (shown to the guest, optional):') || null)
-        : null
       await setReservationStatus(locationId, reservation.id, to, reason)
+      setAsking(null)
       await refresh()
     } catch (e) {
       setError(e.message === 'pos_mode'
@@ -247,6 +258,23 @@ export default function ReservationsDesk({ context, locationId, tab, onTabChange
           mode={creating}
           onClose={() => setCreating(null)}
           onCreated={() => { setCreating(null); refresh() }}
+        />
+      )}
+
+      {asking && (
+        <ConfirmDialog
+          title={asking.to === 'rejected' ? 'Reject this booking?' : 'Cancel this booking?'}
+          description={`${asking.reservation.customer_name || 'Guest'} · ${
+            new Date(asking.reservation.reserved_at).toLocaleString([], {
+              day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit',
+            })} · ${asking.reservation.party_size} guests. The table is freed immediately.`}
+          confirmLabel={asking.to === 'rejected' ? 'Reject booking' : 'Cancel booking'}
+          cancelLabel="Keep the booking"
+          tone="danger"
+          reason={{ label: 'Reason for the guest', placeholder: 'Fully booked, closed for a private event…' }}
+          busy={Boolean(busy)}
+          onCancel={() => setAsking(null)}
+          onConfirm={(text) => act(asking.reservation, asking.to, text)}
         />
       )}
 

@@ -34,6 +34,16 @@ export default function BookingForm({
   // Отказ по занятости — единственный случай, когда есть что предложить
   const [conflict, setConflict] = useState(null)
 
+  /*
+   * Сообщение сервера живёт ровно до того, как хостес изменил то, из-за
+   * чего оно появилось. «That table is taken…» рядом с уже выбранным
+   * другим столом — это ложь про текущее состояние формы.
+   */
+  function clearConflict() {
+    setError('')
+    setConflict(null)
+  }
+
   const tableGroups = useMemo(() => {
     const groups = new Map()
     for (const table of tables.filter((item) => !item.blocked)) {
@@ -156,13 +166,18 @@ export default function BookingForm({
               min={1}
               max={50}
               value={party}
-              onChange={(e) => setParty(e.target.value)}
+              onChange={(e) => { setParty(e.target.value); clearConflict() }}
             />
           </label>
           {!walkIn && (
             <label className="qr-field">
               <span>Date and time</span>
-              <input type="datetime-local" value={at} onChange={(e) => setAt(e.target.value)} required />
+              <input
+              type="datetime-local"
+              value={at}
+              onChange={(e) => { setAt(e.target.value); clearConflict() }}
+              required
+            />
             </label>
           )}
         </div>
@@ -182,7 +197,7 @@ export default function BookingForm({
             type="button"
             className={`table-choice table-choice-auto${picked.length === 0 ? ' is-active' : ''}`}
             aria-pressed={picked.length === 0}
-            onClick={() => setPicked([])}
+            onClick={() => { setPicked([]); clearConflict() }}
           >
             <strong>Automatic</strong>
             <small>Best available table</small>
@@ -198,11 +213,14 @@ export default function BookingForm({
                       type="button"
                       className={`table-choice${picked.includes(table.id) ? ' is-active' : ''}`}
                       aria-pressed={picked.includes(table.id)}
-                      onClick={() => setPicked((cur) => (
-                        cur.includes(table.id)
-                          ? cur.filter((id) => id !== table.id)
-                          : [...cur, table.id]
-                      ))}
+                      onClick={() => {
+                        setPicked((cur) => (
+                          cur.includes(table.id)
+                            ? cur.filter((id) => id !== table.id)
+                            : [...cur, table.id]
+                        ))
+                        clearConflict()
+                      }}
                     >
                       <strong>{table.label}</strong>
                       <small>{table.seats} seats</small>
@@ -227,7 +245,7 @@ export default function BookingForm({
                   {conflict.tables.slice(0, 6).map((table) => (
                     <Button
                       key={table.id}
-                      onClick={() => { setPicked([table.id]); setConflict(null) }}
+                      onClick={() => { setPicked([table.id]); clearConflict() }}
                     >
                       {table.label} · {table.seats} seats
                     </Button>
@@ -245,7 +263,7 @@ export default function BookingForm({
                       onClick={() => {
                         setAt(toLocalInput(slot.at, tz))
                         setPicked([])
-                        setConflict(null)
+                        clearConflict()
                       }}
                     >
                       {hhmm(slot.at)}
