@@ -14,11 +14,13 @@ import {
   bulkUpdateItems, bulkErrorText, reorderItems,
 } from './menu'
 import {
-  GAP_LABELS, bulkPreview, changedCount, filterItems, itemGaps, moveInOrder,
+  GAP_LABELS, bulkOutcome, bulkPreview, changedCount, filterItems, itemGaps, moveInOrder,
+  undoPlan,
 } from './catalog'
 import ItemEditor from './ItemEditor'
 import { hasCapability } from './navigation'
 import Tabs from './ui/Tabs'
+import { Button, IconButton } from './ui/Button'
 import { PageHeader } from './ui/Layout'
 
 /**
@@ -140,6 +142,45 @@ function ItemRow({ item, index, total, selecting, selected, onToggleSelect, onOp
 }
 
 /**
+ * Строка компактного списка: то, по чему работают, а не любуются —
+ * название, артикул, категория, пробелы и цена в одной строке.
+ *
+ * Стрелок порядка здесь нет намеренно: порядок существует ВНУТРИ
+ * категории, и менять его имеет смысл там, где категории видны, — в
+ * режиме «By category».
+ */
+function CatalogRow({ item, categoryName, selecting, selected, onToggleSelect, onOpen }) {
+  const gaps = itemGaps(item)
+  const label = `${item.name}, ${money(item.price)}${item.is_available ? '' : ', hidden'}`
+  return (
+    <div className={`menu-row-wrap catalog-row${selected ? ' is-selected' : ''}`}>
+      {selecting && (
+        <label className="menu-select">
+          <input type="checkbox" checked={selected} onChange={onToggleSelect} />
+          <span className="visually-hidden">Select {item.name}</span>
+        </label>
+      )}
+      <button
+        className={`menu-row as-button ${item.is_available ? '' : 'is-off'}`}
+        aria-label={`Edit ${label}`}
+        onClick={onOpen}
+      >
+        <span className="menu-name">
+          {item.name}
+          {item.sku && <small className="menu-sku"> · {item.sku}</small>}
+          {!item.is_available && <small> · hidden</small>}
+          {gaps.length > 0 && (
+            <small className="menu-gap"> · {gaps.map((g) => GAP_LABELS[g]).join(', ')}</small>
+          )}
+        </span>
+        <span className="catalog-row-cat">{categoryName || 'Uncategorised'}</span>
+        <span className="menu-price">{money(item.price)}</span>
+      </button>
+    </div>
+  )
+}
+
+/**
  * Обязательный шаг перед массовой правкой: что именно изменится и во
  * что. Без него владелец узнаёт о переоценке всего меню по выручке.
  */
@@ -207,6 +248,16 @@ export function ItemsTab({ context, locationId, data, reload, filters, onFilters
   const [selected, setSelected] = useState(new Set())
   const [pending, setPending] = useState(null) // { action, params, rows }
   const [busy, setBusy] = useState(false)
+  /*
+   * Каталог по умолчанию — рабочая поверхность, а не витрина: плоский
+   * список, где видно цену, категорию и пробелы позиции. Разбивка по
+   * категориям остаётся вторым режимом: в ней живёт порядок внутри
+   * категории, ради которого она и нужна.
+   */
+  const [mode, setMode] = useState('list')
+  // Последняя массовая правка — чтобы её можно было отменить
+  const [lastChange, setLastChange] = useState(null)
+  const [undoing, setUndoing] = useState(false)
 
   const filtersOn = query.trim() !== '' || catFilter !== 'all'
     || availability !== 'all' || stateFilter !== 'all'
@@ -243,6 +294,14 @@ export function ItemsTab({ context, locationId, data, reload, filters, onFilters
     setBusy(true)
     try {
       await bulkUpdateItems([...selected], pending.action, pending.params)
+      const categoryName = pending.action === 'category'
+        ? data.categories.find((c) => c.id === pending.params.categoryId)?.name
+        : null
+      setLastChange({
+        summary: bulkOutcome(pending.rows, pending.action, pending.params, categoryName),
+        plan: undoPlan(pending.rows, pending.action),
+        action: pending.action,
+      })
       setPending(null)
       setSelecting(false)
       setSelected(new Set())
@@ -251,6 +310,33 @@ export function ItemsTab({ context, locationId, data, reload, filters, onFilters
       setError(bulkErrorText(e.message))
     } finally {
       setBusy(false)
+    }
+  }
+
+  /**
+   * Отмена. Возвращается ровно то, что изменилось, тем же атомарным RPC.
+   * Если один из вызовов не прошёл — говорим об этом прямо: половина
+   * отменённой правки хуже, чем неотменённая, только если о ней молчать.
+   */
+  async function undoLast() {
+    if (!lastChange?.plan?.length) return
+    setUndoing(true)
+    setError('')
+    let done = 0
+    try {
+      for (const step of lastChange.plan) {
+        await bulkUpdateItems(step.ids, step.action, step.params)
+        done += 1
+      }
+      setLastChange(null)
+      await reload()
+    } catch (e) {
+      setError(done === 0
+        ? bulkErrorText(e.message)
+        : `Undo stopped halfway: ${done} of ${lastChange.plan.length} groups restored. ${bulkErrorText(e.message)}`)
+      await reload()
+    } finally {
+      setUndoing(false)
     }
   }
 
@@ -388,7 +474,16 @@ export function ItemsTab({ context, locationId, data, reload, filters, onFilters
             <button className="icon-button" onClick={() => { setAddingCat(false); setCatName('') }} aria-label="Cancel"><X /></button>
           </div>
         )}
-        {byCat.list.length > 0 && (
+        <div className="menu-mode">
+          <Tabs
+            className="period-switch"
+            label="Catalogue view"
+            items={[{ key: 'list', label: 'List' }, { key: 'groups', label: 'By category' }]}
+            value={mode}
+            onChange={setMode}
+          />
+        </div>
+        {mode === 'groups' && byCat.list.length > 0 && (
           <button className="text-button collapse-all" onClick={() => anyCollapsed ? expandAll() : collapseAll(allCatIds)}>
             {anyCollapsed ? 'Expand all' : 'Collapse all'}
           </button>
@@ -439,6 +534,26 @@ export function ItemsTab({ context, locationId, data, reload, filters, onFilters
 
       {error && <p className="form-error" role="alert">{error}</p>}
 
+      {/* Что именно произошло и можно ли это вернуть. Цена не
+          отменяется: сервер применяет правило, округление необратимо. */}
+      {lastChange && (
+        <div className="bulk-result" role="status">
+          <span>{lastChange.summary}</span>
+          {lastChange.plan?.length > 0 ? (
+            <Button size="compact" onClick={undoLast} busy={undoing} busyLabel="Undoing…">
+              Undo
+            </Button>
+          ) : (
+            <small>
+              {lastChange.action === 'price'
+                ? 'Prices cannot be rolled back automatically — apply the opposite change if needed.'
+                : 'Nothing to undo.'}
+            </small>
+          )}
+          <IconButton label="Dismiss" onClick={() => setLastChange(null)}><X /></IconButton>
+        </div>
+      )}
+
       {visible.length === 0 && (
         <section className="panel form-panel">
           <p className="empty-state">
@@ -447,8 +562,26 @@ export function ItemsTab({ context, locationId, data, reload, filters, onFilters
         </section>
       )}
 
+      {mode === 'list' && visible.length > 0 && (
+        <section className="panel">
+          <div className="menu-list">
+            {visible.map((it) => (
+              <CatalogRow
+                key={it.id}
+                item={it}
+                categoryName={data.categories.find((c) => c.id === it.category_id)?.name}
+                selecting={selecting}
+                selected={selected.has(it.id)}
+                onToggleSelect={() => toggleSelected(it.id)}
+                onOpen={() => setEditorItem(it)}
+              />
+            ))}
+          </div>
+        </section>
+      )}
+
       <div className="menu-groups">
-        {byCat.list.map((cat) => {
+        {mode === 'groups' && byCat.list.map((cat) => {
           const collapsed = isCollapsed(cat.id)
           return (
             <section className="panel menu-category" key={cat.id}>
@@ -489,7 +622,7 @@ export function ItemsTab({ context, locationId, data, reload, filters, onFilters
             </section>
           )
         })}
-        {byCat.orphans.length > 0 && (() => {
+        {mode === 'groups' && byCat.orphans.length > 0 && (() => {
           const collapsed = isCollapsed('__orphans__')
           return (
             <section className="panel menu-category">
@@ -561,15 +694,26 @@ export function ModifiersTab({ context, data, reload }) {
     } catch (e) { setError(e.message) }
   }
 
-  async function addModifier(groupId, count) {
-    const name = prompt('Modifier name')
-    if (!name?.trim()) return
-    const priceStr = prompt('Extra price in ₪ (0 for none)', '0') ?? '0'
-    const delta = shekelsToAgorot(priceStr)
-    if (delta === null) { setError('Invalid price'); return }
-    try { await createModifier(context, groupId, name.trim(), delta, false, count); reload() }
-    catch (e) { setError(e.message) }
+  /**
+   * Добавление модификатора — строкой прямо в группе, как категории и
+   * станции. Раньше это были два подряд `window.prompt`: они не
+   * поддерживаются в части браузеров (и внутри встроенного кадра), а
+   * там, где поддерживаются, спрашивают цену без валюты и без права
+   * передумать на втором шаге.
+   */
+  async function addModifier(groupId, count, name, priceStr) {
+    if (!name.trim()) return
+    const delta = shekelsToAgorot(priceStr || '0')
+    if (delta === null) { setError('Extra price must be a number, for example 3 or 3.50'); return }
+    try {
+      await createModifier(context, groupId, name.trim(), delta, false, count)
+      setAdding(null)
+      reload()
+    } catch (e) { setError(e.message) }
   }
+
+  // Открытая строка добавления: { groupId, name, price }
+  const [adding, setAdding] = useState(null)
 
   const groupIds = useMemo(() => data.modifierGroups.map((g) => g.id), [data.modifierGroups])
   const { isCollapsed, toggle, collapseAll, expandAll, anyCollapsed } = useCollapsed(groupIds)
@@ -619,9 +763,39 @@ export function ModifiersTab({ context, data, reload }) {
                       }} aria-label="Delete"><Trash2 /></button>
                     </div>
                   ))}
-                  <button className="menu-add-row" onClick={() => addModifier(g.id, (g.modifiers || []).length)}>
-                    <Plus /> Add modifier
-                  </button>
+                  {adding?.groupId === g.id ? (
+                    <form
+                      className="inline-add modifier-add"
+                      onSubmit={(e) => {
+                        e.preventDefault()
+                        addModifier(g.id, (g.modifiers || []).length, adding.name, adding.price)
+                      }}
+                    >
+                      <input
+                        autoFocus
+                        placeholder="Modifier name"
+                        aria-label={`Modifier name in ${g.name}`}
+                        value={adding.name}
+                        onChange={(e) => setAdding((a) => ({ ...a, name: e.target.value }))}
+                      />
+                      <input
+                        inputMode="decimal"
+                        placeholder="Extra ₪"
+                        aria-label="Extra price in shekels"
+                        value={adding.price}
+                        onChange={(e) => setAdding((a) => ({ ...a, price: e.target.value }))}
+                      />
+                      <IconButton type="submit" label="Add modifier"><Plus /></IconButton>
+                      <IconButton label="Cancel" onClick={() => setAdding(null)}><X /></IconButton>
+                    </form>
+                  ) : (
+                    <button
+                      className="menu-add-row"
+                      onClick={() => setAdding({ groupId: g.id, name: '', price: '0' })}
+                    >
+                      <Plus /> Add modifier
+                    </button>
+                  )}
                   <button className="menu-delete-row" onClick={async () => {
                     if (!confirm(`Delete group "${g.name}" and its modifiers?`)) return
                     try { await deleteModifierGroup(g.id); reload() } catch (e) { setError(e.message) }

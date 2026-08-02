@@ -1,7 +1,8 @@
-import test from 'node:test'
+import test, { describe, it } from 'node:test'
 import assert from 'node:assert/strict'
 import {
-  bulkPreview, changedCount, filterItems, itemGaps, moveInOrder, money, nextPrice,
+  bulkOutcome, bulkPreview, changedCount, filterItems, itemGaps, moveInOrder, money,
+  nextPrice, undoPlan,
 } from './catalog.js'
 
 /**
@@ -124,4 +125,70 @@ test('деньги показываются без лишних нулей', () 
   assert.equal(money(1250), '₪12.50')
   assert.equal(money(0), '₪0')
   assert.equal(money(null), '₪0')
+})
+
+// ── Отмена массовой правки ───────────────────────────────────
+
+describe('undoPlan', () => {
+  const categories = [
+    { id: 'c1', name: 'Кофе' },
+    { id: 'c2', name: 'Выпечка' },
+  ]
+  const items = [
+    { id: 'i1', name: 'Латте', price: 1800, is_available: true, category_id: 'c1' },
+    { id: 'i2', name: 'Круассан', price: 1400, is_available: false, category_id: 'c2' },
+    { id: 'i3', name: 'Эспрессо', price: 1000, is_available: true, category_id: 'c1' },
+  ]
+
+  it('возвращает ровно то, что изменилось', () => {
+    // Скрываем три позиции; одна и так была скрыта
+    const rows = bulkPreview(items, categories, ['i1', 'i2', 'i3'], 'availability', { available: false })
+    const plan = undoPlan(rows, 'availability')
+    assert.equal(plan.length, 1)
+    assert.deepEqual(plan[0], { action: 'availability', ids: ['i1', 'i3'], params: { available: true } })
+  })
+
+  it('категории возвращает по группам прежних значений', () => {
+    const rows = bulkPreview(items, categories, ['i1', 'i2'], 'category', { categoryId: 'c1' })
+    const plan = undoPlan(rows, 'category')
+    // Менялась только i2 (i1 уже в c1)
+    assert.deepEqual(plan, [{ action: 'category', ids: ['i2'], params: { categoryId: 'c2' } }])
+  })
+
+  it('позицию без прежней категории вернуть нечем — отмены нет вовсе', () => {
+    const orphan = [{ id: 'i9', name: 'Без категории', price: 500, is_available: true, category_id: null }]
+    const rows = bulkPreview(orphan, categories, ['i9'], 'category', { categoryId: 'c1' })
+    assert.equal(undoPlan(rows, 'category'), null, 'неполная отмена хуже её отсутствия')
+  })
+
+  it('цену не отменяем: сервер применяет правило, округление необратимо', () => {
+    const rows = bulkPreview(items, categories, ['i1'], 'price', { percent: -10 })
+    assert.equal(undoPlan(rows, 'price'), null)
+  })
+
+  it('когда ничего не изменилось — отменять нечего', () => {
+    const rows = bulkPreview(items, categories, ['i1'], 'availability', { available: true })
+    assert.deepEqual(undoPlan(rows, 'availability'), [])
+  })
+})
+
+describe('bulkOutcome', () => {
+  const categories = [{ id: 'c1', name: 'Кофе' }]
+  const items = [{ id: 'i1', name: 'Латте', price: 1800, is_available: true, category_id: 'c2' }]
+
+  it('говорит, что именно произошло', () => {
+    const hide = bulkPreview(items, categories, ['i1'], 'availability', { available: false })
+    assert.equal(bulkOutcome(hide, 'availability', { available: false }), '1 item hidden')
+
+    const move = bulkPreview(items, categories, ['i1'], 'category', { categoryId: 'c1' })
+    assert.equal(bulkOutcome(move, 'category', { categoryId: 'c1' }, 'Кофе'), '1 item moved to Кофе')
+
+    const price = bulkPreview(items, categories, ['i1'], 'price', { percent: 10 })
+    assert.equal(bulkOutcome(price, 'price', { percent: 10 }), '1 item repriced by +10%')
+  })
+
+  it('не врёт, когда не изменилось ничего', () => {
+    const noop = bulkPreview(items, categories, ['i1'], 'availability', { available: true })
+    assert.match(bulkOutcome(noop, 'availability', { available: true }), /Nothing changed/)
+  })
 })

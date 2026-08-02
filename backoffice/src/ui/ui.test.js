@@ -4,6 +4,7 @@ import assert from 'node:assert/strict'
 import { describe, it } from 'node:test'
 import { Button, IconButton } from './Button.jsx'
 import Tabs from './Tabs.jsx'
+import ConfirmDialog from './ConfirmDialog.jsx'
 import {
   EmptyPanel, EmptyState, ErrorText, PageHeader, Panel, SearchField, StatusBadge,
 } from './Layout.jsx'
@@ -134,5 +135,42 @@ describe('Tabs', () => {
   it('сохраняет классы экрана — компонент не меняет внешний вид', () => {
     assert.match(html, /class="period-switch menu-tabs"/)
     assert.match(html, /class="is-active"/)
+  })
+})
+
+describe('ConfirmDialog', () => {
+  const props = {
+    title: 'Reject this booking?',
+    description: 'Мири · 2 Aug 19:00 · 2 guests.',
+    confirmLabel: 'Reject booking',
+    cancelLabel: 'Keep the booking',
+    onConfirm: noop,
+    onCancel: noop,
+  }
+
+  it('объявляется срочным диалогом с именем', () => {
+    const html = render(h(ConfirmDialog, props))
+    assert.match(html, /role="alertdialog"/)
+    assert.match(html, /aria-modal="true"/)
+    assert.match(html, /id="confirm-title">Reject this booking\?/)
+    assert.match(html, /Keep the booking/)
+  })
+
+  it('поле причины появляется только когда его просят, и подписано как необязательное', () => {
+    const bare = render(h(ConfirmDialog, props))
+    assert.doesNotMatch(bare, /<input/)
+
+    const withReason = render(h(ConfirmDialog, {
+      ...props,
+      reason: { label: 'Reason for the guest', placeholder: 'Fully booked…' },
+    }))
+    assert.match(withReason, /Reason for the guest \(optional\)/)
+    assert.match(withReason, /placeholder="Fully booked…"/)
+  })
+
+  it('опасное действие не притворяется основным', () => {
+    const html = render(h(ConfirmDialog, { ...props, tone: 'danger' }))
+    assert.doesNotMatch(html, /class="primary-button compact"/)
+    assert.match(html, /is-danger/)
   })
 })

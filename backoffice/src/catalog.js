@@ -95,6 +95,8 @@ export function bulkPreview(items, categories, selectedIds, action, params = {},
         from: item.is_available ? 'On sale' : 'Hidden',
         to: next ? 'On sale' : 'Hidden',
         changes: item.is_available !== next,
+        // Прежнее значение машиночитаемо: из него собирается отмена
+        prev: { available: Boolean(item.is_available) },
       }
     }
     if (action === 'category') {
@@ -104,6 +106,7 @@ export function bulkPreview(items, categories, selectedIds, action, params = {},
         from: catNames.get(item.category_id) ?? '—',
         to: catNames.get(params.categoryId) ?? '—',
         changes: item.category_id !== params.categoryId,
+        prev: { categoryId: item.category_id ?? null },
       }
     }
     const to = nextPrice(item.price, params)
@@ -140,4 +143,65 @@ export function moveInOrder(ids, id, direction) {
   if (to < 0 || to >= list.length) return list
   list.splice(to, 0, list.splice(from, 1)[0])
   return list
+}
+
+
+/**
+ * План отмены массовой правки.
+ *
+ * Отменяется ровно то, что действительно изменилось: если из двенадцати
+ * выбранных позиций скрылись девять, вернуть на продажу надо девять, а
+ * не двенадцать — иначе отмена сама станет правкой.
+ *
+ * Цену вернуть нельзя, и это честнее, чем сделать вид: сервер применяет
+ * ПРАВИЛО (процент), а не список значений, и округление до агоры
+ * необратимо (−10 % и +11,11 % не возвращают исходное). Для цен отдаём
+ * `null` — интерфейс обязан сказать, что откат делается новой правкой.
+ *
+ * Категория возвращается по группам: у изменённых позиций прежние
+ * категории могли быть разными, и каждая группа — отдельный вызов того
+ * же атомарного RPC.
+ */
+export function undoPlan(rows, action) {
+  const changed = (rows ?? []).filter((row) => row.changes)
+  if (changed.length === 0) return []
+  if (action === 'availability') {
+    const groups = new Map()
+    for (const row of changed) {
+      const was = Boolean(row.prev?.available)
+      if (!groups.has(was)) groups.set(was, [])
+      groups.get(was).push(row.id)
+    }
+    return [...groups.entries()].map(([available, ids]) => ({
+      action: 'availability', ids, params: { available },
+    }))
+  }
+  if (action === 'category') {
+    const groups = new Map()
+    for (const row of changed) {
+      const was = row.prev?.categoryId ?? null
+      if (was === null) continue // позиция была без категории — вернуть нечем
+      if (!groups.has(was)) groups.set(was, [])
+      groups.get(was).push(row.id)
+    }
+    // Хоть одна позиция без прежней категории — отмена будет неполной,
+    // а неполная отмена хуже её отсутствия.
+    const restorable = [...groups.values()].reduce((sum, ids) => sum + ids.length, 0)
+    if (restorable !== changed.length) return null
+    return [...groups.entries()].map(([categoryId, ids]) => ({
+      action: 'category', ids, params: { categoryId },
+    }))
+  }
+  return null
+}
+
+/** Что сказать про результат правки: «12 items hidden» */
+export function bulkOutcome(rows, action, params, categoryName) {
+  const count = changedCount(rows)
+  if (count === 0) return 'Nothing changed — the items already looked like that.'
+  const items = `${count} item${count === 1 ? '' : 's'}`
+  if (action === 'availability') return params.available ? `${items} put on sale` : `${items} hidden`
+  if (action === 'category') return `${items} moved to ${categoryName || 'another category'}`
+  const percent = params.percent
+  return `${items} repriced by ${percent > 0 ? '+' : ''}${percent}%`
 }

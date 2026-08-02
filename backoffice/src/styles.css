@@ -1495,6 +1495,29 @@ a { color: inherit; }
   }
 }
 
+/*
+ * Каталог: компактный список — рабочая поверхность по умолчанию.
+ * Категория идёт отдельной колонкой, иначе в плоском списке непонятно,
+ * откуда позиция; на телефоне колонка прячется — там важнее имя и цена.
+ */
+.catalog-row .menu-row { display: grid; grid-template-columns: minmax(0, 1fr) auto auto; gap: var(--sp-3); align-items: center; }
+.catalog-row-cat { color: var(--c-text-subtle); font-size: 12px; white-space: nowrap; }
+.menu-mode { margin-inline-start: auto; }
+
+/* Результат массовой правки и отмена */
+.bulk-result {
+  display: flex; flex-wrap: wrap; align-items: center; gap: var(--sp-3);
+  margin: var(--sp-3) 0; padding: var(--sp-3) var(--sp-4);
+  border: 1px solid var(--c-border-panel); border-radius: var(--r-md);
+  background: var(--c-surface);
+}
+.bulk-result > span { font-size: 14px; font-weight: 700; margin-inline-end: auto; }
+.bulk-result small { color: var(--c-text-subtle); font-size: 12px; }
+
+@media (max-width: 640px) {
+  .catalog-row-cat { display: none; }
+}
+
 /* Ошибка конкретного поля — под ним, а не общим списком внизу формы */
 .field-error { color: var(--c-danger); font-size: 12px; font-weight: 650; }
 .qr-field input[aria-invalid="true"] { border-color: var(--c-danger); }
