@@ -227,6 +227,65 @@ a { color: inherit; }
 .stat-label { margin-top: 8px; font-size: 14px; font-weight: 750; }
 .stat-detail { margin-top: 5px; color: var(--c-text-subtle); font-size: 12px; }
 
+/*
+ * ── Дашборд ──────────────────────────────────────────────────
+ *
+ * Плитки показателей ниже прежних карточек-счётчиков (150px): владельцу
+ * нужно увидеть день целиком, а не три крупные цифры на первом экране.
+ * Иерархия задаётся размером числа, а не рамкой и не цветом.
+ */
+.dashboard-toolbar { justify-content: flex-end; }
+.dashboard-partial {
+  display: inline-flex; align-items: center; gap: var(--sp-2);
+  color: var(--c-danger); font-size: 12px; font-weight: 650;
+}
+.dashboard-partial svg { width: 15px; height: 15px; }
+
+.dashboard-metrics {
+  display: grid; grid-template-columns: repeat(auto-fit, minmax(190px, 1fr));
+  gap: var(--sp-3); margin-top: var(--sp-3);
+}
+.metric {
+  display: grid; gap: var(--sp-1); padding: var(--sp-4) var(--sp-4) var(--sp-3);
+  border: 1px solid var(--c-border-panel); border-radius: var(--r-md);
+  background: var(--c-surface);
+}
+.metric-label { color: var(--c-text-subtle); font-size: 12px; font-weight: 700; }
+.metric-value { font-size: 26px; line-height: 1.1; font-weight: 780; font-variant-numeric: tabular-nums; }
+.metric-detail { color: var(--c-text-faint); font-size: 12px; }
+/* Требующий внимания показатель подписан словом в detail; цвет — усиление */
+.metric.is-alert .metric-detail { color: var(--c-danger); font-weight: 650; }
+
+/* Строка «требует внимания»: иконка, текст, одно действие.
+   Селектор составной: базовое `.data-row` объявлено НИЖЕ по файлу, и при
+   равной специфичности побеждало бы оно. */
+.data-row.attention-row { align-items: flex-start; gap: var(--sp-3); padding: var(--sp-3) 22px; }
+.attention-icon { flex: none; display: grid; place-items: center; width: 20px; height: 20px; color: var(--c-text-faint); }
+.attention-icon svg { width: 18px; height: 18px; }
+.attention-row.is-alert .attention-icon { color: var(--c-danger); }
+.attention-row.is-warn .attention-icon { color: #b4720e; }
+.attention-text { display: grid; gap: 2px; margin-inline-end: auto; }
+.attention-text strong { font-size: 14px; font-weight: 700; white-space: normal; }
+.attention-text small { color: var(--c-text-subtle); font-size: 12px; }
+.attention-row .secondary-button { flex: none; }
+
+/* Канал включён/выключен — словом, точка только помогает */
+.status.is-on { color: var(--c-success); }
+.status.is-off { color: var(--c-text-subtle); }
+.status.is-off i { background: var(--c-text-faint); }
+
+@media (max-width: 640px) {
+  /* На узком экране строка ложится сеткой: иконка и текст всегда рядом,
+     действие — под ними. С flex-wrap длинный заголовок выталкивал иконку
+     на отдельную строку, и пункты выглядели по-разному. */
+  .data-row.attention-row {
+    display: grid; grid-template-columns: 20px minmax(0, 1fr);
+    gap: var(--sp-2) var(--sp-3);
+  }
+  .data-row.attention-row .secondary-button { grid-column: 2; justify-self: start; }
+  .metric-value { font-size: 24px; }
+}
+
 .overview-grid { display: grid; grid-template-columns: minmax(0, 1.55fr) minmax(280px, .85fr); gap: 14px; margin-top: 14px; }
 .panel { min-width: 0; border: 1px solid var(--c-border-panel); border-radius: var(--r-md); background: var(--c-surface); }
 .panel-heading { min-height: 88px; display: flex; align-items: center; justify-content: space-between; gap: 16px; padding: 20px 22px; border-bottom: 1px solid var(--c-border-soft); }
@@ -457,6 +516,14 @@ a { color: inherit; }
 
 /* ── Лента активности ─────────────────────────────────────── */
 .activity-panel { margin-top: 20px; }
+/*
+ * Строки списка обязаны уметь сжиматься. Элемент grid по умолчанию имеет
+ * min-width: auto, то есть не уже своего max-content: на 390px строка
+ * журнала вылезала за панель на 9px и давала горизонтальную прокрутку
+ * всей странице (Phase 0, п. 1).
+ */
+.activity-list, .data-list { min-width: 0; }
+.activity-list > *, .data-list > * { min-width: 0; }
 .activity-list { display: grid; padding: 6px 0; }
 .activity-row { display: flex; align-items: center; gap: 13px; min-height: 56px; padding: 9px 22px; }
 .activity-mark { width: 34px; height: 34px; flex-shrink: 0; border-radius: 10px; display: flex; align-items: center; justify-content: center; }

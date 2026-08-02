@@ -83,7 +83,72 @@ const scrollToPreview = (page) => page.evaluate(() => {
   return window.scrollY
 })
 
-async function bundle(name, contents) {
+/**
+ * Заглушка Supabase для браузерных наборов: данные подставляются в
+ * память, сети нет. Нужна дашборду — его виджеты существуют только в
+ * загруженном состоянии, а оно не проверяется рендером в node.
+ */
+const SUPABASE_STUB = `
+  const FLEET = [
+    { id: 'd1', name: 'Стойка 1', location_id: 'loc-1', location_name: 'Пинскер 29',
+      app_version: '1.5.0', silence_seconds: 60, outbox_pending: 0, outbox_failed: 0, archived_at: null },
+    { id: 'd2', name: 'Стойка 2', location_id: 'loc-1', location_name: 'Пинскер 29',
+      app_version: '1.3.0', silence_seconds: 9000, outbox_pending: 0, outbox_failed: 0, archived_at: null },
+  ]
+  const ORDERS = [{ id: 'o1', location_id: 'loc-1', status: 'new', created_at: new Date(Date.now() - 900000).toISOString(),
+    total: 7400, order_type: 'pickup', source: 'counter_qr', customer_name: 'Мири', items: [] }]
+  const RESERVATIONS = [{ id: 'r1', status: 'new', customer_name: 'Мири Леви', party_size: 2,
+    reserved_at: new Date(Date.now() + 3600000).toISOString(), table_id: null, is_test: false }]
+  const LOCATION = { id: 'loc-1', name: 'Пинскер 29', timezone: 'Asia/Jerusalem', currency: 'ILS',
+    settings: { online_orders: { enabled: true }, reservations: { enabled: false } } }
+  const RPC = {
+    sales_report: () => ({ summary: { gross_sales: 128000, refunds: 0, orders_count: 12, avg_check: 10667 } }),
+    get_backoffice_fleet: () => FLEET,
+    // Длинные подписи нарочно: строка обязана сжиматься, а не растягивать
+    // страницу (регресс Phase 0 — горизонтальная прокрутка на 390px).
+    get_activity_feed: () => [{
+      id: 'a1', type: 'shift_closed', created_at: new Date().toISOString(), amount: 812300,
+      staff_name: 'Александра Константинопольская', location_name: 'Пинскер 29, Петах-Тиква',
+      device_name: 'Стойка у входа', detail: { difference: -1200 },
+    }],
+  }
+  export const isSupabaseConfigured = true
+  export const supabase = {
+    auth: { getSession: async () => ({ data: { session: null } }), onAuthStateChange: () => ({ data: { subscription: { unsubscribe() {} } } }) },
+    rpc: async (name) => {
+      // Управляемый отказ одного источника: дашборд обязан пережить его
+      if (name === 'sales_report' && window.__BREAK_SALES__) {
+        return { data: null, error: { message: 'sales are unavailable' } }
+      }
+      return { data: RPC[name] ? RPC[name]() : null, error: null }
+    },
+    from: (table) => {
+      const rows = table === 'online_orders' ? ORDERS
+        : table === 'reservations' ? RESERVATIONS
+        : table === 'shifts' ? (window.__SHIFTS__ || [])
+        : table === 'locations' ? [LOCATION]
+        : table === 'location_slugs' ? [{ slug: 'bulochka' }] : []
+      const chain = new Proxy({}, { get(_t, prop) {
+        if (prop === 'then') return (resolve) => resolve({ data: rows, error: null })
+        if (prop === 'single' || prop === 'maybeSingle') return () => ({ then: (r) => r({ data: rows[0] ?? null, error: null }) })
+        return () => chain
+      } })
+      return chain
+    },
+    channel: () => { const c = { on: () => c, subscribe: () => c, unsubscribe() {} }; return c },
+    removeChannel: () => {},
+  }
+`
+
+const supabaseStub = {
+  name: 'supabase-stub',
+  setup(build) {
+    build.onResolve({ filter: /^\.\/supabase$/ }, () => ({ path: 'supabase-stub', namespace: 'stub' }))
+    build.onLoad({ filter: /.*/, namespace: 'stub' }, () => ({ contents: SUPABASE_STUB, loader: 'js' }))
+  },
+}
+
+async function bundle(name, contents, { stubSupabase = false } = {}) {
   const result = await build({
     stdin: {
       contents,
@@ -100,6 +165,7 @@ async function bundle(name, contents) {
       'import.meta.env': JSON.stringify({ VITE_PUBLIC_MENU_ORIGIN: guestOrigin }),
       'process.env.NODE_ENV': '"production"',
     },
+    plugins: stubSupabase ? [supabaseStub] : [],
   })
   bundles.set(name, result.outputFiles[0].text)
 }
@@ -239,6 +305,35 @@ before(async () => {
     createRoot(document.getElementById('root')).render(<Page />)
   `)
 
+  await bundle('dashboard', `
+    import { createRoot } from 'react-dom/client'
+    import HomeDashboard from './HomeDashboard'
+
+    const POS = ['pos_operate', 'pos_reports', 'orders_desk', 'reservations_desk',
+      'online_orders', 'public_reservations', 'public_menu']
+    const context = {
+      organization: { id: 'org-1', name: 'Bulochka' },
+      member: { role: 'owner' },
+      capabilities: window.__CAPS__ || POS,
+      locations: [{ id: 'loc-1', name: 'Пинскер 29', timezone: 'Asia/Jerusalem', currency: 'ILS' }],
+    }
+    createRoot(document.getElementById('root')).render(
+      <main className="content">
+        <HomeDashboard context={context} locationId="loc-1" onNavigate={(view, loc, tab) => {
+          window.__NAV__ = { view, tab }
+        }} />
+      </main>
+    )
+  `, { stubSupabase: true })
+
+  await bundle('activity-card', `
+    import { createRoot } from 'react-dom/client'
+    import { ActivityCard } from './ActivityManager'
+    createRoot(document.getElementById('root')).render(
+      <main className="content"><ActivityCard onNavigate={() => {}} /></main>
+    )
+  `, { stubSupabase: true })
+
   await bundle('preview', `
     import { createRoot } from 'react-dom/client'
     import { GuestPreview } from './QrChannels'
@@ -304,6 +399,111 @@ describe('view error boundary', { skip }, () => {
     await page.click('#other')
     await page.waitForSelector('#other-section')
     assert.equal(await page.$('.view-crash'), null)
+    await page.close()
+  })
+})
+
+describe('dashboard', { skip }, () => {
+  /**
+   * Виджеты дашборда существуют только в ЗАГРУЖЕННОМ состоянии: в
+   * серверном рендере эффекты не выполняются, и проверить нечего.
+   * Поэтому здесь настоящий браузер и подставной Supabase.
+   */
+  const open = async (caps = null) => {
+    const page = await browser.newPage()
+    await page.setViewport({ width: 1440, height: 900 })
+    await page.evaluateOnNewDocument((c) => { window.__CAPS__ = c }, caps)
+    await page.goto(`${appOrigin}/dashboard`, { waitUntil: 'networkidle0' })
+    await page.waitForSelector('.dashboard-metrics')
+    return page
+  }
+
+  it('показывает день, проблемы и ведёт в нужный раздел', async () => {
+    const page = await open()
+    const state = await page.evaluate(() => ({
+      metrics: [...document.querySelectorAll('.metric-label')].map((e) => e.textContent),
+      attention: [...document.querySelectorAll('.attention-text strong')].map((e) => e.textContent),
+      shift: [...document.querySelectorAll('.metric')]
+        .find((m) => m.textContent.includes('Shift'))?.textContent,
+    }))
+
+    assert.deepEqual(state.metrics, ['Net sales today', 'Online orders', 'Bookings today', 'Shift'])
+    // Порядок «требует внимания» — по стоимости бездействия
+    assert.match(state.attention[0], /Стойка 2 is not reporting/)
+    assert.match(state.attention[1], /order is waiting/)
+    assert.ok(state.attention.some((t) => /booking request is waiting/.test(t)))
+    assert.ok(state.attention.some((t) => /Table booking is off/.test(t)))
+    assert.match(state.shift, /Closed/, 'открытых смен в фикстуре нет')
+
+    // Кнопка пункта ведёт в свой раздел, а выключенный канал — в свою вкладку
+    await page.evaluate(() => {
+      const row = [...document.querySelectorAll('.attention-row')]
+        .find((r) => /Table booking is off/.test(r.textContent))
+      row.querySelector('button').click()
+    })
+    assert.deepEqual(await page.evaluate(() => window.__NAV__), { view: 'online', tab: 'reservations' })
+    await page.close()
+  })
+
+  it('reserve-клиенту не показывают выручку, кассы и заказы', async () => {
+    const page = await open(['reservations_desk', 'public_reservations'])
+    const state = await page.evaluate(() => ({
+      metrics: [...document.querySelectorAll('.metric-label')].map((e) => e.textContent),
+      panels: [...document.querySelectorAll('.panel-heading h2')].map((e) => e.textContent),
+      attention: [...document.querySelectorAll('.attention-text strong')].map((e) => e.textContent),
+    }))
+    assert.deepEqual(state.metrics, ['Bookings today'])
+    assert.ok(!state.panels.includes('Orders'))
+    assert.ok(!state.panels.includes('Devices'))
+    assert.ok(!state.attention.some((t) => /reporting|order is waiting/.test(t)))
+    await page.close()
+  })
+
+  it('частичный отказ не уносит остальные виджеты', async () => {
+    const page = await browser.newPage()
+    await page.setViewport({ width: 1440, height: 900 })
+    // Ломаем один источник: отчёт по продажам
+    await page.evaluateOnNewDocument(() => {
+      window.__BREAK_SALES__ = true
+    })
+    await page.goto(`${appOrigin}/dashboard`, { waitUntil: 'networkidle0' })
+    await page.waitForSelector('.dashboard-metrics')
+    const state = await page.evaluate(() => ({
+      metrics: [...document.querySelectorAll('.metric-label')].map((e) => e.textContent),
+      sales: [...document.querySelectorAll('.metric')]
+        .find((m) => m.textContent.includes('Net sales'))?.textContent,
+      partial: document.querySelector('.dashboard-partial')?.textContent ?? null,
+      attention: document.querySelectorAll('.attention-row').length,
+    }))
+    assert.ok(state.metrics.includes('Bookings today'), 'остальные виджеты обязаны остаться')
+    assert.match(state.sales, /—/, 'упавший показатель честно пуст, а не нулевой')
+    assert.match(state.partial, /could not be loaded/, 'отказ назван, а не спрятан')
+    assert.ok(state.attention > 0, 'список внимания продолжает работать')
+    await page.close()
+  })
+})
+
+describe('списки не растягивают страницу', { skip }, () => {
+  /**
+   * Строка журнала на 390px вылезала за панель на 9px и давала
+   * горизонтальную прокрутку всей странице: элемент grid по умолчанию не
+   * уже своего max-content. Проверяем на нарочно длинных подписях.
+   */
+  it('строка журнала сжимается, а не выталкивает страницу', async () => {
+    const page = await browser.newPage()
+    await page.setViewport({ width: 390, height: 844 })
+    await page.goto(`${appOrigin}/activity-card`, { waitUntil: 'networkidle0' })
+    await page.waitForSelector('.activity-row')
+    const state = await page.evaluate(() => {
+      const row = document.querySelector('.activity-row')
+      return {
+        overflow: document.documentElement.scrollWidth - document.documentElement.clientWidth,
+        wider: Math.round(row.getBoundingClientRect().width
+          - row.parentElement.getBoundingClientRect().width),
+      }
+    })
+    assert.equal(state.overflow, 0, 'страница не должна прокручиваться вбок')
+    assert.ok(state.wider <= 0, `строка шире контейнера на ${state.wider}px`)
     await page.close()
   })
 })

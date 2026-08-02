@@ -2,7 +2,6 @@ import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import {
   Activity,
   BarChart3,
-  Building2,
   CalendarDays,
   Check,
   ChevronRight,
@@ -36,6 +35,7 @@ import GuestsManager from './GuestsManager'
 import ActivityManager, { ActivityCard } from './ActivityManager'
 import ViewErrorBoundary from './ErrorBoundary'
 import AppShell, { Brand } from './ui/AppShell'
+import HomeDashboard from './HomeDashboard'
 import { PageHeader } from './ui/Layout'
 
 /**
@@ -389,19 +389,6 @@ function HelpPanel({ context, email, onNavigate, onClose }) {
   )
 }
 
-function Stat({ label, value, detail, icon: Icon }) {
-  return (
-    <div className="stat-card">
-      <div className="stat-icon"><Icon /></div>
-      <div>
-        <div className="stat-value">{value}</div>
-        <div className="stat-label">{label}</div>
-        <div className="stat-detail">{detail}</div>
-      </div>
-    </div>
-  )
-}
-
 /**
  * Карточка продуктов (100/104/105): жизненный цикл каждой карточки —
  * Active / Developer / Included with ANGLE Orders / Pending activation /
@@ -503,6 +490,10 @@ function ActivationHome({ context, onReloadContext }) {
  */
 const QUICK_ACTIONS = [
   {
+    view: 'locations', capability: null, icon: Store,
+    title: 'Locations', detail: 'Address, hours, taxes and guest-facing details',
+  },
+  {
     view: 'orders', capability: 'orders_desk', icon: ShoppingBag,
     title: 'Order inbox', detail: 'What guests ordered and where it stands',
   },
@@ -552,67 +543,38 @@ function overviewIntro(context) {
   return `Your ${list} — set up and run from here.`
 }
 
-function Overview({ context, onNavigate, onReloadContext }) {
-  const counts = context.counts || {}
-  const locations = context.locations || []
-  // Capabilities (105): menu-only клиенту не показываем staff/девайсы/кассу.
+/**
+ * Главная. Виджеты «что сейчас» живут в HomeDashboard; здесь остаётся
+ * то, что про настройку: быстрые действия, продукты и журнал.
+ *
+ * Прежние три счётчика (точки, сотрудники, кассы) и список точек убраны
+ * намеренно: они отвечали на вопрос «из чего состоит мой аккаунт», а
+ * владельцу, открывшему кабинет утром, нужен ответ «что происходит и что
+ * требует внимания». Точки никуда не делись — они в быстрых действиях и
+ * в своём разделе.
+ */
+function Overview({ context, locationId, onNavigate, onReloadContext }) {
   const pos = hasCapability(context, 'pos_operate')
-  const actions = QUICK_ACTIONS.filter((action) => hasCapability(context, action.capability))
+  const actions = QUICK_ACTIONS.filter((action) => (
+    action.capability === null || hasCapability(context, action.capability)
+  ))
   return (
-    <>
-      <PageHeader
-        compact={false}
-        eyebrow="YOUR BUSINESS"
-        title={context.organization?.name || 'ANGLE business'}
-        description={overviewIntro(context)}
-      />
-
-      <section className="stats-grid" aria-label="Business overview">
-        <Stat icon={Store} label="Locations" value={counts.locations ?? 0} detail="Business locations" />
-        {pos && <Stat icon={Users} label="Team" value={counts.staff ?? 0} detail="Active staff profiles" />}
-        {pos && <Stat icon={MonitorSmartphone} label="Devices" value={counts.devices ?? 0} detail="Connected registers" />}
+    <HomeDashboard context={context} locationId={locationId} onNavigate={onNavigate}>
+      <section className="panel quick-panel">
+        <div className="panel-heading"><div><h2>Quick access</h2><p>Common owner tasks.</p></div></div>
+        <div className="quick-list">
+          {actions.map(({ view, icon: Icon, title, detail }) => (
+            <button key={view} onClick={() => onNavigate(view)}>
+              <Icon /><span><strong>{title}</strong><small>{detail}</small></span><ChevronRight />
+            </button>
+          ))}
+        </div>
       </section>
-
-      <div className="overview-grid">
-        <section className="panel location-panel">
-          <div className="panel-heading">
-            <div>
-              <h2>Locations</h2>
-              <p>{pos
-                ? 'Configuration shared with every connected register.'
-                : 'Address, hours and guest-facing details for each location.'}</p>
-            </div>
-            <button className="text-button" onClick={() => onNavigate('locations')}>View all <ChevronRight /></button>
-          </div>
-          <div className="location-list">
-            {locations.map((location) => (
-              <button className="location-row" key={location.id} onClick={() => onNavigate('locations', location.id)}>
-                <span className="location-mark"><Building2 /></span>
-                <span><strong>{location.name}</strong><small>{location.timezone} · {location.currency}</small></span>
-                <span className="status"><i /> Active</span>
-                <ChevronRight />
-              </button>
-            ))}
-            {locations.length === 0 && <p className="empty-state">No locations are linked to this account.</p>}
-          </div>
-        </section>
-
-        <section className="panel quick-panel">
-          <div className="panel-heading"><div><h2>Quick access</h2><p>Common owner tasks.</p></div></div>
-          <div className="quick-list">
-            {actions.map(({ view, icon: Icon, title, detail }) => (
-              <button key={view} onClick={() => onNavigate(view)}>
-                <Icon /><span><strong>{title}</strong><small>{detail}</small></span><ChevronRight />
-              </button>
-            ))}
-          </div>
-        </section>
-      </div>
 
       <ProductsCard context={context} onReloadContext={onReloadContext} />
 
       {pos && <ActivityCard onNavigate={onNavigate} />}
-    </>
+    </HomeDashboard>
   )
 }
 
@@ -806,13 +768,14 @@ function Dashboard({ session, context, onReloadContext }) {
     window.scrollTo(0, 0)
   }, [view, locationId, route.tab])
 
-  const navigate = useCallback((nextView, nextLocationId = null) => {
+  const navigate = useCallback((nextView, nextLocationId = null, nextTab = null) => {
     const prev = routeRef.current
     applyRoute({
       view: nextView,
       locationId: nextLocationId ?? prev.locationId,
-      // Вкладка принадлежит разделу: уходя из него, её нельзя тащить
-      tab: nextView === prev.view ? prev.tab : null,
+      // Вкладка принадлежит разделу: уходя из него, её нельзя тащить.
+      // Явно переданная вкладка — переход «в конкретное место раздела».
+      tab: nextTab ?? (nextView === prev.view ? prev.tab : null),
     })
   }, [applyRoute])
 
@@ -867,7 +830,14 @@ function Dashboard({ session, context, onReloadContext }) {
       >
         {view === 'overview' && (noProducts
           ? <ActivationHome context={context} onReloadContext={onReloadContext} />
-          : <Overview context={context} onNavigate={navigate} onReloadContext={onReloadContext} />)}
+          : (
+            <Overview
+              context={context}
+              locationId={locationId}
+              onNavigate={navigate}
+              onReloadContext={onReloadContext}
+            />
+          ))}
         {view === 'orders' && <OrdersInbox context={context} {...scopedProps} />}
         {view === 'reservations' && (
           <ReservationsDesk context={context} {...scopedProps} {...tabProps} />
