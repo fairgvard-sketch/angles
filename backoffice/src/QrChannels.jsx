@@ -544,6 +544,7 @@ export function GuestPreview({ url }) {
 
   function refresh() {
     remember()
+    enteredRef.current = false
     setEntered(false)
     setPreviewKey((key) => key + 1)
     // Управление возвращается той кнопке, которой владелец воспользовался.
@@ -551,6 +552,9 @@ export function GuestPreview({ url }) {
   }
 
   function enterPreview() {
+    // ref меняется до focus(): React-состояние применится следующим
+    // рендером, а onFocus кадра сработает синхронно.
+    enteredRef.current = true
     setEntered(true)
     iframeRef.current?.focus({ preventScroll: true })
   }
@@ -627,6 +631,12 @@ export function GuestPreview({ url }) {
             tabIndex={entered ? 0 : -1}
             hidden={blocked}
             onLoad={() => { loadedRef.current = true; restoreSoon() }}
+            onFocus={() => {
+              // Реальная гостевая страница может повторно поставить focus
+              // спустя секунды после load (например, после запуска hero).
+              // Таймеры загрузки этого уже не поймают, а событие поймает.
+              if (!enteredRef.current) restoreSoon()
+            }}
           />
         )}
       </div>

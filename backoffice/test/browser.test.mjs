@@ -40,6 +40,12 @@ const GUEST_PAGE = `<!doctype html><html><head><meta charset="utf-8">
   const start = document.getElementById('start')
   start.focus()
   start.scrollIntoView()
+  // Некоторые реальные страницы повторяют autofocus после запуска hero.
+  // Защита кабинета должна работать не только в момент iframe load.
+  setTimeout(() => {
+    start.focus()
+    start.scrollIntoView()
+  }, 1200)
   parent.postMessage({ source: 'angle-public', type: 'ready', path: '/order/x' }, '*')
 </script></body></html>`
 
@@ -242,7 +248,7 @@ describe('guest preview iframe', { skip }, () => {
       const anchor = await scrollToPreview(page)
       await page.waitForSelector('iframe')
       // Ждём и загрузку, и попытки чужой страницы утащить фокус
-      await new Promise((resolve) => setTimeout(resolve, 1500))
+      await new Promise((resolve) => setTimeout(resolve, 2200))
 
       const state = await page.evaluate(() => ({
         activeTag: document.activeElement?.tagName ?? null,
@@ -276,7 +282,7 @@ describe('guest preview iframe', { skip }, () => {
         .find((b) => b.textContent.includes('Refresh'))
       refresh.click()
     })
-    await new Promise((resolve) => setTimeout(resolve, 1500))
+    await new Promise((resolve) => setTimeout(resolve, 2200))
 
     const after = await page.evaluate(() => ({
       scrollY: window.scrollY,
