@@ -25,6 +25,7 @@ import {
   Field, LinkBlock, NumberSelect, QrCanvas, SettingGroup, SnippetBlock, Toggle,
   downloadQr, useCopy,
 } from './qr-blocks'
+import { PageHeader } from './ui/Layout'
 
 /**
  * QR-каналы гостя: онлайн-заказы и бронирование столов.
@@ -1402,10 +1403,11 @@ function pickKeys(source, delta) {
   return result
 }
 
-export default function QrChannels({ context, locationId }) {
+export default function QrChannels({ context, locationId, tab: tabFromUrl, onTabChange }) {
   const locations = context?.locations || []
   const activeId = locationId || locations[0]?.id || null
-  const [tab, setTab] = useState('online')
+  const tab = TABS.some((t) => t.key === tabFromUrl) ? tabFromUrl : 'online'
+  const setTab = onTabChange
   const [settings, setSettings] = useState(null)
   // Адрес заведения — канонический источник для гостевой страницы
   const [businessAddress, setBusinessAddress] = useState('')
@@ -1473,10 +1475,7 @@ export default function QrChannels({ context, locationId }) {
   if (locations.length === 0) {
     return (
       <>
-        <section className="page-heading compact-heading">
-          <p className="eyebrow">{context.organization?.name}</p>
-          <h1>QR Menu &amp; Online</h1>
-        </section>
+        <PageHeader eyebrow={context.organization?.name} title="QR Menu & Online" />
         <p className="empty-state">No locations are linked to this account.</p>
       </>
     )
@@ -1484,11 +1483,11 @@ export default function QrChannels({ context, locationId }) {
 
   return (
     <>
-      <section className="page-heading compact-heading">
-        <p className="eyebrow">{context.organization?.name}</p>
-        <h1>QR Menu &amp; Online</h1>
-        <p>The pages your guests open by scanning a code — ordering and table booking.</p>
-      </section>
+      <PageHeader
+        eyebrow={context.organization?.name}
+        title="QR Menu & Online"
+        description="The pages your guests open by scanning a code — ordering and table booking."
+      />
 
       <div className="menu-tabs location-tabs" role="tablist" aria-label="Channel">
         {TABS.map((item) => (

@@ -19,6 +19,7 @@ import {
 import ItemEditor from './ItemEditor'
 import { hasCapability } from './navigation'
 import Tabs from './ui/Tabs'
+import { PageHeader } from './ui/Layout'
 
 /**
  * Меню в бэкофисе — паритет с POS: товары (создание/правка/удаление, варианты,
@@ -675,8 +676,11 @@ export function StationsTab({ context, data, reload }) {
   )
 }
 
-export default function MenuManager({ context, locationId }) {
-  const [tab, setTab] = useState('items')
+export default function MenuManager({ context, locationId, tab: tabFromUrl, onTabChange }) {
+  // Вкладка живёт в адресе: перезагрузка и присланная ссылка открывают
+  // тот же экран. Неизвестное значение — устаревшая ссылка, не ошибка.
+  const tab = TABS.some((t) => t.key === tabFromUrl) ? tabFromUrl : 'items'
+  const setTab = onTabChange
   const [data, setData] = useState(null)
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState('')
@@ -706,17 +710,15 @@ export default function MenuManager({ context, locationId }) {
 
   return (
     <>
-      <section className="page-heading compact-heading">
-        <p className="eyebrow">{context.organization?.name}</p>
-        <h1>Catalogue</h1>
-        {/* Menu-only клиенту нельзя говорить про кассу: у него её нет,
-            и каталог для него — то, что видит гость. */}
-        <p>
-          {hasCapability(context, 'pos_operate')
-            ? 'Everything your registers and guest pages sell. Changes apply immediately.'
-            : 'Everything your guest pages show. Changes apply immediately.'}
-        </p>
-      </section>
+      {/* Menu-only клиенту нельзя говорить про кассу: у него её нет,
+          и каталог для него — то, что видит гость. */}
+      <PageHeader
+        eyebrow={context.organization?.name}
+        title="Catalogue"
+        description={hasCapability(context, 'pos_operate')
+          ? 'Everything your registers and guest pages sell. Changes apply immediately.'
+          : 'Everything your guest pages show. Changes apply immediately.'}
+      />
 
       <Tabs
         className="period-switch menu-tabs"

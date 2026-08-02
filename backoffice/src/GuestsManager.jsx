@@ -10,6 +10,7 @@ import {
   guestsToCsv, csvFileName, duplicateReason, mergePreview, mergeSources,
   customerErrorText,
 } from './guests'
+import { PageHeader } from './ui/Layout'
 
 /**
  * «Customers» — база клиентов организации (114/115/121, правки 131).
@@ -471,7 +472,7 @@ function DuplicateGroup({ group, busy, onMerge }) {
   )
 }
 
-export default function GuestsManager({ context }) {
+export default function GuestsManager({ context, tab: tabFromUrl, onTabChange }) {
   const [guests, setGuests] = useState(null)
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState('')
@@ -482,7 +483,10 @@ export default function GuestsManager({ context }) {
   const [sort, setSort] = useState('recent')
   const [tagCounts, setTagCounts] = useState([])
   const [duplicates, setDuplicates] = useState([])
-  const [view, setView] = useState('list')
+  // Экран дублей — тоже адресуемое состояние: ссылку на него шлют в
+  // поддержку, и перезагрузка не должна возвращать в общий список.
+  const view = tabFromUrl === 'duplicates' ? 'duplicates' : 'list'
+  const setView = (next) => onTabChange?.(next === 'list' ? null : next)
   const [merging, setMerging] = useState(null)
   const [selected, setSelected] = useState(null)
 
@@ -567,11 +571,11 @@ export default function GuestsManager({ context }) {
 
   return (
     <>
-      <section className="page-heading compact-heading">
-        <p className="eyebrow">{context.organization?.name}</p>
-        <h1>Customers</h1>
-        <p>Loyalty members, their visits and what they buy.</p>
-      </section>
+      <PageHeader
+        eyebrow={context.organization?.name}
+        title="Customers"
+        description="Loyalty members, their visits and what they buy."
+      />
 
       <div className="overview-toolbar">
         <label className="guest-search">

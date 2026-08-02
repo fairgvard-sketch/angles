@@ -6,6 +6,7 @@ import {
 import { fetchCategories, updateCategory } from './menu'
 import { agorotToInput, inputToAgorot } from './online'
 import { hasCapability } from './navigation'
+import { PageHeader } from './ui/Layout'
 
 /**
  * Настройки точки в бэкофисе — теперь единственное место, где правится
@@ -72,10 +73,11 @@ function shekels(agorot) {
   return `₪${(agorot / 100).toLocaleString('he-IL', { minimumFractionDigits: 2 })}`
 }
 
-export default function LocationSettings({ context, locationId }) {
+export default function LocationSettings({ context, locationId, tab: tabFromUrl, onTabChange }) {
   const locations = context?.locations || []
   const activeId = locationId || locations[0]?.id || null
-  const [tab, setTab] = useState('general')
+  const tab = TABS.some((t) => t.key === tabFromUrl) ? tabFromUrl : 'general'
+  const setTab = onTabChange
   const [location, setLocation] = useState(null)
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState('')
@@ -95,10 +97,7 @@ export default function LocationSettings({ context, locationId }) {
   if (locations.length === 0) {
     return (
       <>
-        <section className="page-heading compact-heading">
-          <p className="eyebrow">{context.organization?.name}</p>
-          <h1>Locations</h1>
-        </section>
+        <PageHeader eyebrow={context.organization?.name} title="Locations" />
         <p className="empty-state">No locations are linked to this account.</p>
       </>
     )
@@ -106,15 +105,13 @@ export default function LocationSettings({ context, locationId }) {
 
   return (
     <>
-      <section className="page-heading compact-heading">
-        <p className="eyebrow">{context.organization?.name}</p>
-        <h1>Locations</h1>
-        <p>
-          {hasCapability(context, 'pos_operate')
-            ? 'Business details, taxes, loyalty and register defaults — shared with every connected register.'
-            : 'Business details, taxes and the address guests see on your public pages.'}
-        </p>
-      </section>
+      <PageHeader
+        eyebrow={context.organization?.name}
+        title="Locations"
+        description={hasCapability(context, 'pos_operate')
+          ? 'Business details, taxes, loyalty and register defaults — shared with every connected register.'
+          : 'Business details, taxes and the address guests see on your public pages.'}
+      />
 
       <div className="location-tabs settings-topic-tabs" role="tablist" aria-label="Settings topic">
         {TABS.map((t) => (

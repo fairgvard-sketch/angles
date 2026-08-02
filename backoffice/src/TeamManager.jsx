@@ -7,6 +7,7 @@ import {
   fetchRoles, saveRole, deleteRole,
 } from './team'
 import { fetchLocation, patchLocationSettings } from './settings'
+import { PageHeader } from './ui/Layout'
 
 /**
  * Команда в бэкофисе — паритет с кассовым разделом «Сотрудники»: список,
@@ -480,12 +481,13 @@ function PermsTab({ locations }) {
   )
 }
 
-export default function TeamManager({ context }) {
+export default function TeamManager({ context, tab: tabFromUrl, onTabChange }) {
   const locations = context.locations || []
   const myRole = context.member?.role
   const iAmOwner = myRole === 'owner'
 
-  const [tab, setTab] = useState('staff')
+  const tab = TABS.some((t) => t.key === tabFromUrl) ? tabFromUrl : 'staff'
+  const setTab = onTabChange
   const [staff, setStaff] = useState(null)
   const [roles, setRoles] = useState(null)
   const [editing, setEditing] = useState(null) // {} = новый, {id...} = правка
@@ -525,11 +527,11 @@ export default function TeamManager({ context }) {
 
   return (
     <>
-      <section className="page-heading compact-heading">
-        <p className="eyebrow">{context.organization?.name}</p>
-        <h1>Team</h1>
-        <p>People who work on the register, their PINs and what they are allowed to do.</p>
-      </section>
+      <PageHeader
+        eyebrow={context.organization?.name}
+        title="Team"
+        description="People who work on the register, their PINs and what they are allowed to do."
+      />
 
       <div className="menu-tabs location-tabs" role="tablist" aria-label="Team section">
         {TABS.map((t) => (
