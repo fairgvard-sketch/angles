@@ -78,6 +78,43 @@ export function deviceAdvice(device) {
 }
 
 /** Устройство участвует в работе (архивные — нет) */
+/**
+ * Куда попадает терминал в списке: рабочие, требующие внимания и архив.
+ *
+ * План требует разделить их: смешанный список заставляет владельца
+ * глазами искать проблемную кассу среди двадцати рабочих, а списанные
+ * занимают место в операционном списке.
+ */
+export function fleetSection(device) {
+  if (isArchived(device)) return 'archived'
+  return ['offline', 'error', 'never'].includes(deviceStatus(device)) ? 'attention' : 'active'
+}
+
+/** Что сказать про итог удаления: вход закрыт или остался */
+export function deleteOutcome(result) {
+  if (result?.access_revoked) {
+    return 'Terminal deleted and its sign-in revoked — it cannot come back on its own.'
+  }
+  if (result?.reason === 'account_shared') {
+    return 'Terminal removed from the list. Its sign-in is shared with another register, so access stays.'
+  }
+  if (result?.reason === 'account_is_member') {
+    return 'Terminal removed from the list. It was signed in with a person’s account, which was left untouched.'
+  }
+  return 'Terminal removed from the list. It had no sign-in of its own.'
+}
+
+/** Человеческий текст отказов удаления */
+export function deleteErrorText(message) {
+  const m = String(message || '')
+  if (m.includes('outbox_pending')) {
+    return 'This register still has unsent operations — they would be lost. Bring it online first.'
+  }
+  if (m.includes('not_archived')) return 'Archive the register first, then delete it.'
+  if (m.includes('not_found')) return 'This register is no longer there — refresh the list.'
+  return fleetErrorText(m)
+}
+
 export function isArchived(device) {
   return Boolean(device.archived_at)
 }

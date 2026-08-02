@@ -1,8 +1,9 @@
-import test from 'node:test'
+import test, { describe, it } from 'node:test'
 import assert from 'node:assert/strict'
 import {
   STATUS_LABEL, deviceAdvice, deviceStatus, filterFleet, fleetErrorText,
   isArchived, lastSeenLabel, outboxAgeLabel,
+  fleetSection, deleteOutcome, deleteErrorText,
 } from './fleet.js'
 
 /**
@@ -97,4 +98,54 @@ test('ошибки сервера переводятся на язык влад�
   assert.match(fleetErrorText('not_found'), /refresh/i)
   assert.match(fleetErrorText('permission denied'), /role/i)
   assert.equal(fleetErrorText('weird'), 'weird')
+})
+
+// ── Секции парка и удаление (Phase 7) ────────────────────────
+
+describe('fleetSection', () => {
+  const live = { silence_seconds: 60, outbox_failed: 0, archived_at: null }
+
+  it('молчащая и с зависшей очередью — в «требует внимания»', () => {
+    assert.equal(fleetSection({ ...live, silence_seconds: 7200 }), 'attention')
+    assert.equal(fleetSection({ ...live, outbox_failed: 1 }), 'attention')
+    assert.equal(fleetSection({ ...live, silence_seconds: null }), 'attention')
+  })
+
+  it('на связи и с задержкой — рабочие', () => {
+    assert.equal(fleetSection(live), 'active')
+    assert.equal(fleetSection({ ...live, silence_seconds: 900 }), 'active')
+  })
+
+  it('архив важнее состояния: списанная касса не «требует внимания»', () => {
+    assert.equal(
+      fleetSection({ ...live, silence_seconds: 999999, archived_at: '2026-07-01T00:00:00Z' }),
+      'archived',
+    )
+  })
+})
+
+describe('итог удаления терминала', () => {
+  it('закрытый вход назван прямо', () => {
+    assert.match(deleteOutcome({ deleted: true, access_revoked: true }), /revoked/)
+  })
+
+  it('общая учётка объясняется, а не замалчивается', () => {
+    const text = deleteOutcome({ deleted: true, access_revoked: false, reason: 'account_shared' })
+    assert.match(text, /shared with another register/)
+  })
+
+  it('аккаунт человека остаётся нетронутым, и об этом сказано', () => {
+    const text = deleteOutcome({ deleted: true, access_revoked: false, reason: 'account_is_member' })
+    assert.match(text, /person’s account/)
+  })
+})
+
+describe('отказы удаления', () => {
+  it('очередь объясняется деньгами, а не кодом', () => {
+    assert.match(deleteErrorText('outbox_pending'), /unsent operations/)
+  })
+
+  it('порядок шагов назван: сначала архив', () => {
+    assert.match(deleteErrorText('not_archived'), /Archive the register first/)
+  })
 })

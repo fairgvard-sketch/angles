@@ -1,14 +1,16 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
 import {
   Archive, ArchiveRestore, MonitorSmartphone, Pencil, RefreshCw, AlertTriangle,
-  Wifi, X,
+  Trash2, Wifi, X,
 } from 'lucide-react'
 import {
-  fetchFleet, renameDevice, setDeviceArchived,
+  fetchFleet, renameDevice, setDeviceArchived, deleteDevice,
   deviceStatus, STATUS_LABEL, lastSeenLabel, outboxAgeLabel,
   deviceAdvice, filterFleet, fleetErrorText, isArchived,
+  fleetSection, deleteOutcome, deleteErrorText,
 } from './devices'
 import { Button, IconButton } from './ui/Button'
+import ConfirmDialog from './ui/ConfirmDialog'
 import {
   EmptyPanel, EmptyState, ErrorText, PageHeader, Panel, SearchField, StatusBadge,
 } from './ui/Layout'
@@ -31,7 +33,7 @@ function statusVersions(device) {
   return parts.join(' · ')
 }
 
-export function DeviceRow({ device, busy, onRename, onArchive }) {
+export function DeviceRow({ device, busy, onRename, onArchive, onDelete }) {
   const status = deviceStatus(device)
   const outboxAge = outboxAgeLabel(device)
   const advice = deviceAdvice(device)
@@ -121,6 +123,18 @@ export function DeviceRow({ device, busy, onRename, onArchive }) {
           >
             {archived ? <ArchiveRestore /> : <Archive />}
           </IconButton>
+          {/* Удаление живёт только в архиве: сначала владелец убирает
+              кассу из работы и убеждается, что она не нужна. */}
+          {archived && (
+            <IconButton
+              disabled={busy}
+              label={`Delete ${device.name} permanently`}
+              title="Delete for good — the terminal loses access and disappears from the list"
+              onClick={onDelete}
+            >
+              <Trash2 />
+            </IconButton>
+          )}
         </div>
       </div>
     </div>
@@ -135,6 +149,9 @@ export default function DevicesManager({ context }) {
   const [query, setQuery] = useState('')
   const [showArchived, setShowArchived] = useState(false)
   const [busyId, setBusyId] = useState(null)
+  // Удаление необратимо: спрашиваем подтверждение и называем терминал
+  const [deleting, setDeleting] = useState(null)
+  const [notice, setNotice] = useState('')
 
   async function load(silent = false) {
     if (!silent) setLoading(true)
@@ -177,18 +194,44 @@ export default function DevicesManager({ context }) {
   )
   const archivedCount = useMemo(() => (fleet ?? []).filter(isArchived).length, [fleet])
 
-  // Группируем по точке; порядок устройств внутри группы сервер уже задал
-  // (молчащие сверху), порядок групп — по имени точки.
-  const groups = useMemo(() => {
-    if (!fleet) return []
-    const byLoc = new Map()
-    for (const d of visible) {
-      const key = d.location_id || '—'
-      if (!byLoc.has(key)) byLoc.set(key, { name: d.location_name || 'No location', devices: [] })
-      byLoc.get(key).devices.push(d)
+  /*
+   * Три секции вместо одного списка: требующие внимания, рабочие и
+   * архив. Смешанный список заставлял искать молчащую кассу глазами
+   * среди двадцати рабочих. Внутри секции — по точке, как раньше.
+   */
+  const sections = useMemo(() => {
+    const empty = { attention: [], active: [], archived: [] }
+    for (const d of visible) empty[fleetSection(d)].push(d)
+    const byLocation = (list) => {
+      const byLoc = new Map()
+      for (const d of list) {
+        const key = d.location_id || '—'
+        if (!byLoc.has(key)) byLoc.set(key, { name: d.location_name || 'No location', devices: [] })
+        byLoc.get(key).devices.push(d)
+      }
+      return [...byLoc.values()].sort((a, b) => a.name.localeCompare(b.name))
     }
-    return [...byLoc.values()].sort((a, b) => a.name.localeCompare(b.name))
-  }, [fleet, visible])
+    return [
+      {
+        key: 'attention',
+        title: 'Needs attention',
+        hint: 'Not reporting, or the queue is stuck.',
+        groups: byLocation(empty.attention),
+      },
+      {
+        key: 'active',
+        title: 'Working',
+        hint: 'Reporting in and sending their queue.',
+        groups: byLocation(empty.active),
+      },
+      {
+        key: 'archived',
+        title: 'Archived',
+        hint: 'Out of the working list. They keep working until you delete them.',
+        groups: byLocation(empty.archived),
+      },
+    ].filter((section) => section.groups.length > 0)
+  }, [visible])
 
   const total = visible.length
   // Архивные не считаем требующими внимания: владелец уже решил их судьбу
@@ -235,6 +278,48 @@ export default function DevicesManager({ context }) {
       </div>
 
       {error && <ErrorText>{error}</ErrorText>}
+      {notice && (
+        <div className="bulk-result" role="status">
+          <span>{notice}</span>
+          <IconButton label="Dismiss" onClick={() => setNotice('')}><X /></IconButton>
+        </div>
+      )}
+
+      {/*
+        Удаление необратимо и закрывает терминалу вход: подтверждение
+        называет кассу по имени и говорит, что останется, а что исчезнет.
+      */}
+      {deleting && (
+        <ConfirmDialog
+          title={`Delete ${deleting.name} for good?`}
+          description={
+            'The register disappears from this list and loses its sign-in — '
+            + 'it cannot come back on its own, and setting it up again means '
+            + 'connecting the terminal from scratch. '
+            + 'Orders, shifts and reports made on it stay untouched.'
+          }
+          confirmLabel="Delete permanently"
+          cancelLabel="Keep it archived"
+          tone="danger"
+          busy={busyId === deleting.id}
+          onCancel={() => setDeleting(null)}
+          onConfirm={async () => {
+            const device = deleting
+            setDeleting(null)
+            setBusyId(device.id)
+            setError('')
+            try {
+              const result = await deleteDevice(device.id)
+              setNotice(deleteOutcome(result))
+              await load(true)
+            } catch (e) {
+              setError(deleteErrorText(e.message))
+            } finally {
+              setBusyId(null)
+            }
+          }}
+        />
+      )}
 
       {loading && !fleet ? (
         <EmptyState>Loading…</EmptyState>
@@ -250,24 +335,33 @@ export default function DevicesManager({ context }) {
         />
       ) : (
         <>
-          {groups.map((g, i) => (
-            <Panel
-              key={i}
-              title={g.name}
-              description={`${g.devices.length} device${g.devices.length === 1 ? '' : 's'}`}
-            >
-              <div className="data-list">
-                {g.devices.map((d) => (
-                  <DeviceRow
-                    key={d.id}
-                    device={d}
-                    busy={busyId === d.id}
-                    onRename={(name) => mutate(d.id, () => renameDevice(d.id, name))}
-                    onArchive={(next) => mutate(d.id, () => setDeviceArchived(d.id, next))}
-                  />
-                ))}
+          {sections.map((section) => (
+            <section className="fleet-section" key={section.key}>
+              <div className="fleet-section-head">
+                <h2>{section.title}</h2>
+                <p>{section.hint}</p>
               </div>
-            </Panel>
+              {section.groups.map((g, i) => (
+                <Panel
+                  key={i}
+                  title={g.name}
+                  description={`${g.devices.length} device${g.devices.length === 1 ? '' : 's'}`}
+                >
+                  <div className="data-list">
+                    {g.devices.map((d) => (
+                      <DeviceRow
+                        key={d.id}
+                        device={d}
+                        busy={busyId === d.id}
+                        onRename={(name) => mutate(d.id, () => renameDevice(d.id, name))}
+                        onArchive={(next) => mutate(d.id, () => setDeviceArchived(d.id, next))}
+                        onDelete={() => setDeleting(d)}
+                      />
+                    ))}
+                  </div>
+                </Panel>
+              ))}
+            </section>
           ))}
           {updatedAt && (
             <p className="updated-at">Updated {updatedAt.toLocaleTimeString('en-GB', { hour: '2-digit', minute: '2-digit' })}</p>

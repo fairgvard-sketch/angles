@@ -3,6 +3,7 @@ import { supabase } from './supabase'
 export {
   deviceStatus, STATUS_LABEL, lastSeenLabel, outboxAgeLabel,
   deviceAdvice, isArchived, filterFleet, fleetErrorText,
+  fleetSection, deleteOutcome, deleteErrorText,
 } from './fleet'
 
 /**
@@ -35,6 +36,27 @@ export async function renameDevice(deviceId, name) {
  * Архив — только классификация кабинета: терминал продолжает работать,
  * записи и отчёты не трогаются, действие обратимо (130).
  */
+/**
+ * Окончательное удаление терминала (касса 135).
+ *
+ * Удаляется строка парка И учётка терминала — иначе касса при следующем
+ * запуске зарегистрируется заново (`register_device` идемпотентна) и
+ * вернётся в список. Сервер откажет, если терминал не в архиве или у
+ * него остались неотправленные операции.
+ *
+ * Возвращает `{ deleted, access_revoked, reason }`: вход закрывается не
+ * всегда — общая на несколько касс или человеческая учётка остаётся, и
+ * интерфейс обязан это сказать.
+ */
+export async function deleteDevice(deviceId) {
+  const { data, error } = await supabase.rpc('delete_device_web', {
+    p_device_id: deviceId,
+    p_staff_session: null,
+  })
+  if (error) throw new Error(error.message)
+  return data ?? { deleted: true, access_revoked: false, reason: null }
+}
+
 export async function setDeviceArchived(deviceId, archived) {
   const { error } = await supabase.rpc('set_device_archived_web', {
     p_device_id: deviceId, p_archived: archived, p_staff_session: null,

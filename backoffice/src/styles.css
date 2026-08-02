@@ -1504,6 +1504,14 @@ a { color: inherit; }
 .catalog-row-cat { color: var(--c-text-subtle); font-size: 12px; white-space: nowrap; }
 .menu-mode { margin-inline-start: auto; }
 
+/* Парк касс: секции «требует внимания / рабочие / архив» */
+.fleet-section { margin-top: var(--sp-5); }
+.fleet-section:first-of-type { margin-top: var(--sp-3); }
+.fleet-section-head { margin-bottom: var(--sp-2); }
+.fleet-section-head h2 { margin: 0; font-size: 15px; }
+.fleet-section-head p { margin: 2px 0 0; color: var(--c-text-subtle); font-size: 12px; }
+.fleet-section .panel + .panel { margin-top: var(--sp-2); }
+
 /* Результат массовой правки и отмена */
 .bulk-result {
   display: flex; flex-wrap: wrap; align-items: center; gap: var(--sp-3);
