@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useRef, useState } from 'react'
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import {
   ArrowDown, ArrowRight, ArrowUp, CheckSquare, ChevronDown, ChevronRight,
   Plus, Search, Trash2, X,
@@ -30,6 +30,9 @@ const TABS = [
   { key: 'modifiers', label: 'Modifiers' },
   { key: 'stations', label: 'Stations' },
 ]
+
+/** Отбор по умолчанию: ничего не отфильтровано. */
+export const EMPTY_FILTERS = { query: '', category: 'all', availability: 'all', state: 'all' }
 
 function money(agorot) {
   return `${agorotToShekels(agorot).toLocaleString('he-IL', { minimumFractionDigits: agorot % 100 ? 2 : 0 })} ₪`
@@ -180,7 +183,7 @@ function BulkReview({ rows, action, busy, error, onCancel, onApply }) {
 }
 
 // ── Вкладка «Товары» ─────────────────────────────────────────
-function ItemsTab({ context, locationId, data, reload }) {
+export function ItemsTab({ context, locationId, data, reload, filters, onFilters }) {
   const [editorItem, setEditorItem] = useState(null) // {} = новый, {id...} = правка
   const [addingCat, setAddingCat] = useState(false)
   const [catName, setCatName] = useState('')
@@ -189,11 +192,14 @@ function ItemsTab({ context, locationId, data, reload }) {
   const [catLoc, setCatLoc] = useState(locationId || context.locations?.[0]?.id || '')
   const [error, setError] = useState('')
 
-  // Поиск и фильтры
-  const [query, setQuery] = useState('')
-  const [catFilter, setCatFilter] = useState('all')
-  const [availability, setAvailability] = useState('all')
-  const [stateFilter, setStateFilter] = useState('all')
+  // Поиск и фильтры живут в разделе, а не во вкладке: заглянуть в
+  // «Модификаторы» и вернуться — не повод потерять отбор, который
+  // владелец только что набрал.
+  const { query, category: catFilter, availability, state: stateFilter } = filters
+  const setQuery = (value) => onFilters({ query: value })
+  const setCatFilter = (value) => onFilters({ category: value })
+  const setAvailability = (value) => onFilters({ availability: value })
+  const setStateFilter = (value) => onFilters({ state: value })
   // Массовая правка
   const [selecting, setSelecting] = useState(false)
   const [selected, setSelected] = useState(new Set())
@@ -340,7 +346,7 @@ function ItemsTab({ context, locationId, data, reload }) {
           <button
             type="button"
             className="text-button"
-            onClick={() => { setQuery(''); setCatFilter('all'); setAvailability('all'); setStateFilter('all') }}
+            onClick={() => onFilters(EMPTY_FILTERS)}
           >
             <X /> Clear
           </button>
@@ -541,7 +547,7 @@ function ItemsTab({ context, locationId, data, reload }) {
 }
 
 // ── Вкладка «Модификаторы» ───────────────────────────────────
-function ModifiersTab({ context, data, reload }) {
+export function ModifiersTab({ context, data, reload }) {
   const [error, setError] = useState('')
   const [newGroup, setNewGroup] = useState('')
 
@@ -579,60 +585,17 @@ function ModifiersTab({ context, data, reload }) {
           </button>
         )}
       </div>
-      {selecting && (
-        <div className="bulk-bar" role="group" aria-label="Bulk actions">
-          <span className="bulk-count">{selected.size} selected</span>
-          <button
-            type="button"
-            className="secondary-button"
-            onClick={() => setSelected(new Set(visible.map((i) => i.id)))}
-          >
-            Select all shown
-          </button>
-          <button type="button" className="secondary-button" disabled={selected.size === 0}
-            onClick={() => askBulk('availability', { available: false })}>Hide</button>
-          <button type="button" className="secondary-button" disabled={selected.size === 0}
-            onClick={() => askBulk('availability', { available: true })}>Put on sale</button>
-          <label className="order-filter">
-            <span className="visually-hidden">Move to category</span>
-            <select
-              value=""
-              disabled={selected.size === 0}
-              onChange={(e) => e.target.value && askBulk('category', { categoryId: e.target.value })}
-            >
-              <option value="">Move to…</option>
-              {data.categories.map((c) => <option key={c.id} value={c.id}>{c.name}</option>)}
-            </select>
-          </label>
-          <label className="order-filter">
-            <span className="visually-hidden">Change prices</span>
-            <select
-              value=""
-              disabled={selected.size === 0}
-              onChange={(e) => e.target.value && askBulk('price', { percent: Number(e.target.value) })}
-            >
-              <option value="">Change price…</option>
-              <option value="10">+10%</option>
-              <option value="5">+5%</option>
-              <option value="-5">−5%</option>
-              <option value="-10">−10%</option>
-            </select>
-          </label>
-        </div>
-      )}
 
       {error && <p className="form-error" role="alert">{error}</p>}
 
-      {visible.length === 0 && (
-        <section className="panel form-panel">
-          <p className="empty-state">
-            {filtersOn ? 'Nothing matches these filters.' : 'The catalogue is empty — add the first item.'}
-          </p>
-        </section>
-      )}
-
       <div className="menu-groups">
-        {data.modifierGroups.length === 0 && <p className="empty-state">No modifier groups yet.</p>}
+        {data.modifierGroups.length === 0 && (
+          <section className="panel form-panel">
+            <p className="empty-state">
+              No modifier groups yet — add the first one above.
+            </p>
+          </section>
+        )}
         {data.modifierGroups.map((g) => {
           const collapsed = isCollapsed(g.id)
           return (
@@ -674,7 +637,7 @@ function ModifiersTab({ context, data, reload }) {
 }
 
 // ── Вкладка «Станции» ────────────────────────────────────────
-function StationsTab({ context, data, reload }) {
+export function StationsTab({ context, data, reload }) {
   const [error, setError] = useState('')
   const [newName, setNewName] = useState('')
 
@@ -716,6 +679,12 @@ export default function MenuManager({ context, locationId }) {
   const [data, setData] = useState(null)
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState('')
+  // Отбор каталога переживает переключение вкладок: см. ItemsTab.
+  const [filters, setFilters] = useState(EMPTY_FILTERS)
+  const patchFilters = useCallback(
+    (patch) => setFilters((prev) => ({ ...prev, ...patch })),
+    []
+  )
 
   async function reload() {
     setLoading(true)
@@ -763,7 +732,16 @@ export default function MenuManager({ context, locationId }) {
         <p className="empty-state">Loading…</p>
       ) : (
         <>
-          {tab === 'items' && <ItemsTab context={context} locationId={locationId} data={data} reload={reload} />}
+          {tab === 'items' && (
+            <ItemsTab
+              context={context}
+              locationId={locationId}
+              data={data}
+              reload={reload}
+              filters={filters}
+              onFilters={patchFilters}
+            />
+          )}
           {tab === 'modifiers' && <ModifiersTab context={context} data={data} reload={reload} />}
           {tab === 'stations' && <StationsTab context={context} data={data} reload={reload} />}
         </>
