@@ -18,6 +18,7 @@ import {
 } from './catalog'
 import ItemEditor from './ItemEditor'
 import { hasCapability } from './navigation'
+import Tabs from './ui/Tabs'
 
 /**
  * Меню в бэкофисе — паритет с POS: товары (создание/правка/удаление, варианты,
@@ -717,14 +718,13 @@ export default function MenuManager({ context, locationId }) {
         </p>
       </section>
 
-      <div className="period-switch menu-tabs" role="tablist" aria-label="Menu section">
-        {TABS.map((t) => (
-          <button key={t.key} role="tab" aria-selected={tab === t.key}
-            className={tab === t.key ? 'is-active' : ''} onClick={() => setTab(t.key)}>
-            {t.label}
-          </button>
-        ))}
-      </div>
+      <Tabs
+        className="period-switch menu-tabs"
+        label="Menu section"
+        items={TABS}
+        value={tab}
+        onChange={setTab}
+      />
 
       {error && <p className="form-error" role="alert">{error}</p>}
 

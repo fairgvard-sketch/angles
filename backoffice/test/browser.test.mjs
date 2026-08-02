@@ -156,6 +156,35 @@ before(async () => {
     createRoot(document.getElementById('root')).render(<App />)
   `)
 
+  await bundle('tabs', `
+    import { useState } from 'react'
+    import { createRoot } from 'react-dom/client'
+    import Tabs from './ui/Tabs'
+
+    const items = [
+      { key: 'items', label: 'Items' },
+      { key: 'modifiers', label: 'Modifiers' },
+      { key: 'stations', label: 'Stations' },
+    ]
+    function Page({ dir }) {
+      const [tab, setTab] = useState('items')
+      return (
+        <main className="content" dir={dir}>
+          <button id="before" className="secondary-button">before the tabs</button>
+          <Tabs
+            className="period-switch menu-tabs"
+            label="Menu section"
+            items={items}
+            value={tab}
+            onChange={setTab}
+          />
+          <p id="current">{tab}</p>
+        </main>
+      )
+    }
+    createRoot(document.getElementById('root')).render(<Page dir={window.__DIR__ || 'ltr'} />)
+  `)
+
   await bundle('preview', `
     import { createRoot } from 'react-dom/client'
     import { GuestPreview } from './QrChannels'
@@ -221,6 +250,84 @@ describe('view error boundary', { skip }, () => {
     await page.click('#other')
     await page.waitForSelector('#other-section')
     assert.equal(await page.$('.view-crash'), null)
+    await page.close()
+  })
+})
+
+describe('tabs keyboard behaviour', { skip }, () => {
+  /**
+   * Раньше `role="tablist"` был обещанием без исполнения: стрелки не
+   * двигали ничего, а Tab прогонял по всем вкладкам подряд. Проверяем в
+   * настоящем браузере — это поведение фокуса, его не видно в разметке.
+   */
+  const open = async (dir = 'ltr') => {
+    const page = await browser.newPage()
+    await page.setViewport({ width: 1440, height: 900 })
+    await page.evaluateOnNewDocument((d) => { window.__DIR__ = d }, dir)
+    await page.goto(`${appOrigin}/tabs`, { waitUntil: 'networkidle0' })
+    return page
+  }
+  const state = (page) => page.evaluate(() => ({
+    current: document.getElementById('current').textContent,
+    active: document.activeElement?.textContent ?? '',
+    entries: [...document.querySelectorAll('[role="tab"]')]
+      .filter((t) => t.tabIndex === 0).map((t) => t.textContent),
+  }))
+
+  it('в группу ведёт один Tab, дальше двигают стрелки', async () => {
+    const page = await open()
+    await page.focus('#before')
+    await page.keyboard.press('Tab')
+    assert.equal((await state(page)).active, 'Items', 'Tab заводит на активную вкладку')
+
+    await page.keyboard.press('ArrowRight')
+    let now = await state(page)
+    assert.equal(now.current, 'modifiers')
+    assert.equal(now.active, 'Modifiers')
+    assert.deepEqual(now.entries, ['Modifiers'], 'точка входа переезжает на выбранную')
+
+    await page.keyboard.press('End')
+    assert.equal((await state(page)).current, 'stations')
+    await page.keyboard.press('ArrowRight')
+    assert.equal((await state(page)).current, 'items', 'с последней вправо — на первую')
+    await page.keyboard.press('Home')
+    assert.equal((await state(page)).current, 'items')
+
+    // Следующий Tab уводит из группы, а не по остальным вкладкам
+    await page.keyboard.press('Tab')
+    assert.notEqual((await state(page)).active, 'Modifiers')
+    await page.close()
+  })
+
+  it('в RTL стрелка вправо ведёт к предыдущей вкладке', async () => {
+    const page = await open('rtl')
+    await page.focus('#before')
+    await page.keyboard.press('Tab')
+    await page.keyboard.press('ArrowRight')
+    assert.equal((await state(page)).current, 'stations', 'вправо в RTL — это назад')
+    await page.keyboard.press('ArrowLeft')
+    assert.equal((await state(page)).current, 'items')
+    await page.close()
+  })
+
+  it('фокус с клавиатуры видно, а от мыши подсветки нет', async () => {
+    const page = await open()
+    const ring = (sel) => page.evaluate((s) => {
+      const el = document.querySelector(s)
+      const cs = getComputedStyle(el)
+      return { width: cs.outlineWidth, style: cs.outlineStyle }
+    }, sel)
+
+    await page.focus('#before')
+    await page.keyboard.press('Tab')
+    const keyboard = await ring('[role="tab"][tabindex="0"]')
+    assert.notEqual(keyboard.style, 'none', 'клавиатурный фокус обязан быть виден')
+    assert.notEqual(keyboard.width, '0px')
+
+    await page.mouse.click(10, 10) // сбросить фокус
+    await page.click('#before')
+    const mouse = await ring('#before')
+    assert.equal(mouse.style, 'none', 'клик мышью не рисует рамку')
     await page.close()
   })
 })

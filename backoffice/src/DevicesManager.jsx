@@ -1,13 +1,17 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
 import {
   Archive, ArchiveRestore, MonitorSmartphone, Pencil, RefreshCw, AlertTriangle,
-  Search, Wifi, X,
+  Wifi, X,
 } from 'lucide-react'
 import {
   fetchFleet, renameDevice, setDeviceArchived,
   deviceStatus, STATUS_LABEL, lastSeenLabel, outboxAgeLabel,
   deviceAdvice, filterFleet, fleetErrorText, isArchived,
 } from './devices'
+import { Button, IconButton } from './ui/Button'
+import {
+  EmptyPanel, EmptyState, ErrorText, PageHeader, Panel, SearchField, StatusBadge,
+} from './ui/Layout'
 
 /**
  * «Девайсы» — парк касс организации. Данные из телеметрии (heartbeat 074)
@@ -27,7 +31,7 @@ function statusVersions(device) {
   return parts.join(' · ')
 }
 
-function DeviceRow({ device, busy, onRename, onArchive }) {
+export function DeviceRow({ device, busy, onRename, onArchive }) {
   const status = deviceStatus(device)
   const outboxAge = outboxAgeLabel(device)
   const advice = deviceAdvice(device)
@@ -41,7 +45,7 @@ function DeviceRow({ device, busy, onRename, onArchive }) {
   return (
     <div className={`data-row device-row${archived ? ' is-archived' : ''}`}>
       <div className="device-main">
-        <span className={`device-status is-${status}`}><i />{STATUS_LABEL[status]}</span>
+        <StatusBadge className="device-status" tone={status} label={STATUS_LABEL[status]} />
         <div className="device-name">
           {editing ? (
             <form
@@ -69,15 +73,15 @@ function DeviceRow({ device, busy, onRename, onArchive }) {
                 aria-label={`Name for ${device.name}`}
                 onChange={(e) => setName(e.target.value)}
               />
-              <button
+              <Button
                 type="submit"
-                className="text-button"
+                variant="text"
                 /* Safari не фокусирует кнопки по клику, поэтому
                    relatedTarget там пуст — не даём увести фокус вовсе. */
                 onMouseDown={(e) => e.preventDefault()}
               >
                 Save
-              </button>
+              </Button>
             </form>
           ) : (
             <strong>
@@ -102,25 +106,21 @@ function DeviceRow({ device, busy, onRename, onArchive }) {
         )}
         <span className="device-seen">{lastSeenLabel(device)}</span>
         <div className="device-actions">
-          <button
-            type="button"
-            className="icon-button"
+          <IconButton
             disabled={busy}
-            aria-label={`Rename ${device.name}`}
+            label={`Rename ${device.name}`}
             onClick={() => { setName(device.name); setEditing(true) }}
           >
             <Pencil />
-          </button>
-          <button
-            type="button"
-            className="icon-button"
+          </IconButton>
+          <IconButton
             disabled={busy}
-            aria-label={archived ? `Restore ${device.name}` : `Archive ${device.name}`}
+            label={archived ? `Restore ${device.name}` : `Archive ${device.name}`}
             title={archived ? 'Back to the working list' : 'Hide from the working list — the terminal keeps working'}
             onClick={() => onArchive(!archived)}
           >
             {archived ? <ArchiveRestore /> : <Archive />}
-          </button>
+          </IconButton>
         </div>
       </div>
     </div>
@@ -199,68 +199,63 @@ export default function DevicesManager({ context }) {
 
   return (
     <>
-      <section className="page-heading compact-heading">
-        <p className="eyebrow">{context.organization?.name}</p>
-        <h1>Devices</h1>
-        <p>POS terminals connected to your organisation.</p>
-      </section>
+      <PageHeader
+        eyebrow={context.organization?.name}
+        title="Devices"
+        description="POS terminals connected to your organisation."
+      />
 
       <div className="order-toolbar">
-        <label className="order-search">
-          <Search aria-hidden />
-          <span className="visually-hidden">Search devices</span>
-          <input
-            type="search"
-            value={query}
-            placeholder="Name, location or version"
-            onChange={(e) => setQuery(e.target.value)}
-          />
-        </label>
+        <SearchField
+          label="Search devices"
+          value={query}
+          onChange={setQuery}
+          placeholder="Name, location or version"
+        />
         {/* Списанные кассы не должны занимать операционный список, но
             и потеряться не должны — переключатель, а не удаление. */}
         {archivedCount > 0 && (
-          <button
-            type="button"
-            className={showArchived ? 'primary-button compact' : 'secondary-button'}
+          <Button
+            variant={showArchived ? 'primary' : 'secondary'}
+            size={showArchived ? 'compact' : 'default'}
             aria-pressed={showArchived}
             onClick={() => setShowArchived((v) => !v)}
           >
             {showArchived ? 'Hide archived' : `Show archived (${archivedCount})`}
-          </button>
+          </Button>
         )}
         {query && (
-          <button type="button" className="text-button" onClick={() => setQuery('')}><X /> Clear</button>
+          <Button variant="text" onClick={() => setQuery('')}><X /> Clear</Button>
         )}
         <div className="device-summary">
           <span><Wifi /> {total} device{total === 1 ? '' : 's'}</span>
           {attention > 0 && <span className="is-negative"><AlertTriangle /> {attention} need attention</span>}
         </div>
-        <button className="icon-button" onClick={() => load()} aria-label="Refresh devices" disabled={loading}><RefreshCw /></button>
+        <IconButton onClick={() => load()} label="Refresh devices" disabled={loading}><RefreshCw /></IconButton>
       </div>
 
-      {error && <p className="form-error" role="alert">{error}</p>}
+      {error && <ErrorText>{error}</ErrorText>}
 
       {loading && !fleet ? (
-        <p className="empty-state">Loading…</p>
+        <EmptyState>Loading…</EmptyState>
       ) : total === 0 && (query || showArchived) ? (
-        <section className="panel form-panel">
-          <p className="empty-state">No devices match this search.</p>
-        </section>
+        <Panel className="form-panel">
+          <EmptyState>No devices match this search.</EmptyState>
+        </Panel>
       ) : total === 0 ? (
-        <section className="section-placeholder panel">
-          <span className="section-icon"><MonitorSmartphone /></span>
-          <div>
-            <h2>No devices yet</h2>
-            <p>Terminals appear here once your ANGLE POS has been set up on a device.</p>
-          </div>
-        </section>
+        <EmptyPanel
+          icon={<MonitorSmartphone />}
+          title="No devices yet"
+          description="Terminals appear here once your ANGLE POS has been set up on a device."
+        />
       ) : (
         <>
           {groups.map((g, i) => (
-            <section className="panel" key={i}>
-              <div className="panel-heading">
-                <div><h2>{g.name}</h2><p>{g.devices.length} device{g.devices.length === 1 ? '' : 's'}</p></div>
-              </div>
+            <Panel
+              key={i}
+              title={g.name}
+              description={`${g.devices.length} device${g.devices.length === 1 ? '' : 's'}`}
+            >
               <div className="data-list">
                 {g.devices.map((d) => (
                   <DeviceRow
@@ -272,7 +267,7 @@ export default function DevicesManager({ context }) {
                   />
                 ))}
               </div>
-            </section>
+            </Panel>
           ))}
           {updatedAt && (
             <p className="updated-at">Updated {updatedAt.toLocaleTimeString('en-GB', { hour: '2-digit', minute: '2-digit' })}</p>

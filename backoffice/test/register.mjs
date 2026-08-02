@@ -21,7 +21,8 @@ import { transformSync } from 'esbuild'
  * Новых зависимостей нет: esbuild уже стоит внутри Vite.
  */
 
-const SOURCE = /\/backoffice\/(src|test)\/[^/]+\.(jsx|js)$/
+// Подкаталоги тоже наши: общие примитивы живут в `src/ui/`.
+const SOURCE = /\/backoffice\/(src|test)\/.+\.(jsx|js)$/
 
 registerHooks({
   // Внутри кабинета соседи импортируются без расширения — так их
