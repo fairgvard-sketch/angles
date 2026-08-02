@@ -4,6 +4,7 @@ import {
   fetchActivity, TYPE_META, eventTitle, eventAmount, eventDetail, timeAgo,
   ACTIVITY_TYPES, activityToCsv, activityFileName,
 } from './activity'
+import { PageHeader } from './ui/Layout'
 
 /**
  * «Activity» — журнал событий кассы (открытие/закрытие смены, возврат) из
@@ -157,11 +158,11 @@ export default function ActivityManager({ context }) {
 
   return (
     <>
-      <section className="page-heading compact-heading">
-        <p className="eyebrow">{context.organization?.name}</p>
-        <h1>Activity</h1>
-        <p>Shifts opened and closed, and refunds issued on your registers.</p>
-      </section>
+      <PageHeader
+        eyebrow={context.organization?.name}
+        title="Activity"
+        description="Shifts opened and closed, and refunds issued on your registers."
+      />
 
       <div className="overview-toolbar">
         <label className="guest-search">

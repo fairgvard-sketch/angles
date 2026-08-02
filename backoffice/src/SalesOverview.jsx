@@ -7,6 +7,7 @@ import {
   previousRange, PREVIOUS_LABEL, delta, scopeLine, channelLabel, orderTypeLabel,
   salesToCsv, salesFileName,
 } from './sales'
+import { PageHeader } from './ui/Layout'
 
 /**
  * «Sales» — выручка владельца. Данные из sales_report (089, членство вместо
@@ -212,13 +213,11 @@ export default function SalesOverview({ context }) {
 
   return (
     <>
-      <section className="page-heading compact-heading">
-        <p className="eyebrow">{context?.organization?.name}</p>
-        <h1>Sales</h1>
+      <PageHeader eyebrow={context?.organization?.name} title="Sales">
         {/* Охват приходит с сервера вместе с числами: период, точки, зона
             и валюта. Без него число невозможно проверить. */}
         <p className="scope-line">{scopeLine(report?.scope, from, to)}</p>
-      </section>
+      </PageHeader>
 
       <div className="overview-toolbar">
         <div className="period-switch" role="tablist" aria-label="Reporting period">

@@ -14,6 +14,7 @@ import LaunchChecklist from './LaunchChecklist'
 import BookingForm from './BookingForm'
 import { fetchLocationSlug, fetchLocation } from './settings'
 import { fetchTimelineTables } from './reservations'
+import { PageHeader } from './ui/Layout'
 
 /**
  * «Reservations» — веб-стол хостес (Kassa 102): подтверждение, отказ,
@@ -183,11 +184,11 @@ export default function ReservationsDesk({ context, locationId, tab, onTabChange
 
   return (
     <>
-      <section className="page-heading compact-heading">
-        <p className="eyebrow">{context.organization?.name}</p>
-        <h1>Reservations</h1>
-        <p>Booking requests and today’s visits — confirm, complete or mark no-shows.</p>
-      </section>
+      <PageHeader
+        eyebrow={context.organization?.name}
+        title="Reservations"
+        description="Booking requests and today’s visits — confirm, complete or mark no-shows."
+      />
 
       {/* Гость по телефону и гость с улицы — обычная работа хостес, а не
           повод идти к кассе. Кнопки стоят над таблицей, а не в углу

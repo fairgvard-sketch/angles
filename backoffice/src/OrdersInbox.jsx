@@ -12,6 +12,7 @@ import {
   bucketOrders, dayStartMs, elapsedLabel, filterOrders, formatAgorot,
   fulfilmentMode, orderItemLines, orderRef, orderTimeLabel,
 } from './orders-inbox'
+import { PageHeader } from './ui/Layout'
 
 /**
  * «Orders» — рабочий инбокс онлайн-заказов (Kassa 101, Phase 3).
@@ -324,15 +325,13 @@ export default function OrdersInbox({ context, locationId }) {
 
   return (
     <>
-      <section className="page-heading compact-heading">
-        <p className="eyebrow">{context.organization?.name}</p>
-        <h1>Orders</h1>
-        <p>
-          {standalone
-            ? 'Incoming online orders — accept, prepare and complete them right here.'
-            : 'Online orders for this location are accepted on the register; here they are read-only.'}
-        </p>
-      </section>
+      <PageHeader
+        eyebrow={context.organization?.name}
+        title="Orders"
+        description={standalone
+          ? 'Incoming online orders — accept, prepare and complete them right here.'
+          : 'Online orders for this location are accepted on the register; here they are read-only.'}
+      />
 
       <div className="order-toolbar">
         <label className="order-search">
