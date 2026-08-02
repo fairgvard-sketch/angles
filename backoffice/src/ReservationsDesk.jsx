@@ -1,10 +1,15 @@
-import { useCallback, useEffect, useRef, useState } from 'react'
-import { CalendarDays, DoorOpen, Phone, Plus, RefreshCw, StickyNote, Users } from 'lucide-react'
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
+import {
+  CalendarDays, ChevronLeft, ChevronRight, DoorOpen, Phone, Plus, RefreshCw,
+  StickyNote, Users,
+} from 'lucide-react'
 import { supabase } from './supabase'
 import {
-  RESERVATION_STATUS_LABELS, RESERVATION_ACTIONS,
+  RESERVATION_ACTIONS,
   fetchReservations, setReservationStatus, visitLabel,
 } from './reservations'
+import { statusClass, statusLabel, visitState } from './reservation-status'
+import { shiftDate, todayInZone } from './timeline'
 import { playNewOrderChime } from './orders'
 import TimelineDesk from './TimelineDesk'
 import WaitlistPanel from './WaitlistPanel'
@@ -14,9 +19,10 @@ import LaunchChecklist from './LaunchChecklist'
 import BookingForm from './BookingForm'
 import Tabs from './ui/Tabs'
 import ConfirmDialog from './ui/ConfirmDialog'
+import { IconButton } from './ui/Button'
 import { fetchLocationSlug, fetchLocation } from './settings'
 import { fetchTimelineTables } from './reservations'
-import { PageHeader } from './ui/Layout'
+import { SearchField } from './ui/Layout'
 
 /**
  * «Reservations» — веб-стол хостес (Kassa 102): подтверждение, отказ,
@@ -43,6 +49,7 @@ const VIEWS = [
 function ReservationCard({ reservation, busyAction, onAction }) {
   const seated = reservation.order_id != null
   const actions = seated ? [] : (RESERVATION_ACTIONS[reservation.status] ?? [])
+  const state = visitState(reservation)
   return (
     <article className={`order-card is-${reservation.status}`}>
       <header className="order-card-head">
@@ -54,12 +61,14 @@ function ReservationCard({ reservation, busyAction, onAction }) {
             {reservation.customer_phone && <> · <Phone /> {reservation.customer_phone}</>}
           </small>
         </div>
-        <span className={`order-status is-${reservation.status === 'confirmed' ? 'ready' : reservation.status}`}>
-          {/* Тестовая бронь (126) занимает настоящий стол — её нельзя
-              спутать с гостевой, иначе хостес будет ждать никого. */}
+        {/* Состояние тем же словом и цветом, что на полотне: один визит
+            не может называться в списке иначе, чем в таймлайне.
+            Тестовая бронь (126) занимает настоящий стол — её нельзя
+            спутать с гостевой, иначе хостес будет ждать никого. */}
+        <span className={`rsv-status ${statusClass(state)}`}>
           {reservation.is_test
             ? 'Test'
-            : seated ? 'Seated (POS)' : RESERVATION_STATUS_LABELS[reservation.status] ?? reservation.status}
+            : seated ? 'Seated (POS)' : statusLabel(state)}
         </span>
       </header>
       {reservation.note && <p className="order-note"><StickyNote /> {reservation.note}</p>}
@@ -87,7 +96,9 @@ function ReservationCard({ reservation, busyAction, onAction }) {
   )
 }
 
-export default function ReservationsDesk({ context, locationId, tab, onTabChange }) {
+export default function ReservationsDesk({
+  context, locationId, tab, onTabChange, date, onDateChange,
+}) {
   const [data, setData] = useState(null)
   const [error, setError] = useState('')
   const [busy, setBusy] = useState(null) // { id, to }
@@ -106,6 +117,19 @@ export default function ReservationsDesk({ context, locationId, tab, onTabChange
   const [tables, setTables] = useState([])
   const [tz, setTz] = useState('Asia/Jerusalem')
   const knownIds = useRef(new Set())
+
+  /*
+   * День и поиск принадлежат разделу, а не одной вкладке: полотно,
+   * список и лист ожидания отвечают на вопросы про ОДИН день, и
+   * переключение вкладки не должно возвращать хостес в «сегодня».
+   *
+   * День живёт в адресе (`?d=`), поиск — нет: ссылку присылают на день,
+   * а не на набранную в поле строку.
+   */
+  const today = todayInZone(Date.now(), tz)
+  const day = date || today
+  const setDay = (next) => onDateChange?.(next === today ? null : next)
+  const [query, setQuery] = useState('')
 
   useEffect(() => {
     if (!locationId) return
@@ -189,39 +213,81 @@ export default function ReservationsDesk({ context, locationId, tab, onTabChange
     }
   }
 
-  const active = data?.active ?? []
+  // Поиск раздела работает и здесь: поле в шапке обязано что-то менять
+  // на КАЖДОЙ вкладке, иначе это украшение.
+  const matches = useMemo(() => {
+    const needle = query.trim().toLowerCase()
+    if (!needle) return () => true
+    return (r) => `${r.customer_name ?? ''} ${r.customer_phone ?? ''}`
+      .toLowerCase().includes(needle)
+  }, [query])
+
+  const active = (data?.active ?? []).filter(matches)
   const pending = active.filter((r) => r.status === 'new')
   const confirmed = active.filter((r) => r.status !== 'new')
-  const history = data?.history ?? []
+  const history = (data?.history ?? []).filter(matches)
 
   return (
     <>
-      <PageHeader
-        eyebrow={context.organization?.name}
-        title="Reservations"
-        description="Booking requests and today’s visits — confirm, complete or mark no-shows."
-      />
+      {/*
+        Одна рабочая строка вместо титульного заголовка на 40px, описания
+        в две строки и отдельной полосы кнопок: раздел хостес открывают,
+        чтобы увидеть день, а не прочитать, что это раздел броней.
 
-      {/* Гость по телефону и гость с улицы — обычная работа хостес, а не
-          повод идти к кассе. Кнопки стоят над таблицей, а не в углу
-          карточки: их ищут первыми. */}
-      <div className="desk-actions">
-        <button
-          type="button"
-          className="primary-button compact"
-          disabled={!locationId}
-          onClick={() => setCreating('booking')}
-        >
-          <Plus /> New reservation
-        </button>
-        <button
-          type="button"
-          className="secondary-button"
-          disabled={!locationId}
-          onClick={() => setCreating('walk-in')}
-        >
-          <DoorOpen /> Walk-in
-        </button>
+        Гость по телефону и гость с улицы — обычная работа хостес, а не
+        повод идти к кассе, поэтому оба действия стоят здесь.
+      */}
+      <div className="rsv-header">
+        <h1>Reservations</h1>
+
+        <div className="rsv-daynav">
+          <IconButton label="Previous day" onClick={() => setDay(shiftDate(day, -1))}>
+            <ChevronLeft />
+          </IconButton>
+          <input
+            type="date"
+            aria-label="Reservations day"
+            value={day}
+            onChange={(e) => e.target.value && setDay(e.target.value)}
+          />
+          <IconButton label="Next day" onClick={() => setDay(shiftDate(day, 1))}>
+            <ChevronRight />
+          </IconButton>
+          <button
+            type="button"
+            className="rsv-today"
+            disabled={day === today}
+            onClick={() => setDay(today)}
+          >
+            Today
+          </button>
+        </div>
+
+        <SearchField
+          label="Search reservations"
+          value={query}
+          onChange={setQuery}
+          placeholder="Guest name or phone"
+        />
+
+        <div className="rsv-header-actions">
+          <button
+            type="button"
+            className="secondary-button"
+            disabled={!locationId}
+            onClick={() => setCreating('walk-in')}
+          >
+            <DoorOpen /> Walk-in
+          </button>
+          <button
+            type="button"
+            className="primary-button compact"
+            disabled={!locationId}
+            onClick={() => setCreating('booking')}
+          >
+            <Plus /> New reservation
+          </button>
+        </div>
       </div>
 
       {/* Пять вкладок на 390px переносились в две строки, и активная
@@ -278,7 +344,9 @@ export default function ReservationsDesk({ context, locationId, tab, onTabChange
         />
       )}
 
-      {view === 'timeline' && locationId && <TimelineDesk locationId={locationId} />}
+      {view === 'timeline' && locationId && (
+        <TimelineDesk locationId={locationId} date={day} query={query} />
+      )}
       {view === 'waitlist' && locationId && <WaitlistPanel locationId={locationId} />}
       {view === 'floor' && locationId && <FloorPlanEditor locationId={locationId} />}
       {/* Аналитика намеренно смотрит на всю организацию: сравнение точек
@@ -299,7 +367,9 @@ export default function ReservationsDesk({ context, locationId, tab, onTabChange
         {data === null ? (
           <p className="empty-state">Loading…</p>
         ) : pending.length === 0 ? (
-          <p className="empty-state">No pending requests.</p>
+          <p className="empty-state">
+            {query.trim() ? `No pending request matches “${query.trim()}”.` : 'No pending requests.'}
+          </p>
         ) : (
           <div className="order-grid">
             {pending.map((reservation) => (
@@ -323,7 +393,9 @@ export default function ReservationsDesk({ context, locationId, tab, onTabChange
         {data === null ? (
           <p className="empty-state">Loading…</p>
         ) : confirmed.length === 0 ? (
-          <p className="empty-state">No confirmed visits yet.</p>
+          <p className="empty-state">
+            {query.trim() ? `No visit matches “${query.trim()}”.` : 'No confirmed visits yet.'}
+          </p>
         ) : (
           <div className="order-grid">
             {confirmed.map((reservation) => (

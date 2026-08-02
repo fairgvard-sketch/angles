@@ -697,6 +697,7 @@ function Dashboard({ session, context, onReloadContext }) {
       view: parsed.view,
       locationId: parsed.locationId || readStoredLocation(),
       tab: parsed.tab,
+      date: parsed.date,
     }
   })
 
@@ -729,20 +730,22 @@ function Dashboard({ session, context, onReloadContext }) {
   // Адрес всегда отражает то, что на экране; кривой приводим в порядок
   // заменой записи, чтобы Назад не возвращал в него же.
   useEffect(() => {
-    const current = { view, locationId, tab: route.tab }
+    const current = { view, locationId, tab: route.tab, date: route.date }
     routeRef.current = current
     const url = routeToUrl(current, window.location.pathname)
     if (url !== window.location.pathname + window.location.search) {
       window.history.replaceState({ ...current }, '', url)
     }
-  }, [view, locationId, route.tab])
+  }, [view, locationId, route.tab, route.date])
 
   // Назад/Вперёд браузера меняют раздел, а не выкидывают из кабинета
   const poppedRef = useRef(false)
   useEffect(() => {
     function onPopState() {
       const parsed = parseRoute(window.location.search)
-      const next = { view: parsed.view, locationId: parsed.locationId, tab: parsed.tab }
+      const next = {
+        view: parsed.view, locationId: parsed.locationId, tab: parsed.tab, date: parsed.date,
+      }
       routeRef.current = next
       poppedRef.current = true
       setRoute(next)
@@ -766,7 +769,7 @@ function Dashboard({ session, context, onReloadContext }) {
       return
     }
     window.scrollTo(0, 0)
-  }, [view, locationId, route.tab])
+  }, [view, locationId])
 
   const navigate = useCallback((nextView, nextLocationId = null, nextTab = null) => {
     const prev = routeRef.current
@@ -776,6 +779,8 @@ function Dashboard({ session, context, onReloadContext }) {
       // Вкладка принадлежит разделу: уходя из него, её нельзя тащить.
       // Явно переданная вкладка — переход «в конкретное место раздела».
       tab: nextTab ?? (nextView === prev.view ? prev.tab : null),
+      // День — тоже свойство раздела, а не кабинета целиком.
+      date: nextView === prev.view ? prev.date : null,
     })
   }, [applyRoute])
 
@@ -790,6 +795,12 @@ function Dashboard({ session, context, onReloadContext }) {
     applyRoute({ ...routeRef.current, tab: nextTab }, 'replace')
   }, [applyRoute])
 
+  // Смена дня — то же самое: листание календаря не должно набивать
+  // историю браузера десятком шагов назад.
+  const changeDate = useCallback((nextDate) => {
+    applyRoute({ ...routeRef.current, date: nextDate || null }, 'replace')
+  }, [applyRoute])
+
   useEffect(() => { if (locationId) storeLocation(locationId) }, [locationId])
 
   async function signOut() {
@@ -800,6 +811,8 @@ function Dashboard({ session, context, onReloadContext }) {
   // ссылка в поддержку должны открывать тот же экран, а не первый таб.
   const scopedProps = { locationId, onLocationChange: changeLocation }
   const tabProps = { tab: route.tab, onTabChange: changeTab }
+  // День живёт в адресе только у раздела броней — остальным он не нужен
+  const dateProps = { date: route.date, onDateChange: changeDate }
 
   return (
     <AppShell
@@ -822,9 +835,13 @@ function Dashboard({ session, context, onReloadContext }) {
     >
       {/* Граница ошибки живёт внутри рабочей области и пересоздаётся при
           смене раздела: упавший модуль не уносит навигацию, шапку и
-          возможность уйти в другой раздел. */}
+          возможность уйти в другой раздел.
+          Вкладки в ключе НЕТ намеренно: раньше переход Timeline → List и
+          обратно пересоздавал раздел целиком — полотно теряло день,
+          зону и позицию прокрутки и заново тянуло данные. Вкладка — это
+          другой ответ на тот же вопрос, а не другой экран. */}
       <ViewErrorBoundary
-        key={`${view}:${locationId ?? ''}:${route.tab ?? ''}`}
+        key={`${view}:${locationId ?? ''}`}
         view={view}
         onHome={() => navigate(DEFAULT_VIEW)}
       >
@@ -840,7 +857,7 @@ function Dashboard({ session, context, onReloadContext }) {
           ))}
         {view === 'orders' && <OrdersInbox context={context} {...scopedProps} />}
         {view === 'reservations' && (
-          <ReservationsDesk context={context} {...scopedProps} {...tabProps} />
+          <ReservationsDesk context={context} {...scopedProps} {...tabProps} {...dateProps} />
         )}
         {view === 'sales' && <SalesOverview context={context} />}
         {view === 'activity' && <ActivityManager context={context} />}

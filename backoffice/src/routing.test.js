@@ -61,10 +61,26 @@ test('точка сохраняется и на Dashboard — выбор не с
   assert.equal(routeToSearch({ view: 'overview', locationId: 'loc-9' }), '?loc=loc-9')
 })
 
-test('sameRoute отличает изменение раздела, точки и вкладки', () => {
+test('sameRoute отличает изменение раздела, точки, вкладки и дня', () => {
   const base = { view: 'orders', locationId: 'a', tab: null }
   assert.equal(sameRoute(base, { ...base }), true)
   assert.equal(sameRoute(base, { ...base, view: 'menu' }), false)
   assert.equal(sameRoute(base, { ...base, locationId: 'b' }), false)
   assert.equal(sameRoute(base, { ...base, tab: 'history' }), false)
+  assert.equal(sameRoute(base, { ...base, date: '2026-05-17' }), false)
+  // Отсутствие дня и явный null — это один и тот же «сегодня»
+  assert.equal(sameRoute(base, { ...base, date: null }), true)
+})
+
+test('рабочий день раздела живёт в адресе', () => {
+  const search = routeToSearch({ view: 'reservations', locationId: 'loc-1', date: '2026-05-17' })
+  assert.equal(search, '?view=reservations&loc=loc-1&d=2026-05-17')
+  assert.equal(parseRoute(search, ALLOWED).date, '2026-05-17')
+})
+
+test('испорченный день — не «Invalid Date», а сегодня', () => {
+  // Ссылку правят руками и присылают в поддержку обрезанной
+  assert.equal(parseRoute('?view=reservations&d=17-05-2026', ALLOWED).date, null)
+  assert.equal(parseRoute('?view=reservations&d=', ALLOWED).date, null)
+  assert.equal(routeToSearch({ view: 'reservations', date: 'вчера' }), '?view=reservations')
 })

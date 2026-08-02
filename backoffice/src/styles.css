@@ -43,6 +43,27 @@
   --c-danger: #b4453c;
   --c-success: #34734c;
 
+  /* Состояния визита. Один набор на таймлайн, список, лист ожидания и
+     панель визита: цвет статуса меняется здесь, а не в семи местах.
+     Пары фон/текст держат контраст ≥ 4.5:1 — статус читается и мелким
+     шрифтом внутри узкого блока. Кобальт занят двумя вещами и только
+     ими: «сейчас» и «выбрано», иначе указатель времени спорит за
+     внимание со статусом. Красный оставлен конфликту — состояние
+     «ждёт подтверждения» ошибкой не является. */
+  --rsv-confirmed-bg: #0b2345;
+  --rsv-confirmed-fg: #fff;
+  --rsv-seated-bg: #168a4b;
+  --rsv-seated-fg: #fff;
+  --rsv-pending-bg: #f3c85b;
+  --rsv-pending-fg: #3a2a00;
+  --rsv-done-bg: #d9dde2;
+  --rsv-done-fg: #49515c;
+  --rsv-noshow-bg: #fdf1f0;
+  --rsv-noshow-fg: #9b2c22;
+  --rsv-conflict: #d92d20;
+  --rsv-conflict-surface: #fdeceb;
+  --rsv-accent: #2563eb;
+
   /* Тени и фокус */
   --shadow-1: 0 1px 2px rgb(20 22 27 / 10%);
   --shadow-pop: 0 12px 32px rgb(20 24 31 / 14%);
@@ -1258,9 +1279,12 @@ a { color: inherit; }
    Столы по вертикали, время по горизонтали. Полотно прокручивается
    горизонтально; колонка столов и линейка часов держат ширину, поэтому
    блоки позиционируются процентами внутри трека фиксированной ширины. */
+/* Тулбар полотна: только то, что меняет само полотно. День и поиск
+   принадлежат разделу и живут в его шапке, метрик здесь нет — место
+   отдано столам. */
 .timeline-controls {
-  display: grid; grid-template-columns: auto minmax(0, 1fr) auto;
-  align-items: end; gap: 14px; margin: 16px 0 12px;
+  display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between;
+  gap: var(--sp-3); margin: 0 0 var(--sp-3);
 }
 .timeline-filter-group { min-width: 0; display: grid; gap: 6px; }
 .timeline-control-label {
@@ -1289,14 +1313,6 @@ a { color: inherit; }
   border-color: var(--c-text); background: var(--c-text); color: var(--c-on-ink);
   box-shadow: 0 1px 2px rgb(20 22 27 / 14%);
 }
-.timeline-summary { display: flex; gap: 8px; margin-inline-start: auto; }
-.timeline-summary span {
-  min-width: 78px; min-height: 54px; display: flex; flex-direction: column;
-  justify-content: center; padding: 7px 10px; border-radius: 9px; background: var(--c-surface-muted);
-}
-.timeline-summary small { color: #6f747d; font-size: 10px; white-space: nowrap; }
-.timeline-summary strong { margin-top: 2px; font-size: 17px; color: var(--c-text); font-variant-numeric: tabular-nums; }
-.timeline-summary .is-accent strong { color: #a15c07; }
 .timeline-guide {
   display: flex; align-items: center; justify-content: space-between;
   gap: 12px; margin-bottom: 9px;
@@ -1304,10 +1320,11 @@ a { color: inherit; }
 .timeline-legend { display: flex; flex-wrap: wrap; align-items: center; gap: 10px; }
 .timeline-legend span { display: inline-flex; align-items: center; gap: 5px; color: #686e77; font-size: 11px; }
 .timeline-legend i { width: 9px; height: 9px; border: 1px solid; border-radius: 3px; }
-.timeline-legend i.is-pending { background: #fff8eb; border-color: #e9b85e; }
-.timeline-legend i.is-confirmed { background: var(--c-surface); border-color: #bfc4cb; }
-.timeline-legend i.is-arrived { background: var(--c-text); border-color: var(--c-text); }
-.timeline-legend i.is-done { background: var(--c-border-soft); border-color: #d6d9de; }
+.timeline-legend i.is-pending { background: var(--rsv-pending-bg); border-color: var(--rsv-pending-bg); }
+.timeline-legend i.is-confirmed { background: var(--rsv-confirmed-bg); border-color: var(--rsv-confirmed-bg); }
+.timeline-legend i.is-arrived { background: var(--rsv-seated-bg); border-color: var(--rsv-seated-bg); }
+.timeline-legend i.is-done { background: var(--rsv-done-bg); border-color: #c8ced5; }
+.timeline-legend i.is-conflict { background: var(--rsv-conflict-surface); border-color: var(--rsv-conflict); }
 .timeline-pan { display: flex; align-items: center; gap: 14px; flex: none; }
 .timeline-pan .text-button { min-height: 32px; color: #555b64; }
 .timeline-pan svg { width: 14px; height: 14px; }
@@ -1315,8 +1332,17 @@ a { color: inherit; }
   margin: -2px 0 10px; color: #80858d; font-size: 11px;
 }
 
+/*
+ * Полотно прокручивается САМО — и по горизонтали, и по вертикали.
+ *
+ * Раньше вертикально ехала вся страница, и «липкая» шкала часов липла к
+ * окну браузера: на зале в тридцать столов хостес прокручивал до нижних
+ * строк и терял из виду время, к которому они относятся. Своя область
+ * прокрутки возвращает шкале и колонке столов их работу.
+ */
 .timeline-scroll {
-  max-width: 100%; overflow-x: auto; overscroll-behavior-x: contain;
+  max-width: 100%; max-height: min(70vh, 760px);
+  overflow: auto; overscroll-behavior: contain;
   -webkit-overflow-scrolling: touch; border: 1px solid var(--c-border-panel);
   border-radius: 10px; background: var(--c-surface); scrollbar-width: thin;
 }
@@ -1324,7 +1350,9 @@ a { color: inherit; }
   --timeline-label-width: 112px;
   width: calc(var(--timeline-label-width) + var(--timeline-track-width));
 }
-.timeline-ruler { display: flex; position: sticky; top: 0; z-index: 2; background: var(--c-surface); border-bottom: 1px solid var(--c-border-panel); }
+/* Шкала часов держится над строками: у полотна своя вертикальная
+   прокрутка, и липкая колонка столов (z-3) иначе проезжала бы поверх. */
+.timeline-ruler { display: flex; position: sticky; top: 0; z-index: 6; background: var(--c-surface); border-bottom: 1px solid var(--c-border-panel); }
 .timeline-ruler .timeline-track { height: 32px; }
 .timeline-zonerow { display: flex; background: var(--c-surface-muted); border-bottom: 1px solid var(--c-border-hair); }
 .timeline-zonerow .timeline-label { font-size: 12px; font-weight: 700; color: var(--c-text-muted); padding: 6px 12px; }
@@ -1335,7 +1363,7 @@ a { color: inherit; }
   flex: 0 0 var(--timeline-label-width); display: flex; align-items: center; gap: 6px;
   padding: 8px 10px; border-inline-end: 1px solid var(--c-border-panel); background: var(--c-surface);
 }
-.timeline-ruler .timeline-label { z-index: 5; }
+.timeline-ruler .timeline-label { z-index: 7; }
 .timeline-zonerow .timeline-label { z-index: 4; background: var(--c-surface-muted); }
 .timeline-label strong { font-size: 15px; color: var(--c-text); }
 .timeline-label small { color: var(--c-text-subtle); font-size: 12px; }
@@ -1347,30 +1375,80 @@ a { color: inherit; }
   font-size: 12px; font-weight: 650; color: var(--c-text-muted); font-variant-numeric: tabular-nums;
 }
 .timeline-grid { position: absolute; inset-block: 0; width: 1px; background: var(--c-surface-sunken); }
-.timeline-now { position: absolute; inset-block: 0; width: 2px; background: #d92d20; z-index: 1; }
+/* Получас помогает прицелиться, но не спорит с часом за внимание */
+.timeline-grid.is-half { background: var(--c-border-hair); inset-block: 30%; }
+/* «Сейчас» — тонкая кобальтовая линия. Красной она быть не может: этим
+   же красным помечен конфликт, и хостес читал указатель времени как
+   аварию на каждом столе. */
+.timeline-now { position: absolute; inset-block: 0; width: 1px; background: var(--rsv-accent); z-index: 1; }
 .timeline-now-label {
   position: absolute; top: 2px; z-index: 3; transform: translateX(-50%);
-  padding: 1px 4px; border-radius: 4px; background: #d92d20; color: var(--c-on-ink);
-  font-size: 9px; font-weight: 750;
+  padding: 1px 4px; border-radius: 4px; background: var(--rsv-accent); color: #fff;
+  font-size: 9px; font-weight: 750; font-variant-numeric: tabular-nums;
 }
 .timeline-blocked {
   position: absolute; inset: 0; display: flex; align-items: center; justify-content: center;
   font-size: 12px; font-weight: 650; color: var(--c-text-faint);
 }
 .timeline-block {
-  position: absolute; top: 5px; bottom: 5px; min-width: 44px;
-  display: flex; flex-direction: column; justify-content: center; gap: 2px;
-  padding: 0 8px; border-radius: var(--r-md); border: 1px solid; text-align: start;
+  position: absolute; top: 4px; bottom: 4px; min-width: 40px;
+  display: flex; flex-direction: column; justify-content: center; gap: 1px;
+  padding: 0 7px; border-radius: var(--r-md); border: 1px solid; text-align: start;
   overflow: hidden; cursor: pointer; font: inherit;
+  transition: box-shadow .12s ease-out, filter .12s ease-out;
 }
-.timeline-block strong { font-size: 13px; font-weight: 700; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-.timeline-block small { font-size: 11px; opacity: 0.8; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-.timeline-block.is-pending { background: #fff8eb; border-color: #f0c274; color: #6b4708; }
-.timeline-block.is-confirmed { background: var(--c-surface); border-color: var(--c-border); color: var(--c-text); }
-.timeline-block.is-arrived { background: var(--c-text); border-color: var(--c-text); color: var(--c-on-ink); }
-.timeline-block.is-done { background: var(--c-surface-hover); border-color: var(--c-border-panel); color: var(--c-text-subtle); }
-.timeline-block.is-noshow { background: #fdf1f0; border-color: #f3c4c0; color: #9b2c22; }
-.timeline-block.is-conflict { box-shadow: 0 0 0 2px #d92d20; }
+/*
+ * Порядок важности внутри блока: время → имя → компания и состояние.
+ * Время не сжимается и не обрезается никогда — именно оно отвечает на
+ * вопрос «когда», ради которого на полотно и смотрят.
+ */
+.timeline-block strong {
+  display: flex; align-items: baseline; gap: 5px; min-width: 0;
+  font-size: 12px; font-weight: 700; line-height: 1.25;
+}
+.timeline-block-time { flex: none; font-variant-numeric: tabular-nums; opacity: .85; }
+.timeline-block-name { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-weight: 750; }
+.timeline-block small {
+  font-size: 11px; opacity: .82; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+}
+.timeline-block:hover { filter: brightness(1.06); }
+.timeline-block.is-done:hover { filter: brightness(.97); }
+/* Знак конфликта в самом блоке: на тёмной заливке рамка теряется.
+   Место под него освобождается отступом, иначе он ложится на имя. */
+.timeline-block.is-conflict { padding-inline-end: 20px; }
+.timeline-block-flag {
+  position: absolute; inset-block-start: 3px; inset-inline-end: 4px;
+  display: flex; align-items: center; justify-content: center;
+  width: 14px; height: 14px; border-radius: 50%;
+  background: var(--rsv-conflict); color: #fff; font-size: 10px; font-weight: 800;
+}
+.timeline-block.is-pending { background: var(--rsv-pending-bg); border-color: #dcae3e; color: var(--rsv-pending-fg); }
+.timeline-block.is-confirmed { background: var(--rsv-confirmed-bg); border-color: var(--rsv-confirmed-bg); color: var(--rsv-confirmed-fg); }
+.timeline-block.is-arrived { background: var(--rsv-seated-bg); border-color: var(--rsv-seated-bg); color: var(--rsv-seated-fg); }
+.timeline-block.is-done { background: var(--rsv-done-bg); border-color: #c8ced5; color: var(--rsv-done-fg); }
+.timeline-block.is-noshow { background: var(--rsv-noshow-bg); border-color: #f3c4c0; color: var(--rsv-noshow-fg); }
+.timeline-block.is-conflict { box-shadow: inset 0 0 0 2px var(--rsv-conflict); }
+/* Выделение обязано быть видно на ЛЮБОМ статусе: кольцо снаружи блока,
+   а не заливка — иначе выбранный тёмно-синий визит не отличить от
+   соседнего тёмно-синего. */
+.timeline-block.is-selected {
+  box-shadow: 0 0 0 2px var(--c-surface), 0 0 0 4px var(--rsv-accent);
+  z-index: 2;
+}
+.timeline-block.is-selected.is-conflict {
+  box-shadow: inset 0 0 0 2px var(--rsv-conflict), 0 0 0 2px var(--c-surface), 0 0 0 4px var(--rsv-accent);
+}
+.timeline-block:focus-visible {
+  outline: 2px solid var(--rsv-accent); outline-offset: 2px;
+}
+/* Поиск не прячет визиты: спрятанный визит хостес считает несуществующим.
+   Несовпавшие приглушаются, совпавшие остаются в своём месте суток. */
+.timeline-block.is-dimmed { opacity: .28; }
+@media (forced-colors: active) {
+  .timeline-block { border-color: CanvasText; }
+  .timeline-block.is-selected { outline: 3px solid Highlight; }
+  .timeline-block.is-dimmed { opacity: 1; }
+}
 /* Визит выходит за выбранные сутки: обрезанный край, а не ровный блок —
    иначе ночная бронь читается как начавшаяся ровно в полночь. */
 .timeline-block.is-clip-start {
@@ -1380,6 +1458,30 @@ a { color: inherit; }
 .timeline-block.is-clip-end {
   border-start-end-radius: 0; border-end-end-radius: 0;
   border-inline-end-style: dashed;
+}
+
+/*
+ * Скелет полотна. Раньше на месте таблицы стояла строчка «Loading…»:
+ * страница схлопывалась в один абзац и через секунду прыгала обратно на
+ * полный экран, утаскивая под курсором вкладки и кнопки. Скелет держит
+ * ту же геометрию, что и готовое полотно, поэтому прыжка нет.
+ */
+.timeline-skeleton .timeline-row { pointer-events: none; }
+.timeline-skeleton .timeline-label span,
+.timeline-skeleton .timeline-bar {
+  display: block; border-radius: var(--r-sm);
+  background: linear-gradient(90deg, var(--c-surface-sunken), var(--c-surface-hover), var(--c-surface-sunken));
+  background-size: 200% 100%; animation: timeline-shimmer 1.4s ease-in-out infinite;
+}
+.timeline-skeleton .timeline-label span { width: 56px; height: 12px; }
+.timeline-skeleton .timeline-bar { position: absolute; top: 12px; height: 28px; }
+@keyframes timeline-shimmer {
+  from { background-position: 200% 0; }
+  to { background-position: -200% 0; }
+}
+@media (prefers-reduced-motion: reduce) {
+  .timeline-skeleton .timeline-label span,
+  .timeline-skeleton .timeline-bar { animation: none; }
 }
 
 /* Адрес гостевой страницы: факт важнее поля ввода */
@@ -1394,19 +1496,76 @@ a { color: inherit; }
 .desk-actions button { min-height: 40px; }
 .desk-actions svg { width: 17px; height: 17px; }
 
+/*
+ * Шапка рабочего раздела: заголовок, день, поиск и одно основное
+ * действие в одной строке.
+ *
+ * Раньше здесь стоял титульный заголовок в 40px с описанием на две
+ * строки, под ним отдельная полоса кнопок, а день visita жил ниже — уже
+ * внутри полотна. До первой брони с ноутбука доходило меньше половины
+ * экрана. День и поиск принадлежат ВСЕМУ разделу, а не одной вкладке:
+ * список, лист ожидания и полотно отвечают на вопросы про один и тот же
+ * день.
+ */
+.rsv-header {
+  display: flex; flex-wrap: wrap; align-items: center; gap: var(--sp-3);
+  margin-bottom: var(--sp-3);
+}
+.rsv-header h1 { margin: 0; font-size: 25px; font-weight: 730; line-height: 1.1; }
+.rsv-header .order-search { flex: 1 1 220px; max-width: 340px; min-height: 40px; }
+.rsv-header-actions { display: flex; align-items: center; gap: var(--sp-2); margin-inline-start: auto; }
+.rsv-header-actions button { min-height: 40px; }
+.rsv-header-actions svg { width: 17px; height: 17px; }
+.rsv-daynav { display: flex; align-items: center; gap: var(--sp-1); min-width: 0; }
+.rsv-daynav input[type="date"] {
+  width: 148px; min-width: 0; height: 40px; padding: 0 9px;
+  border: 1px solid var(--c-border); border-radius: var(--r-md);
+  background: var(--c-surface); font: inherit; font-size: 13px;
+}
+.rsv-daynav .icon-button { width: 40px; height: 40px; }
+.rsv-daynav svg { width: 16px; height: 16px; }
+.rsv-today {
+  flex: 0 0 auto; min-height: 40px; padding: 0 12px;
+  border: 1px solid var(--c-border-panel); border-radius: var(--r-md);
+  background: var(--c-surface); color: var(--c-text-muted);
+  font: inherit; font-size: 13px; font-weight: 700; cursor: pointer;
+}
+.rsv-today:hover { background: var(--c-surface-hover); color: var(--c-text); }
+.rsv-today[disabled] { opacity: .55; cursor: default; }
+
+/*
+ * Состояние визита словом. Тот же набор цветов, что и у блоков полотна:
+ * бронь, увиденная в списке и на полотне, обязана выглядеть одинаково.
+ */
+.rsv-status {
+  display: inline-flex; align-items: center; min-height: 24px;
+  padding: 0 9px; border-radius: var(--r-sm);
+  font-size: 12px; font-weight: 700; white-space: nowrap;
+}
+.rsv-status.is-pending { background: var(--rsv-pending-bg); color: var(--rsv-pending-fg); }
+.rsv-status.is-confirmed { background: var(--rsv-confirmed-bg); color: var(--rsv-confirmed-fg); }
+.rsv-status.is-arrived { background: var(--rsv-seated-bg); color: var(--rsv-seated-fg); }
+.rsv-status.is-done { background: var(--rsv-done-bg); color: var(--rsv-done-fg); }
+.rsv-status.is-noshow { background: var(--rsv-noshow-bg); color: var(--rsv-noshow-fg); }
+.rsv-status.is-cancelled { background: var(--c-surface-sunken); color: var(--c-text-muted); }
+
 /* Полоса вкладок: на телефоне прокручивается, а не переносится */
 .desk-tabs {
-  display: flex; gap: 6px; margin-bottom: 16px; padding-bottom: 2px;
+  display: flex; gap: var(--sp-4); margin-bottom: var(--sp-4);
+  border-bottom: 1px solid var(--c-border-panel);
   overflow-x: auto; overscroll-behavior-x: contain; scrollbar-width: none;
 }
 .desk-tabs::-webkit-scrollbar { display: none; }
 .desk-tabs button {
-  flex: 0 0 auto; min-height: 40px; padding: 0 14px;
-  border: 1px solid var(--c-border-panel); border-radius: var(--r-pill); background: var(--c-surface);
-  color: var(--c-text-muted); font: inherit; font-size: 14px; font-weight: 650; white-space: nowrap; cursor: pointer;
+  flex: 0 0 auto; min-height: 40px; padding: 0 2px;
+  border: 0; border-bottom: 2px solid transparent; background: transparent;
+  color: var(--c-text-muted); font: inherit; font-size: 14px; font-weight: 600;
+  white-space: nowrap; cursor: pointer;
 }
-.desk-tabs button:hover { background: var(--c-surface-hover); color: var(--c-text); }
-.desk-tabs button.is-active { background: var(--c-text); border-color: var(--c-text); color: var(--c-on-ink); }
+.desk-tabs button:hover { color: var(--c-text); }
+.desk-tabs button.is-active {
+  border-bottom-color: var(--rsv-accent); color: var(--c-text); font-weight: 730;
+}
 
 /* Чеклист запуска: свёрнут — одна строка, а не первый экран телефона */
 .launch-toggle {
@@ -1547,6 +1706,33 @@ a { color: inherit; }
 }
 .sheet h3 { font-size: 18px; color: var(--c-text); }
 .sheet-sub { color: var(--c-text-muted); font-size: 14px; }
+
+/*
+ * Факты визита: стол, состояние, телефон. Пары «подпись — значение», а
+ * не строка через точку: за каким столом сидит гость, хостес ищет
+ * глазами на бегу, и это не должно быть частью предложения.
+ */
+.sheet-facts { display: grid; gap: var(--sp-2); margin: 0; }
+.sheet-facts > div { display: grid; grid-template-columns: 84px minmax(0, 1fr); align-items: center; gap: var(--sp-3); }
+.sheet-facts dt { color: var(--c-text-subtle); font-size: 12px; font-weight: 700; text-transform: uppercase; letter-spacing: .04em; }
+.sheet-facts dd { margin: 0; color: var(--c-text); font-size: 14px; font-weight: 650; }
+.sheet-fact-muted { color: var(--c-text-muted); font-weight: 500; }
+
+/* Конфликт назван по имени — с кем именно столкнулась бронь */
+.sheet-clash {
+  display: flex; flex-direction: column; gap: var(--sp-1);
+  padding: var(--sp-3); border-radius: var(--r-md);
+  border: 1px solid var(--rsv-conflict); background: var(--rsv-conflict-surface);
+  color: #7c1d16; font-size: 13px;
+}
+.sheet-clash strong { font-size: 13px; }
+.sheet-clash ul { margin: 0; padding-inline-start: 18px; }
+.sheet-clash li { font-variant-numeric: tabular-nums; }
+.sheet-clash span { color: #8a3a32; }
+
+/* Служебная строка: откуда бронь и когда заведена */
+.sheet-meta { margin-top: auto; padding-top: var(--sp-2); color: var(--c-text-faint); font-size: 12px; }
+
 .sheet-section { display: flex; flex-direction: column; gap: 6px; margin-top: 6px; }
 .sheet-section-title { font-size: 12px; font-weight: 700; color: var(--c-text-muted); text-transform: uppercase; letter-spacing: .04em; }
 
@@ -1573,15 +1759,20 @@ a { color: inherit; }
 
 @media (max-width: 720px) {
   .desk-actions button { min-height: 44px; }
+  /* Палец, а не курсор: в шапке раздела нет ни одной цели меньше 44px */
+  .rsv-header { gap: var(--sp-2); }
+  .rsv-header h1 { font-size: 22px; }
+  .rsv-header .order-search { flex-basis: 100%; max-width: none; min-height: 44px; }
+  .rsv-header-actions { width: 100%; margin-inline-start: 0; }
+  .rsv-header-actions button { flex: 1 1 0; min-height: 44px; }
+  .rsv-daynav { width: 100%; display: grid; grid-template-columns: 44px minmax(0, 1fr) 44px auto; }
+  .rsv-daynav input[type="date"] { width: 100%; height: 44px; }
+  .rsv-daynav .icon-button { width: 44px; height: 44px; }
+  .rsv-today { min-height: 44px; }
   .timeline-panel { padding-inline: 12px; }
   .timeline-panel > .panel-heading { margin-inline: -12px; padding-inline: 16px; }
   .timeline-controls { grid-template-columns: minmax(0, 1fr); align-items: stretch; gap: 10px; }
   .timeline-zone-filter { min-width: 0; }
-  .timeline-daynav { display: grid; grid-template-columns: 40px minmax(0, 1fr) 40px auto; }
-  .timeline-daynav input[type="date"] { width: 100%; }
-  .timeline-summary { width: 100%; display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); margin: 0; gap: 6px; }
-  .timeline-summary span { min-width: 0; min-height: 48px; padding: 6px 8px; }
-  .timeline-summary small { overflow: hidden; text-overflow: ellipsis; }
   .timeline-guide { align-items: flex-start; flex-direction: column; gap: 7px; }
   .timeline-pan { width: 100%; justify-content: space-between; }
   .timeline-canvas { --timeline-label-width: 96px; }

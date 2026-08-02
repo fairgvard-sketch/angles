@@ -1,9 +1,13 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { ChevronLeft, ChevronRight, RefreshCw } from 'lucide-react'
 import {
-  blockState, buildRows, groupByZone, hourTicks, nowMarkerPct, occupancySummary,
-  shiftDate, timelineWindow, todayInZone,
+  blockState, buildRows, groupByZone, hourTicks, nowMarkerPct,
+  timelineWindow, todayInZone,
 } from './timeline'
+import { statusClass, statusLabel } from './reservation-status'
+import {
+  blockDetail, blockWidthPx, halfHourMarks, overlappingVisits, showsMeta, showsName,
+} from './timeline-view'
 import {
   fetchReservationSettings, fetchTimelineReservations, fetchTimelineTables,
   markReservationArrived, setReservationTables, setReservationStatus, deskErrorText,
@@ -25,22 +29,6 @@ import { Button } from './ui/Button'
 
 const HOUR_PX = 96
 
-const STATE_CLASS = {
-  pending: 'is-pending',
-  confirmed: 'is-confirmed',
-  arrived: 'is-arrived',
-  done: 'is-done',
-  noshow: 'is-noshow',
-}
-
-const STATE_LABEL = {
-  pending: 'Pending',
-  confirmed: 'Confirmed',
-  arrived: 'Seated',
-  done: 'Completed',
-  noshow: 'No-show',
-}
-
 /** Время визита в зоне точки — и в подписи блока, и в карточке */
 function timeInZone(ms, tz) {
   try {
@@ -60,7 +48,7 @@ function blockLabel(block, table, tz) {
     `${booking.partySize} guests`,
     `table ${table.label}`,
     `${timeInZone(booking.startMs, tz)}–${timeInZone(booking.endMs, tz)}`,
-    STATE_LABEL[booking.state],
+    statusLabel(booking.state),
   ]
   if (block.combined) parts.push('combined tables')
   if (block.clipsStart) parts.push('started the day before')
@@ -69,7 +57,7 @@ function blockLabel(block, table, tz) {
   return parts.join(' · ')
 }
 
-export default function TimelineDesk({ locationId }) {
+export default function TimelineDesk({ locationId, date, query = '' }) {
   const [nowMs, setNowMs] = useState(() => Date.now())
   useEffect(() => {
     const id = setInterval(() => setNowMs(Date.now()), 60_000)
@@ -82,11 +70,12 @@ export default function TimelineDesk({ locationId }) {
   const [error, setError] = useState('')
   const [busy, setBusy] = useState(false)
   const [detail, setDetail] = useState(null)
+  // Отказ действия принадлежит панели визита, а не полотну под ней
+  const [sheetError, setSheetError] = useState('')
   const [zoneFilter, setZoneFilter] = useState(null)
 
   const tz = meta.timezone
   const todayStr = useMemo(() => todayInZone(nowMs, tz), [nowMs, tz])
-  const [date, setDate] = useState(() => todayInZone(Date.now(), 'Asia/Jerusalem'))
 
   const baseWindow = useMemo(
     () => timelineWindow(date, tz, meta.schedule),
@@ -146,9 +135,21 @@ export default function TimelineDesk({ locationId }) {
       state: blockState(r.status, r.arrived_at, r.order_id),
       guestName: r.customer_name,
       partySize: r.party_size,
+      phone: r.customer_phone ?? '',
       posSeated: r.order_id != null,
     }
   }), [raw])
+
+  /*
+   * Поиск не убирает визиты с полотна: пропавший визит хостес считает
+   * несуществующим и звонит гостю зря. Несовпавшие приглушаются, и
+   * место суток остаётся видимым.
+   */
+  const needle = query.trim().toLowerCase()
+  const matchesQuery = useCallback((booking) => {
+    if (!needle) return true
+    return `${booking.guestName ?? ''} ${booking.phone ?? ''}`.toLowerCase().includes(needle)
+  }, [needle])
 
   const win = useMemo(
     () => timelineWindow(date, tz, meta.schedule, bookings),
@@ -166,8 +167,22 @@ export default function TimelineDesk({ locationId }) {
   const hiddenTableCount = rows.length - operationalRows.length
   const zones = useMemo(() => groupByZone(operationalRows), [operationalRows])
   const visibleZones = zoneFilter === null ? zones : zones.filter((z) => z.id === zoneFilter)
-  const summary = useMemo(() => occupancySummary(operationalRows, nowMs), [operationalRows, nowMs])
+  // Сколько визитов дня отвечает поиску — иначе приглушённое полотно
+  // выглядит сломанным, а не отфильтрованным.
+  const found = useMemo(() => {
+    if (!needle) return null
+    const ids = new Set()
+    for (const row of operationalRows) {
+      for (const block of row.blocks) {
+        if (matchesQuery(block.booking)) ids.add(block.booking.id)
+      }
+    }
+    return ids.size
+  }, [needle, matchesQuery, operationalRows])
   const ticks = useMemo(() => hourTicks(win, tz), [win, tz])
+  // Получас виден, но тише часа: он помогает прицелиться, а не читается
+  // как отдельная отметка времени.
+  const halfMarks = useMemo(() => halfHourMarks(ticks, win), [ticks, win])
   const markerPct = date === todayStr ? nowMarkerPct(nowMs, win) : null
   const trackWidth = Math.max(720, ((win.endMs - win.startMs) / 3_600_000) * HOUR_PX)
 
@@ -201,15 +216,24 @@ export default function TimelineDesk({ locationId }) {
     })
   }
 
+  /*
+   * Отказ сервера показывается ТАМ, где нажали кнопку.
+   *
+   * Раньше ошибка действия из карточки визита попадала в общий блок
+   * полотна — то есть под открытую панель: хостес видел, что ничего не
+   * произошло, и не видел почему. Успех закрывает панель, отказ
+   * оставляет её открытой вместе с причиной.
+   */
   async function act(fn) {
     setBusy(true)
+    setSheetError('')
     try {
       await fn()
       setDetail(null)
       await load()
       setError('')
     } catch (e) {
-      setError(deskErrorText(e.message))
+      setSheetError(deskErrorText(e.message))
     } finally {
       setBusy(false)
     }
@@ -217,78 +241,36 @@ export default function TimelineDesk({ locationId }) {
 
   return (
     <section className="panel form-panel timeline-panel">
-      <div className="panel-heading">
-        <div>
-          <h2>Table availability</h2>
-          <p>Each row is a table. Move through the day horizontally and select a booking for details.</p>
-        </div>
-        <button type="button" className="icon-button" aria-label="Refresh" onClick={load}>
-          <RefreshCw />
-        </button>
-      </div>
-
+      {/*
+        Тулбар полотна: зона и движение по времени. Метрик здесь больше
+        нет — три карточки занимали ту же высоту, что четыре стола, и
+        отвечали на вопросы, которые само полотно показывает нагляднее.
+      */}
       <div className="timeline-controls">
-        <div className="timeline-filter-group">
-          <span className="timeline-control-label">Date</span>
-          <div className="timeline-daynav">
-            <button type="button" className="secondary-button compact timeline-arrow" aria-label="Previous day"
-              onClick={() => setDate((d) => shiftDate(d, -1))}><ChevronLeft /></button>
-            <input aria-label="Timeline date" type="date" value={date}
-              onChange={(e) => e.target.value && setDate(e.target.value)} />
-            <button type="button" className="secondary-button compact timeline-arrow" aria-label="Next day"
-              onClick={() => setDate((d) => shiftDate(d, 1))}><ChevronRight /></button>
+        {zones.length > 1 ? (
+          <div className="timeline-zones" aria-label="Zone filter">
             <button
               type="button"
-              className={`timeline-filter-button${date === todayStr ? ' is-active' : ''}`}
-              onClick={() => setDate(todayStr)}
+              className={`timeline-filter-button${zoneFilter === null ? ' is-active' : ''}`}
+              aria-pressed={zoneFilter === null}
+              onClick={() => setZoneFilter(null)}
             >
-              Today
+              All zones
             </button>
-          </div>
-        </div>
-
-        {zones.length > 1 && (
-          <div className="timeline-filter-group timeline-zone-filter">
-            <span className="timeline-control-label">Zone</span>
-            <div className="timeline-zones">
+            {zones.map((z) => (
               <button
+                key={z.id ?? 'none'}
                 type="button"
-                className={`timeline-filter-button${zoneFilter === null ? ' is-active' : ''}`}
-                onClick={() => setZoneFilter(null)}
+                className={`timeline-filter-button${zoneFilter === z.id ? ' is-active' : ''}`}
+                aria-pressed={zoneFilter === z.id}
+                onClick={() => setZoneFilter(z.id)}
               >
-                All
+                {z.name ?? 'No zone'}
               </button>
-              {zones.map((z) => (
-                <button
-                  key={z.id ?? 'none'}
-                  type="button"
-                  className={`timeline-filter-button${zoneFilter === z.id ? ' is-active' : ''}`}
-                  onClick={() => setZoneFilter(z.id)}
-                >
-                  {z.name ?? 'No zone'}
-                </button>
-              ))}
-            </div>
+            ))}
           </div>
-        )}
+        ) : <span />}
 
-        <div className="timeline-summary">
-          <span><small>Busy now</small><strong>{summary.busyTables}/{summary.totalTables}</strong></span>
-          <span><small>Seats free</small><strong>{summary.freeSeats}</strong></span>
-          <span><small>Next hour</small><strong>{summary.soon}</strong></span>
-          {summary.pending > 0 && (
-            <span className="is-accent"><small>Pending</small><strong>{summary.pending}</strong></span>
-          )}
-        </div>
-      </div>
-
-      <div className="timeline-guide">
-        <div className="timeline-legend" aria-label="Booking statuses">
-          <span><i className="is-pending" />Pending</span>
-          <span><i className="is-confirmed" />Confirmed</span>
-          <span><i className="is-arrived" />Seated</span>
-          <span><i className="is-done" />Completed</span>
-        </div>
         <div className="timeline-pan" aria-label="Move through timeline">
           <button type="button" className="text-button" onClick={() => panTimeline(-1)}>
             <ChevronLeft /> Earlier
@@ -301,7 +283,27 @@ export default function TimelineDesk({ locationId }) {
           <button type="button" className="text-button" onClick={() => panTimeline(1)}>
             Later <ChevronRight />
           </button>
+          <button type="button" className="icon-button" aria-label="Refresh timeline" onClick={load}>
+            <RefreshCw />
+          </button>
         </div>
+      </div>
+
+      <div className="timeline-guide">
+        <div className="timeline-legend" aria-label="Booking statuses">
+          <span><i className="is-pending" />Pending</span>
+          <span><i className="is-confirmed" />Confirmed</span>
+          <span><i className="is-arrived" />Seated</span>
+          <span><i className="is-done" />Completed</span>
+          <span><i className="is-conflict" />Conflict</span>
+        </div>
+        {found !== null && (
+          <p className="timeline-hidden-note" role="status">
+            {found === 0
+              ? `Nothing on this day matches “${query.trim()}”.`
+              : `${found} visit${found === 1 ? '' : 's'} match “${query.trim()}” — the rest are dimmed.`}
+          </p>
+        )}
       </div>
 
       {hiddenTableCount > 0 && (
@@ -313,7 +315,7 @@ export default function TimelineDesk({ locationId }) {
       {error && <p className="form-error" role="alert">{error}</p>}
 
       {raw === null ? (
-        <p className="empty-state">Loading…</p>
+        <TimelineSkeleton rows={tables.length || 6} />
       ) : tables.length === 0 ? (
         <p className="empty-state">
           No tables yet. Reserve needs a floor plan before the timeline can show anything.
@@ -360,36 +362,62 @@ export default function TimelineDesk({ locationId }) {
                       {ticks.map((tick) => (
                         <span key={tick.ts} className="timeline-grid" style={{ left: `${tick.leftPct}%` }} />
                       ))}
+                      {halfMarks.map((mark) => (
+                        <span key={mark.ts} className="timeline-grid is-half" style={{ left: `${mark.leftPct}%` }} />
+                      ))}
                       {row.table.blocked && <span className="timeline-blocked">disabled</span>}
                       {markerPct !== null && (
                         <span className="timeline-now" style={{ left: `${markerPct}%` }} />
                       )}
-                      {row.blocks.map((block) => (
-                        <button
-                          key={block.booking.id}
-                          type="button"
-                          className={`timeline-block ${STATE_CLASS[block.booking.state]}${
-                            block.conflict ? ' is-conflict' : ''}${
-                            block.clipsStart ? ' is-clip-start' : ''}${
-                            block.clipsEnd ? ' is-clip-end' : ''}`}
-                          style={{ left: `${block.leftPct}%`, width: `${block.widthPct}%` }}
-                          onClick={() => setDetail(raw.find((r) => r.id === block.booking.id) ?? null)}
-                          // Одинаковых блоков на экране десятки: без имени
-                          // с гостем, столом и временем скринридер читает
-                          // подряд «кнопка, кнопка, кнопка».
-                          aria-label={blockLabel(block, row.table, tz)}
-                          title={blockLabel(block, row.table, tz)}
-                        >
-                          <strong>{block.booking.guestName}</strong>
-                          <small>
-                            {block.booking.partySize}
-                            {block.combined ? ' · combined' : ''}
-                            {block.booking.state !== 'confirmed'
-                              ? ` · ${STATE_LABEL[block.booking.state]}`
-                              : ''}
-                          </small>
-                        </button>
-                      ))}
+                      {row.blocks.map((block) => {
+                        const detailLevel = blockDetail(blockWidthPx(block.widthPct, trackWidth))
+                        return (
+                          <button
+                            key={block.booking.id}
+                            type="button"
+                            className={`timeline-block ${statusClass(block.booking.state)}${
+                              block.conflict ? ' is-conflict' : ''}${
+                              block.clipsStart ? ' is-clip-start' : ''}${
+                              block.clipsEnd ? ' is-clip-end' : ''}${
+                              detail?.id === block.booking.id ? ' is-selected' : ''}${
+                              matchesQuery(block.booking) ? '' : ' is-dimmed'}`}
+                            style={{ left: `${block.leftPct}%`, width: `${block.widthPct}%` }}
+                            // Выбранный визит — состояние кнопки, а не только
+                            // рамка: читалка обязана сказать, что открыто.
+                            aria-pressed={detail?.id === block.booking.id}
+                            onClick={() => setDetail(raw.find((r) => r.id === block.booking.id) ?? null)}
+                            // Одинаковых блоков на экране десятки: без имени
+                            // с гостем, столом и временем скринридер читает
+                            // подряд «кнопка, кнопка, кнопка». Подпись полная
+                            // всегда, даже когда в сам блок влезло одно время.
+                            aria-label={blockLabel(block, row.table, tz)}
+                            title={blockLabel(block, row.table, tz)}
+                          >
+                            <strong>
+                              <span className="timeline-block-time">
+                                {timeInZone(block.booking.startMs, tz)}
+                                {detailLevel === 'wide' && `–${timeInZone(block.booking.endMs, tz)}`}
+                              </span>
+                              {showsName(detailLevel) && (
+                                <span className="timeline-block-name">{block.booking.guestName}</span>
+                              )}
+                            </strong>
+                            {showsMeta(detailLevel) && (
+                              <small>
+                                {block.booking.partySize}
+                                {block.combined ? ' · combined' : ''}
+                                {` · ${statusLabel(block.booking.state)}`}
+                              </small>
+                            )}
+                            {/* Конфликт обязан быть виден в самом блоке:
+                                обводка на приглушённом или тёмном фоне
+                                читается хуже, чем знак рядом со временем. */}
+                            {block.conflict && (
+                              <span className="timeline-block-flag" aria-hidden>!</span>
+                            )}
+                          </button>
+                        )
+                      })}
                     </div>
                   </div>
                 ))}
@@ -405,7 +433,11 @@ export default function TimelineDesk({ locationId }) {
           tables={tables}
           tz={tz}
           busy={busy}
-          onClose={() => setDetail(null)}
+          error={sheetError}
+          // С кем именно столкнулась бронь — из тех же строк, что рисуют
+          // полотно: панель и сетка не могут расходиться в этом ответе.
+          clashes={overlappingVisits(operationalRows, detail.id)}
+          onClose={() => { setDetail(null); setSheetError('') }}
           onEdit={(patch) => act(async () => {
             // Контакты и «когда/сколько» — разные функции сервера: у
             // второй пересчёт занятости, у первой его не нужно.
@@ -428,13 +460,48 @@ export default function TimelineDesk({ locationId }) {
 }
 
 /**
+ * Полотно на время загрузки: те же строки и та же высота, что у готового.
+ *
+ * Строка «Loading…» схлопывала раздел в один абзац, а через секунду
+ * возвращала его на полный экран — вкладки и кнопки уезжали из-под
+ * курсора ровно в тот момент, когда по ним целились.
+ */
+function TimelineSkeleton({ rows }) {
+  const shape = [
+    [4, 26], [38, 18], [12, 30], [56, 22], [24, 34], [66, 16],
+  ]
+  return (
+    <div className="timeline-scroll">
+      <div className="timeline-canvas timeline-skeleton" style={{ '--timeline-track-width': '100%' }}>
+        <div className="timeline-ruler" aria-hidden>
+          <div className="timeline-label" />
+          <div className="timeline-track" />
+        </div>
+        <div role="status" aria-live="polite" className="visually-hidden">Loading the timeline…</div>
+        {Array.from({ length: Math.min(rows, 10) }, (_, i) => {
+          const [left, width] = shape[i % shape.length]
+          return (
+            <div key={i} className="timeline-row" aria-hidden>
+              <div className="timeline-label"><span /></div>
+              <div className="timeline-track">
+                <span className="timeline-bar" style={{ left: `${left}%`, width: `${width}%` }} />
+              </div>
+            </div>
+          )
+        })}
+      </div>
+    </div>
+  )
+}
+
+/**
  * Карточка визита: контакты, состав и действия. Пикер столов —
  * множественный: объединение столов такое же обычное действие хостес,
  * как назначение одного.
  */
 function BookingSheet({
-  reservation, tables, tz, busy, onClose, onConfirm, onArrived, onCompleted,
-  onNoShow, onTables, onEdit,
+  reservation, tables, tz, busy, error, clashes = [], onClose, onConfirm, onArrived,
+  onCompleted, onNoShow, onTables, onEdit,
 }) {
   const linked = (reservation.tables_link ?? []).map((l) => l.table_id)
   const initial = linked.length > 0
@@ -470,11 +537,33 @@ function BookingSheet({
     })
   }
 
-  const when = new Date(reservation.reserved_at).toLocaleString([], {
+  const startMs = new Date(reservation.reserved_at).getTime()
+  const when = new Date(reservation.reserved_at).toLocaleDateString([], {
     weekday: 'short', day: 'numeric', month: 'short',
-    hour: '2-digit', minute: '2-digit',
   })
-  const state = STATE_LABEL[blockState(reservation.status, reservation.arrived_at, reservation.order_id)]
+  const span = `${timeInZone(startMs, tz)}–${timeInZone(startMs + (reservation.duration_min || 90) * 60_000, tz)}`
+  const state = blockState(reservation.status, reservation.arrived_at, reservation.order_id)
+
+  // Стол и зона словами: «стол 4 · Pergola» отвечает на вопрос «куда
+  // идти», а список id в пикере — нет.
+  const seatedAt = initial
+    .map((id) => tables.find((t) => t.id === id))
+    .filter(Boolean)
+  const zoneName = seatedAt.find((t) => t.zoneName)?.zoneName ?? null
+
+  /*
+   * Источник называется только тогда, когда он ДЕЙСТВИТЕЛЬНО известен.
+   *
+   * Колонку `source` заполняет одна лишь ручная бронь кабинета (127);
+   * гостевая страница и касса идут через общий `create_reservation` и
+   * оставляют её пустой. Поэтому пусто здесь означает не «неизвестно
+   * откуда», а «не из кабинета» — и написать «Source unknown» значило бы
+   * выдать нормальную гостевую бронь за подозрительную.
+   */
+  const SOURCE_LABEL = {
+    backoffice: 'Added in the back office',
+  }
+  const sourceLabel = SOURCE_LABEL[reservation.source] ?? null
 
   return (
     <Drawer
@@ -487,20 +576,70 @@ function BookingSheet({
           {reservation.is_test && <span className="guest-fav is-warn"> Test</span>}
         </>
       )}
-      subtitle={`${when} · ${reservation.party_size} guests · ${state}`}
+      subtitle={`${reservation.party_size} guests · ${when}, ${span}`}
       onClose={onClose}
       footer={<Button onClick={onClose}>Close</Button>}
     >
-        {reservation.customer_phone && (
-          <p className="sheet-sub"><a href={`tel:${reservation.customer_phone}`}>{reservation.customer_phone}</a></p>
-        )}
+        {/*
+          Порядок сведений — рабочий: кто и сколько человек, когда, за
+          каким столом, в каком состоянии, как позвонить, что просили.
+          Служебное (откуда бронь и когда заведена) уходит вниз: оно
+          нужно, когда с визитом что-то не так, а не каждый раз.
+        */}
+        <dl className="sheet-facts">
+          <div>
+            <dt>Table</dt>
+            <dd>
+              {seatedAt.length > 0
+                ? seatedAt.map((t) => t.label).join(' + ')
+                : 'Not assigned yet'}
+              {zoneName && <span className="sheet-fact-muted"> · {zoneName}</span>}
+            </dd>
+          </div>
+          <div>
+            <dt>Status</dt>
+            {/* Состояние — тем же цветом и словом, что и на полотне */}
+            <dd><span className={`rsv-status ${statusClass(state)}`}>{statusLabel(state)}</span></dd>
+          </div>
+          {reservation.customer_phone && (
+            <div>
+              <dt>Phone</dt>
+              <dd><a href={`tel:${reservation.customer_phone}`}>{reservation.customer_phone}</a></dd>
+            </div>
+          )}
+        </dl>
+
         {reservation.note && <p className="order-note">{reservation.note}</p>}
+
+        {/*
+          Конфликт назван по имени: красной рамки на полотне мало, чтобы
+          понять, кого именно придётся двигать.
+        */}
+        {clashes.length > 0 && (
+          <div className="sheet-clash" role="note">
+            <strong>Overlaps another booking</strong>
+            <ul>
+              {clashes.map(({ booking, table }) => (
+                <li key={booking.id}>
+                  {timeInZone(booking.startMs, tz)}–{timeInZone(booking.endMs, tz)}
+                  {' · '}{booking.guestName}
+                  {' · table '}{table.label}
+                </li>
+              ))}
+            </ul>
+            <span>Move one of the visits or give it another table.</span>
+          </div>
+        )}
 
         {posSeated && (
           <p className="form-hint">
             Seated into a POS order — this visit is handled on the register.
           </p>
         )}
+
+        {/* Отказ сервера — здесь, рядом с кнопкой, которую нажали, а не
+            в полотне под открытой панелью. */}
+        {error && <p className="form-error" role="alert">{error}</p>}
 
         {active && !posSeated && !editing && (
           <button type="button" className="secondary-button" onClick={() => setEditing(true)}>
@@ -611,6 +750,18 @@ function BookingSheet({
               )}
             </div>
           </>
+        )}
+
+        {/* Служебное — внизу и тихо: нужно, когда с визитом что-то не
+            так, а не при каждом открытии карточки. */}
+        {(sourceLabel || reservation.created_at) && (
+          <p className="sheet-meta">
+            {sourceLabel}
+            {sourceLabel && reservation.created_at && ' · '}
+            {reservation.created_at && `booked ${new Date(reservation.created_at).toLocaleString([], {
+              day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit',
+            })}`}
+          </p>
         )}
 
     </Drawer>

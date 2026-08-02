@@ -21,6 +21,14 @@ export const DEFAULT_VIEW = 'overview'
 const VIEW_KEY = 'view'
 const LOCATION_KEY = 'loc'
 const TAB_KEY = 'tab'
+/**
+ * Рабочий день раздела. Он общий для всех вкладок броней: полотно,
+ * список и лист ожидания отвечают на вопросы про ОДИН день, и ссылка на
+ * «субботу» обязана открывать субботу, а не сегодня.
+ */
+const DATE_KEY = 'd'
+
+const DATE_RE = /^\d{4}-\d{2}-\d{2}$/
 
 /**
  * Разбор адреса. Неизвестный или недоступный раздел — не ошибка, а
@@ -32,10 +40,14 @@ export function parseRoute(search, allowedViews = null) {
   const raw = params.get(VIEW_KEY)
   const allowed = Array.isArray(allowedViews) ? allowedViews : null
   const known = raw && (!allowed || allowed.includes(raw))
+  // Мусор в дате — не ошибка, а испорченная ссылка: раздел открывается
+  // на сегодняшнем дне, а не на «Invalid Date».
+  const date = params.get(DATE_KEY)
   return {
     view: known ? raw : DEFAULT_VIEW,
     locationId: params.get(LOCATION_KEY) || null,
     tab: params.get(TAB_KEY) || null,
+    date: date && DATE_RE.test(date) ? date : null,
     normalized: Boolean(raw) && !known,
   }
 }
@@ -44,11 +56,14 @@ export function parseRoute(search, allowedViews = null) {
  * Адрес раздела. Dashboard остаётся без параметров: базовый адрес
  * кабинета не должен обрастать хвостом при первом же открытии.
  */
-export function routeToSearch({ view, locationId = null, tab = null } = {}) {
+export function routeToSearch({ view, locationId = null, tab = null, date = null } = {}) {
   const params = new URLSearchParams()
   if (view && view !== DEFAULT_VIEW) params.set(VIEW_KEY, view)
   if (locationId) params.set(LOCATION_KEY, locationId)
   if (tab) params.set(TAB_KEY, tab)
+  // Сегодняшний день в адрес не пишем: базовая ссылка на раздел не
+  // должна протухать к завтрашнему утру.
+  if (date && DATE_RE.test(date)) params.set(DATE_KEY, date)
   const query = params.toString()
   return query ? `?${query}` : ''
 }
@@ -60,5 +75,8 @@ export function routeToUrl(route, pathname = '/account/') {
 
 /** Изменился ли адрес — чтобы не плодить одинаковые записи истории */
 export function sameRoute(a, b) {
-  return a?.view === b?.view && a?.locationId === b?.locationId && a?.tab === b?.tab
+  return a?.view === b?.view
+    && a?.locationId === b?.locationId
+    && a?.tab === b?.tab
+    && (a?.date ?? null) === (b?.date ?? null)
 }

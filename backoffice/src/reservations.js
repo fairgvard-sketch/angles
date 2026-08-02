@@ -106,6 +106,10 @@ export async function fetchTimelineReservations(locationId, fromMs, toMs) {
     .select(
       'id, status, customer_name, customer_phone, party_size, reserved_at, '
       + 'duration_min, note, order_id, arrived_at, table_id, hold_table_ids, zone_id, is_test, '
+      // Откуда бронь и когда заведена — это в карточке визита отвечает на
+      // «кто это вообще»: заявка с сайта и звонок хостес ведут себя
+      // по-разному, а время создания объясняет странные визиты.
+      + 'source, created_at, '
       + 'tables_link:reservation_tables ( table_id, is_primary )'
     )
     .eq('location_id', locationId)
