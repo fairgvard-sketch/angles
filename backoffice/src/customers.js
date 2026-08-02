@@ -216,6 +216,23 @@ export function mergePreview(target, source) {
     + `working — it will lead to this profile.`
 }
 
+/**
+ * Текст последнего шага слияния.
+ *
+ * Он обязан назвать ОБЕ стороны: что останется и что исчезнет из
+ * списков. Слияние не удаляет исходный профиль (он становится
+ * указателем на объединённый), но вернуть его кнопкой нельзя — и об
+ * этом говорим прямо, а не «действие необратимо».
+ */
+export function mergeConfirmText(target, sources) {
+  if (!target || !(sources ?? []).length) return ''
+  const keep = `${target.name || formatPhone(target.phone)} · ${formatPhone(target.phone)}`
+  const gone = sources.map((g) => g.name || formatPhone(g.phone)).join(', ')
+  return `Keeping: ${keep}. Disappearing from the list: ${gone}. `
+    + 'Visits, spend, points, notes and tags move over; the old numbers keep '
+    + 'leading to this profile. This cannot be undone from the back office.'
+}
+
 /** Кандидаты группы, кроме выбранного основным */
 export function mergeSources(group, targetId) {
   return (group?.guests ?? []).filter((g) => g.id !== targetId)

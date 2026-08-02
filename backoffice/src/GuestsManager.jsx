@@ -7,10 +7,14 @@ import {
   saveGuestProfile, mergeGuests, anonymizeGuest,
   formatMoney, formatPhone, normalizePhoneInput, lastVisitLabel, formatDateTime,
   SEGMENTS, SORTS, segmentSummary, parseTagsInput, TAG_LIMIT,
-  guestsToCsv, csvFileName, duplicateReason, mergePreview, mergeSources,
+  guestsToCsv, csvFileName, duplicateReason, mergeConfirmText, mergePreview, mergeSources,
   customerErrorText,
 } from './guests'
 import { PageHeader } from './ui/Layout'
+import Drawer from './ui/Drawer'
+import Tabs from './ui/Tabs'
+import ConfirmDialog from './ui/ConfirmDialog'
+import { Button } from './ui/Button'
 
 /**
  * «Customers» — база клиентов организации (114/115/121, правки 131).
@@ -243,25 +247,18 @@ function GuestCard({ guest, onModeKnown, onChanged, onClose }) {
   const title = card?.name || guest.name || formatPhone(card?.phone || guest.phone)
 
   return (
-    <div className="modal-scrim" onClick={onClose}>
-      <div className="modal" onClick={(e) => e.stopPropagation()} role="dialog" aria-modal="true">
-        <header className="modal-head">
-          <h2>{title}</h2>
-          <div className="modal-head-actions">
-            {pane === 'view' && card && (
-              <button
-                type="button"
-                className="secondary-button"
-                onClick={() => setPane('edit')}
-              >
-                <Pencil aria-hidden /> Edit
-              </button>
-            )}
-            <button className="icon-button" onClick={onClose} aria-label="Close"><X /></button>
-          </div>
-        </header>
-
-        <div className="modal-body">
+    <Drawer
+      labelledBy="guest-card-title"
+      title={title}
+      subtitle={card?.phone ? formatPhone(card.phone) : null}
+      onClose={onClose}
+      actions={pane === 'view' && card && (
+        <Button onClick={() => setPane('edit')}>
+          <Pencil aria-hidden /> Edit
+        </Button>
+      )}
+    >
+      <>
           {pane === 'edit' ? (
             <ProfileEditor
               guest={guest}
@@ -325,16 +322,16 @@ function GuestCard({ guest, onModeKnown, onChanged, onClose }) {
                 </div>
               )}
 
-              <div className="guest-tabs">
-                <button
-                  className={tab === 'orders' ? 'is-active' : ''}
-                  onClick={() => setTab('orders')}
-                >Orders</button>
-                <button
-                  className={tab === 'events' ? 'is-active' : ''}
-                  onClick={() => setTab('events')}
-                >Loyalty log</button>
-              </div>
+              <Tabs
+                className="guest-tabs"
+                label="Guest history"
+                items={[
+                  { key: 'orders', label: 'Orders' },
+                  { key: 'events', label: 'Loyalty log' },
+                ]}
+                value={tab}
+                onChange={setTab}
+              />
 
               {error && <p className="form-error" role="alert">{error}</p>}
 
@@ -414,9 +411,8 @@ function GuestCard({ guest, onModeKnown, onChanged, onClose }) {
               </div>
             </>
           )}
-        </div>
-      </div>
-    </div>
+      </>
+    </Drawer>
   )
 }
 
@@ -426,6 +422,8 @@ function GuestCard({ guest, onModeKnown, onChanged, onClose }) {
  */
 function DuplicateGroup({ group, busy, onMerge }) {
   const [targetId, setTargetId] = useState(group.guests?.[0]?.id ?? null)
+  // Слияние необратимо: спрашиваем ещё раз и называем обе стороны
+  const [asking, setAsking] = useState(false)
   const target = (group.guests ?? []).find((g) => g.id === targetId)
   const sources = mergeSources(group, targetId)
   const targetName = target ? (target.name || formatPhone(target.phone)) : ''
@@ -460,14 +458,32 @@ function DuplicateGroup({ group, busy, onMerge }) {
           ? mergePreview(target, sources[0])
           : `Everything from ${sources.length} profiles moves to ${targetName}. The old numbers keep working — they will lead to this profile.`}
       </p>
-      <button
-        type="button"
-        className="primary-button compact"
+      <Button
+        variant="primary"
+        size="compact"
         disabled={busy || !target || sources.length === 0}
-        onClick={() => onMerge(targetId, sources.map((s) => s.id))}
+        onClick={() => setAsking(true)}
       >
         {busy ? 'Merging…' : `Merge into ${targetName}`}
-      </button>
+      </Button>
+
+      {/*
+        Последний шаг именует обе стороны: что останется и что исчезнет.
+        Слияние не удаляет исходный профиль (он становится указателем), но
+        из списков он уходит навсегда, и вернуть его кнопкой нельзя.
+      */}
+      {asking && (
+        <ConfirmDialog
+          title={`Merge into ${targetName}?`}
+          description={mergeConfirmText(target, sources)}
+          confirmLabel="Merge profiles"
+          cancelLabel="Keep them separate"
+          tone="danger"
+          busy={busy}
+          onCancel={() => setAsking(false)}
+          onConfirm={() => { setAsking(false); onMerge(targetId, sources.map((g) => g.id)) }}
+        />
+      )}
     </div>
   )
 }

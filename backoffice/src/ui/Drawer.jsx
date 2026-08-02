@@ -16,7 +16,9 @@ import { IconButton } from './Button'
  *   • возвращать фокус туда, откуда её открыли;
  *   • объявляться как диалог с именем.
  */
-export default function Drawer({ title, subtitle, onClose, children, footer, labelledBy }) {
+export default function Drawer({
+  title, subtitle, onClose, children, footer, actions, labelledBy,
+}) {
   const panelRef = useRef(null)
   const returnRef = useRef(null)
   const titleId = labelledBy || 'drawer-title'
@@ -84,7 +86,10 @@ export default function Drawer({ title, subtitle, onClose, children, footer, lab
             <h3 id={titleId}>{title}</h3>
             {subtitle && <p className="drawer-sub">{subtitle}</p>}
           </div>
-          <IconButton label="Close" onClick={onClose}><X /></IconButton>
+          <div className="drawer-head-actions">
+            {actions}
+            <IconButton label="Close" onClick={onClose}><X /></IconButton>
+          </div>
         </header>
         <div className="drawer-body">{children}</div>
         {footer && <footer className="drawer-foot">{footer}</footer>}

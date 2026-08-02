@@ -1,9 +1,10 @@
-import test from 'node:test'
+import test, { describe, it } from 'node:test'
 import assert from 'node:assert/strict'
 import {
   SEGMENTS, segmentParams, segmentSummary, parseTagsInput, TAG_LIMIT,
   guestsToCsv, csvFileName, duplicateReason, mergePreview, mergeSources,
   customerErrorText, normalizePhoneInput, formatPhone, formatMoney,
+  mergeConfirmText,
 } from './customers.js'
 
 // ── Сегменты считает сервер ──────────────────────────────────
@@ -179,4 +180,29 @@ test('деньги приходят агоротами и показываютс
 test('десятизначный номер разбивается на группы, остальные — как есть', () => {
   assert.equal(formatPhone('0501234567'), '050-123-4567')
   assert.equal(formatPhone('972501234567'), '972501234567')
+})
+
+describe('mergeConfirmText', () => {
+  const target = { id: 'a', name: 'Мири Леви', phone: '0521234567', visits: 24, total_spent: 412300 }
+  const source = { id: 'b', name: 'Мири', phone: '0521234568', visits: 3, total_spent: 8800 }
+
+  it('называет обе стороны: что останется и что исчезнет', () => {
+    const text = mergeConfirmText(target, [source])
+    assert.match(text, /Keeping: Мири Леви/)
+    assert.match(text, /Disappearing from the list: Мири/)
+  })
+
+  it('говорит прямо, что откатить это из кабинета нельзя', () => {
+    assert.match(mergeConfirmText(target, [source]), /cannot be undone/)
+  })
+
+  it('профиль без имени называется номером, а не пустотой', () => {
+    const noName = { id: 'c', phone: '0539876543', visits: 1, total_spent: 0 }
+    const text = mergeConfirmText(target, [noName])
+    assert.match(text, /Disappearing from the list: 053-987-6543/)
+  })
+
+  it('без источников текста нет — подтверждать нечего', () => {
+    assert.equal(mergeConfirmText(target, []), '')
+  })
 })
