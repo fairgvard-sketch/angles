@@ -1396,6 +1396,19 @@ a { color: inherit; }
 .funnel-fill { display: block; height: 100%; border-radius: 999px; background: #16181d; min-width: 2px; }
 .funnel-value { font-size: 14px; font-weight: 700; font-variant-numeric: tabular-nums; text-align: end; white-space: nowrap; }
 .funnel-value small { display: block; font-size: 11px; font-weight: 500; color: #868b93; }
+/* Оговорка про выборку и когорту: она объясняет числа, поэтому стоит
+   под ними и не спорит с ними по весу. */
+.funnel-note { margin: 4px 22px 18px; color: #6e737b; font-size: 12px; line-height: 1.5; }
+
+/* Упавший раздел: рабочая область объясняет, что произошло, и оставляет
+   два выхода — повторить и уйти на Dashboard. */
+.view-crash { padding: 32px 28px; text-align: center; }
+.view-crash-icon { display: inline-grid; place-items: center; width: 44px; height: 44px; border-radius: 10px; background: #fdf3e3; color: #b4720e; }
+.view-crash-icon svg { width: 22px; height: 22px; }
+.view-crash h2 { margin: 16px 0 0; font-size: 20px; }
+.view-crash > p { max-width: 460px; margin: 10px auto 0; color: #6e737b; font-size: 14px; line-height: 1.5; }
+.view-crash .order-actions { justify-content: center; margin-top: 22px; }
+.view-crash-detail { margin: 20px auto 0; color: #9ba0a8; font-size: 11px; word-break: break-word; }
 
 @media (max-width: 720px) {
   .funnel-row { grid-template-columns: minmax(80px, 1fr) minmax(0, 1.2fr) auto; gap: 8px; padding: 6px 16px; }

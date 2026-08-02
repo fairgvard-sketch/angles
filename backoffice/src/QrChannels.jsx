@@ -437,16 +437,34 @@ function HeroVideoField({ context, url, onChange }) {
  */
 const PREVIEW_TIMEOUT_MS = 8000
 
-function GuestPreview({ url }) {
+export function GuestPreview({ url }) {
   const [previewKey, setPreviewKey] = useState(0)
-  const [status, setStatus] = useState('loading')
+  // `idle` — кадр ещё не поднимали намеренно. Без этого состояния таймаут
+  // объявлял бы «превью не загрузилось» про кадр, который мы сами и не
+  // просили грузить.
+  const [status, setStatus] = useState('idle')
+  // Кадр не монтируется, пока панель не показалась: раздел, открытый
+  // сверху, не должен вообще запускать гостевую страницу.
+  const [armed, setArmed] = useState(false)
+  const [entered, setEntered] = useState(false)
   const loadedRef = useRef(false)
+  const frameRef = useRef(null)
+  const iframeRef = useRef(null)
+  const refreshRef = useRef(null)
+  const anchorRef = useRef(null)
+  const timersRef = useRef([])
+  // Отложенное восстановление якоря читает «зашёл ли владелец сам» из
+  // ref: таймеры переживают рендер, а состояние в замыкании — нет.
+  const enteredRef = useRef(false)
+  enteredRef.current = entered
 
   useEffect(() => {
+    if (!armed) return undefined
     loadedRef.current = false
     setStatus('loading')
     function onMessage(event) {
       if (event.origin !== PUBLIC_MENU_ORIGIN) return
+      if (event.source !== iframeRef.current?.contentWindow) return
       if (event.data?.source !== 'angle-public' || event.data?.type !== 'ready') return
       setStatus('ready')
     }
@@ -458,7 +476,94 @@ function GuestPreview({ url }) {
       window.removeEventListener('message', onMessage)
       clearTimeout(timer)
     }
-  }, [previewKey, url])
+  }, [previewKey, url, armed])
+
+  useEffect(() => {
+    const el = frameRef.current
+    if (!el || typeof IntersectionObserver !== 'function') {
+      setArmed(true)
+      return undefined
+    }
+    const observer = new IntersectionObserver((entries) => {
+      if (entries.some((entry) => entry.isIntersecting)) {
+        setArmed(true)
+        observer.disconnect()
+      }
+    }, { rootMargin: '150px' })
+    observer.observe(el)
+    return () => observer.disconnect()
+  }, [])
+
+  /**
+   * Кадр не имеет права двигать страницу под собой.
+   *
+   * Гостевая страница внутри ставит фокус своей кнопке, а браузер, чтобы
+   * «показать» сфокусированное, подкручивает и родительский документ —
+   * владелец, открывший раздел, оказывался в середине страницы, у
+   * телефона с превью. Опросить чужой домен нельзя, поэтому положение
+   * страницы и активный элемент запоминаются ДО загрузки и возвращаются
+   * после: и на первой загрузке, и на «Refresh preview».
+   */
+  const remember = () => {
+    anchorRef.current = {
+      x: window.scrollX,
+      y: window.scrollY,
+      active: document.activeElement,
+    }
+  }
+
+  // Якорь снимается перед каждой загрузкой кадра, включая первую.
+  useEffect(() => { if (armed) remember() }, [armed, previewKey])
+
+  const restore = () => {
+    const anchor = anchorRef.current
+    if (!anchor || !iframeRef.current) return
+    if (window.scrollX !== anchor.x || window.scrollY !== anchor.y) {
+      window.scrollTo(anchor.x, anchor.y)
+    }
+    // Фокус забирают только если владелец не заходил в превью сам.
+    if (!enteredRef.current && document.activeElement === iframeRef.current) {
+      iframeRef.current.blur()
+      const back = anchor.active
+      if (back && back !== iframeRef.current && document.contains(back)) {
+        back.focus({ preventScroll: true })
+      }
+    }
+  }
+
+  // Страница внутри кадра ставит фокус не синхронно с onLoad, поэтому
+  // якорь возвращается ещё несколько раз в ближайшие кадры.
+  const restoreSoon = () => {
+    restore()
+    timersRef.current.forEach(clearTimeout)
+    timersRef.current = [0, 60, 200, 600].map((ms) => setTimeout(restore, ms))
+  }
+
+  // Раздел закрыли — никаких отложенных прыжков по чужой странице.
+  useEffect(() => () => timersRef.current.forEach(clearTimeout), [])
+
+  function refresh() {
+    remember()
+    setEntered(false)
+    setPreviewKey((key) => key + 1)
+    // Управление возвращается той кнопке, которой владелец воспользовался.
+    refreshRef.current?.focus({ preventScroll: true })
+  }
+
+  function enterPreview() {
+    setEntered(true)
+    iframeRef.current?.focus({ preventScroll: true })
+  }
+
+  // Ушли из кадра — он снова вне обхода табом.
+  useEffect(() => {
+    if (!entered) return undefined
+    function onFocusIn(event) {
+      if (event.target !== iframeRef.current) setEntered(false)
+    }
+    document.addEventListener('focusin', onFocusIn)
+    return () => document.removeEventListener('focusin', onFocusIn)
+  }, [entered])
 
   const blocked = status === 'blocked'
   return (
@@ -470,10 +575,23 @@ function GuestPreview({ url }) {
           <p>This is the same mobile page guests open from the counter QR.</p>
         </div>
         <div className="guest-preview-actions">
+          {/* Кадр вне обхода табом, иначе владелец «проваливается» в чужую
+              страницу мимоходом. Зайти в него можно намеренно — и выйти
+              обычным Tab: следующий focusin вернёт кадр в прежнее
+              состояние. */}
+          <button
+            type="button"
+            className="text-button"
+            onClick={enterPreview}
+            disabled={!armed || blocked}
+          >
+            Enter preview
+          </button>
           <button
             type="button"
             className="secondary-button"
-            onClick={() => setPreviewKey((key) => key + 1)}
+            ref={refreshRef}
+            onClick={refresh}
           >
             <RefreshCw /> Refresh preview
           </button>
@@ -482,7 +600,7 @@ function GuestPreview({ url }) {
           </a>
         </div>
       </div>
-      <div className={`guest-phone-frame${status === 'ready' ? ' is-ready' : ''}`}>
+      <div ref={frameRef} className={`guest-phone-frame${status === 'ready' ? ' is-ready' : ''}`}>
         {status === 'loading' && (
           <p className="guest-preview-state" role="status">Loading the guest page…</p>
         )}
@@ -499,15 +617,18 @@ function GuestPreview({ url }) {
             </a>
           </div>
         )}
-        <iframe
-          key={previewKey}
-          src={url}
-          title="Guest ordering menu preview"
-          loading="lazy"
-          tabIndex={-1}
-          hidden={blocked}
-          onLoad={() => { loadedRef.current = true }}
-        />
+        {armed && (
+          <iframe
+            key={previewKey}
+            ref={iframeRef}
+            src={url}
+            title="Guest ordering menu preview"
+            loading="lazy"
+            tabIndex={entered ? 0 : -1}
+            hidden={blocked}
+            onLoad={() => { loadedRef.current = true; restoreSoon() }}
+          />
+        )}
       </div>
       {status === 'unconfirmed' && (
         <p className="guest-preview-note" role="status">

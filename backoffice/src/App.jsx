@@ -36,6 +36,7 @@ import ReservationsDesk from './ReservationsDesk'
 import DevicesManager from './DevicesManager'
 import GuestsManager from './GuestsManager'
 import ActivityManager, { ActivityCard } from './ActivityManager'
+import ViewErrorBoundary from './ErrorBoundary'
 
 /**
  * Иконки разделов. Список разделов и правила видимости живут в
@@ -930,17 +931,36 @@ function Dashboard({ session, context, onReloadContext }) {
   }, [view, locationId, route.tab])
 
   // Назад/Вперёд браузера меняют раздел, а не выкидывают из кабинета
+  const poppedRef = useRef(false)
   useEffect(() => {
     function onPopState() {
       const parsed = parseRoute(window.location.search)
       const next = { view: parsed.view, locationId: parsed.locationId, tab: parsed.tab }
       routeRef.current = next
+      poppedRef.current = true
       setRoute(next)
       setDrawer(false)
     }
     window.addEventListener('popstate', onPopState)
     return () => window.removeEventListener('popstate', onPopState)
   }, [])
+
+  /**
+   * Новый раздел открывается СВЕРХУ. Без этого браузер оставляет прокрутку
+   * от предыдущего экрана, и владелец, открыв «QR menu & online» из меню,
+   * попадал в середину страницы — к встроенному превью гостя, а не к
+   * заголовку и настройкам.
+   *
+   * Назад/Вперёд — исключение: там место в странице принадлежит истории,
+   * и восстанавливать его должен браузер, а не мы.
+   */
+  useEffect(() => {
+    if (poppedRef.current) {
+      poppedRef.current = false
+      return
+    }
+    window.scrollTo(0, 0)
+  }, [view, locationId, route.tab])
 
   const navigate = useCallback((nextView, nextLocationId = null) => {
     const prev = routeRef.current
@@ -1005,24 +1025,33 @@ function Dashboard({ session, context, onReloadContext }) {
             <LocationPicker locations={locations} locationId={locationId} onChange={changeLocation} />
           )}
         </header>
+        {/* Граница ошибки живёт внутри рабочей области и пересоздаётся при
+            смене раздела: упавший модуль не уносит навигацию, шапку и
+            возможность уйти в другой раздел. */}
         <main className="content">
-          {view === 'overview' && (noProducts
-            ? <ActivationHome context={context} onReloadContext={onReloadContext} />
-            : <Overview context={context} onNavigate={navigate} onReloadContext={onReloadContext} />)}
-          {view === 'orders' && <OrdersInbox context={context} {...scopedProps} />}
-          {view === 'reservations' && (
-            <ReservationsDesk context={context} {...scopedProps} tab={route.tab} onTabChange={changeTab} />
-          )}
-          {view === 'sales' && <SalesOverview context={context} />}
-          {view === 'activity' && <ActivityManager context={context} />}
-          {view === 'locations' && <LocationSettings context={context} {...scopedProps} />}
-          {view === 'menu' && <MenuManager context={context} {...scopedProps} />}
-          {view === 'team' && <TeamManager context={context} />}
-          {view === 'online' && <QrChannels context={context} {...scopedProps} />}
-          {view === 'devices' && <DevicesManager context={context} />}
-          {view === 'guests' && <GuestsManager context={context} />}
-          {view === 'settings' && <AccountSettingsPage email={session.user.email} onSignOut={signOut} />}
-          {PLANNED_SECTIONS[view] && <SectionPage section={view} context={context} onNavigate={navigate} />}
+          <ViewErrorBoundary
+            key={`${view}:${locationId ?? ''}:${route.tab ?? ''}`}
+            view={view}
+            onHome={() => navigate(DEFAULT_VIEW)}
+          >
+            {view === 'overview' && (noProducts
+              ? <ActivationHome context={context} onReloadContext={onReloadContext} />
+              : <Overview context={context} onNavigate={navigate} onReloadContext={onReloadContext} />)}
+            {view === 'orders' && <OrdersInbox context={context} {...scopedProps} />}
+            {view === 'reservations' && (
+              <ReservationsDesk context={context} {...scopedProps} tab={route.tab} onTabChange={changeTab} />
+            )}
+            {view === 'sales' && <SalesOverview context={context} />}
+            {view === 'activity' && <ActivityManager context={context} />}
+            {view === 'locations' && <LocationSettings context={context} {...scopedProps} />}
+            {view === 'menu' && <MenuManager context={context} {...scopedProps} />}
+            {view === 'team' && <TeamManager context={context} />}
+            {view === 'online' && <QrChannels context={context} {...scopedProps} />}
+            {view === 'devices' && <DevicesManager context={context} />}
+            {view === 'guests' && <GuestsManager context={context} />}
+            {view === 'settings' && <AccountSettingsPage email={session.user.email} onSignOut={signOut} />}
+            {PLANNED_SECTIONS[view] && <SectionPage section={view} context={context} onNavigate={navigate} />}
+          </ViewErrorBoundary>
         </main>
       </div>
       {help && (
