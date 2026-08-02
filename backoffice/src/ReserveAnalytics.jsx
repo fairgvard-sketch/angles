@@ -3,9 +3,9 @@ import {
   CalendarDays, Clock, RefreshCw, Search, TrendingUp, Users, UserX,
 } from 'lucide-react'
 import {
-  PERIODS, FUNNEL_STEPS, WEEKDAYS,
+  PERIODS, WEEKDAYS, MIN_SESSIONS_FOR_RATE,
   analyticsRange, fetchReserveAnalytics, analyticsErrorText,
-  pct, hours, leadTime,
+  funnelView, pct, hours, leadTime,
 } from './reserve-analytics'
 
 /**
@@ -33,37 +33,55 @@ function Stat({ icon: Icon, label, value, sub }) {
   )
 }
 
-/** Воронка: ширина строки — доля от вершины, а не от предыдущего шага. */
-function Funnel({ funnel }) {
-  const top = funnel?.page_view ?? 0
+/**
+ * Воронка: ширина строки — доля от вершины, а не от предыдущего шага.
+ * Числа и знаменатель считает `funnelView` — там же описан контракт.
+ */
+export function Funnel({ view }) {
   return (
     <section className="panel">
       <div className="panel-heading">
         <div>
           <h2>Booking funnel</h2>
-          <p>By the moment the guest acted · sessions, not clicks</p>
+          <p>By the moment the guest acted · sessions that got at least this far</p>
         </div>
       </div>
-      {top === 0 ? (
+      {view.top === 0 ? (
         <p className="empty-state">
           No guest sessions in this period yet.
         </p>
       ) : (
-        <div className="funnel-list">
-          {FUNNEL_STEPS.map((step) => {
-            const value = funnel[step.key] ?? 0
-            const share = top > 0 ? Math.round((value / top) * 100) : 0
-            return (
-              <div className="funnel-row" key={step.key}>
-                <span className="funnel-label">{step.label}</span>
+        <>
+          <div className="funnel-list">
+            {view.rows.map((row) => (
+              <div className="funnel-row" key={row.key}>
+                <span className="funnel-label">{row.label}</span>
                 <span className="funnel-track">
-                  <span className="funnel-fill" style={{ width: `${share}%` }} />
+                  <span className="funnel-fill" style={{ width: `${row.share}%` }} />
                 </span>
-                <span className="funnel-value">{value}<small>{share}%</small></span>
+                <span className="funnel-value">
+                  {row.value}
+                  <small>{row.rate === null ? '—' : `${row.rate}%`}</small>
+                </span>
               </div>
-            )
-          })}
-        </div>
+            ))}
+          </div>
+          {!view.enough && (
+            <p className="funnel-note">
+              {view.top} session{view.top === 1 ? '' : 's'} in this period — too few
+              to read as conversion. Shares appear from {MIN_SESSIONS_FOR_RATE} sessions
+              on; until then the steps are shown as counts only.
+            </p>
+          )}
+          {view.repaired && !view.exact && (
+            <p className="funnel-note">
+              Some sessions were first seen mid-way — for example a tab opened before
+              this period, or a second booking started from a finished one. They are
+              counted from the step they were seen at, so every step shares one
+              cohort.
+            </p>
+          )}
+        </>
       )}
     </section>
   )
@@ -135,6 +153,8 @@ export default function ReserveAnalytics({ locations }) {
   const funnel = report?.funnel
   const occupancy = report?.occupancy
   const waitlist = report?.waitlist
+  // Воронка и конверсия считаются из одной когорты: см. funnelView.
+  const funnelRows = useMemo(() => funnelView(funnel), [funnel])
 
   const sourceRows = (report?.by_source ?? []).map((s) => ({
     key: s.source,
@@ -247,8 +267,8 @@ export default function ReserveAnalytics({ locations }) {
             <Stat
               icon={TrendingUp}
               label="Page to booking"
-              value={pct(funnel?.conversion)}
-              sub={`${funnel?.submitted ?? 0} of ${funnel?.page_view ?? 0} sessions`}
+              value={pct(funnelRows.conversion)}
+              sub={`${funnelRows.booked} of ${funnelRows.top} sessions`}
             />
             <Stat
               icon={Users}
@@ -276,7 +296,7 @@ export default function ReserveAnalytics({ locations }) {
             />
           </section>
 
-          <Funnel funnel={funnel ?? {}} />
+          <Funnel view={funnelRows} />
 
           <div className="overview-columns">
             <BarList
