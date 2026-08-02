@@ -6,14 +6,12 @@ import {
   CalendarDays,
   Check,
   ChevronRight,
-  CircleHelp,
   Copy,
   CreditCard,
   LayoutDashboard,
   LogOut,
   Menu as MenuIcon,
   MonitorSmartphone,
-  MoreHorizontal,
   QrCode,
   ShoppingBag,
   Store,
@@ -37,6 +35,8 @@ import DevicesManager from './DevicesManager'
 import GuestsManager from './GuestsManager'
 import ActivityManager, { ActivityCard } from './ActivityManager'
 import ViewErrorBoundary from './ErrorBoundary'
+import AppShell, { Brand } from './ui/AppShell'
+import { PageHeader } from './ui/Layout'
 
 /**
  * Иконки разделов. Список разделов и правила видимости живут в
@@ -56,15 +56,6 @@ const NAV_ICONS = {
   devices: MonitorSmartphone,
   reports: BarChart3,
   integrations: CreditCard,
-}
-
-function Brand({ compact = false }) {
-  return (
-    <a className="brand" href="/" aria-label="ANGLE home">
-      <img src="/favicon.png" alt="" />
-      {!compact && <span>ANGLE</span>}
-    </a>
-  )
 }
 
 function SignIn() {
@@ -398,132 +389,6 @@ function HelpPanel({ context, email, onNavigate, onClose }) {
   )
 }
 
-/**
- * Меню аккаунта (Phase 2): Account, Help и выход живут у имени
- * владельца, а не среди операционных разделов. Раньше «Settings» с одной
- * лишь почтой стоял в списке модулей и читался как настройки бизнеса.
- */
-function AccountMenu({ email, active, onNavigate, onHelp, onSignOut, onClose }) {
-  const ref = useRef(null)
-  const [open, setOpen] = useState(false)
-
-  useEffect(() => {
-    if (!open) return undefined
-    function onDocClick(event) {
-      if (!ref.current?.contains(event.target)) setOpen(false)
-    }
-    function onKey(event) {
-      if (event.key === 'Escape') setOpen(false)
-    }
-    document.addEventListener('mousedown', onDocClick)
-    document.addEventListener('keydown', onKey)
-    return () => {
-      document.removeEventListener('mousedown', onDocClick)
-      document.removeEventListener('keydown', onKey)
-    }
-  }, [open])
-
-  function pick(action) {
-    setOpen(false)
-    onClose()
-    action()
-  }
-
-  return (
-    <div className="account-menu" ref={ref}>
-      <button
-        type="button"
-        className={`account-chip${open ? ' is-open' : ''}`}
-        aria-haspopup="menu"
-        aria-expanded={open}
-        onClick={() => setOpen((v) => !v)}
-      >
-        <span className="avatar">{email?.slice(0, 1).toUpperCase() || 'A'}</span>
-        <span className="account-email">{email}</span>
-        <MoreHorizontal />
-      </button>
-      {open && (
-        <div className="account-popover" role="menu">
-          <button
-            type="button"
-            role="menuitem"
-            className={active === 'settings' ? 'active' : ''}
-            onClick={() => pick(() => onNavigate('settings'))}
-          >
-            <UserRound /><span>Account</span>
-          </button>
-          <button type="button" role="menuitem" onClick={() => pick(onHelp)}>
-            <CircleHelp /><span>Help</span>
-          </button>
-          <button type="button" role="menuitem" className="is-danger" onClick={() => pick(onSignOut)}>
-            <LogOut /><span>Sign out</span>
-          </button>
-        </div>
-      )}
-    </div>
-  )
-}
-
-function Sidebar({ nav, active, onNavigate, open, onClose, onHelp, onSignOut, email }) {
-  const go = (id) => { onNavigate(id); onClose() }
-
-  return (
-    <>
-      {open && <button className="drawer-scrim" aria-label="Close navigation" onClick={onClose} />}
-      <aside className={`sidebar ${open ? 'is-open' : ''}`}>
-        <div className="sidebar-top">
-          <Brand />
-          <div className="sidebar-top-actions">
-            <button
-              className="icon-button sidebar-mobile-action"
-              aria-label="Help"
-              onClick={() => { onHelp(); onClose() }}
-            >
-              <CircleHelp />
-            </button>
-            <button className="icon-button sidebar-close" onClick={onClose} aria-label="Close navigation"><X /></button>
-          </div>
-        </div>
-        <nav className="side-nav" aria-label="Back office">
-          {nav.primary.map(({ id, label }) => {
-            const Icon = NAV_ICONS[id]
-            return (
-              <button key={id} className={active === id ? 'active' : ''} onClick={() => go(id)}>
-                {Icon && <Icon />}
-                <span>{label}</span>
-              </button>
-            )
-          })}
-          {nav.groups.map((group) => (
-            <div className="side-nav-group" key={group.id} role="group" aria-labelledby={`nav-${group.id}`}>
-              <p className="side-nav-title" id={`nav-${group.id}`}>{group.label}</p>
-              {group.items.map(({ id, label }) => {
-                const Icon = NAV_ICONS[id]
-                return (
-                  <button key={id} className={active === id ? 'active' : ''} onClick={() => go(id)}>
-                    {Icon && <Icon />}
-                    <span>{label}</span>
-                  </button>
-                )
-              })}
-            </div>
-          ))}
-        </nav>
-        <div className="sidebar-bottom">
-          <AccountMenu
-            email={email}
-            active={active}
-            onNavigate={onNavigate}
-            onHelp={onHelp}
-            onSignOut={onSignOut}
-            onClose={onClose}
-          />
-        </div>
-      </aside>
-    </>
-  )
-}
-
 function Stat({ label, value, detail, icon: Icon }) {
   return (
     <div className="stat-card">
@@ -618,15 +483,14 @@ function ActivationHome({ context, onReloadContext }) {
   const requests = Array.isArray(context?.product_requests) ? context.product_requests : []
   return (
     <>
-      <section className="page-heading">
-        <p className="eyebrow">YOUR BUSINESS</p>
-        <h1>{context.organization?.name || 'ANGLE business'}</h1>
-        <p>
-          {requests.length > 0
-            ? 'Your workspace is ready. The ANGLE team is activating your products — this usually takes less than a business day.'
-            : 'Your workspace is ready. Choose a product to get started.'}
-        </p>
-      </section>
+      <PageHeader
+        compact={false}
+        eyebrow="YOUR BUSINESS"
+        title={context.organization?.name || 'ANGLE business'}
+        description={requests.length > 0
+          ? 'Your workspace is ready. The ANGLE team is activating your products — this usually takes less than a business day.'
+          : 'Your workspace is ready. Choose a product to get started.'}
+      />
       <ProductsCard context={context} onReloadContext={onReloadContext} />
     </>
   )
@@ -696,11 +560,12 @@ function Overview({ context, onNavigate, onReloadContext }) {
   const actions = QUICK_ACTIONS.filter((action) => hasCapability(context, action.capability))
   return (
     <>
-      <section className="page-heading">
-        <p className="eyebrow">YOUR BUSINESS</p>
-        <h1>{context.organization?.name || 'ANGLE business'}</h1>
-        <p>{overviewIntro(context)}</p>
-      </section>
+      <PageHeader
+        compact={false}
+        eyebrow="YOUR BUSINESS"
+        title={context.organization?.name || 'ANGLE business'}
+        description={overviewIntro(context)}
+      />
 
       <section className="stats-grid" aria-label="Business overview">
         <Stat icon={Store} label="Locations" value={counts.locations ?? 0} detail="Business locations" />
@@ -776,11 +641,11 @@ function SectionPage({ section, context, onNavigate }) {
   const planned = PLANNED_SECTIONS[section]
   return (
     <>
-      <section className="page-heading compact-heading">
-        <p className="eyebrow">{context.organization?.name}</p>
-        <h1>{item.label}</h1>
-        <p>{planned?.summary}</p>
-      </section>
+      <PageHeader
+        eyebrow={context.organization?.name}
+        title={item.label}
+        description={planned?.summary}
+      />
       <section className="section-placeholder panel">
         <span className="section-icon"><Icon /></span>
         <div>
@@ -804,11 +669,11 @@ function SectionPage({ section, context, onNavigate }) {
 function AccountSettingsPage({ email, onSignOut }) {
   return (
     <>
-      <section className="page-heading compact-heading">
-        <p className="eyebrow">ACCOUNT</p>
-        <h1>Settings</h1>
-        <p>Manage your back-office account and session.</p>
-      </section>
+      <PageHeader
+        eyebrow="ACCOUNT"
+        title="Settings"
+        description="Manage your back-office account and session."
+      />
       <section className="panel account-settings-panel">
         <div className="account-settings-copy">
           <h2>Account</h2>
@@ -846,27 +711,7 @@ function storeLocation(id) {
   }
 }
 
-function LocationPicker({ locations, locationId, onChange }) {
-  const current = locations.find((l) => l.id === locationId)
-  if (locations.length === 0) return null
-  if (locations.length === 1) {
-    return <span className="topbar-location is-single"><Building2 /> {current?.name ?? locations[0].name}</span>
-  }
-  return (
-    <label className="topbar-location">
-      <Building2 aria-hidden />
-      <span className="visually-hidden">Location</span>
-      <select value={locationId ?? ''} onChange={(event) => onChange(event.target.value)}>
-        {locations.map((location) => (
-          <option key={location.id} value={location.id}>{location.name}</option>
-        ))}
-      </select>
-    </label>
-  )
-}
-
 function Dashboard({ session, context, onReloadContext }) {
-  const [drawer, setDrawer] = useState(false)
   const [help, setHelp] = useState(false)
   // Организация без активного продукта (104): стабильный экран выбора/
   // ожидания активации вместо пустых операционных разделов.
@@ -939,7 +784,6 @@ function Dashboard({ session, context, onReloadContext }) {
       routeRef.current = next
       poppedRef.current = true
       setRoute(next)
-      setDrawer(false)
     }
     window.addEventListener('popstate', onPopState)
     return () => window.removeEventListener('popstate', onPopState)
@@ -985,75 +829,60 @@ function Dashboard({ session, context, onReloadContext }) {
 
   useEffect(() => { if (locationId) storeLocation(locationId) }, [locationId])
 
-  // Полноэкранное меню открыто — фон под ним не скроллится
-  useEffect(() => {
-    if (!drawer) return undefined
-    const prev = document.body.style.overflow
-    document.body.style.overflow = 'hidden'
-    return () => { document.body.style.overflow = prev }
-  }, [drawer])
-
   async function signOut() {
     await supabase.auth.signOut()
   }
 
+  // Вкладка живёт в адресе у КАЖДОГО раздела с вкладками: перезагрузка и
+  // ссылка в поддержку должны открывать тот же экран, а не первый таб.
   const scopedProps = { locationId, onLocationChange: changeLocation }
+  const tabProps = { tab: route.tab, onTabChange: changeTab }
 
   return (
-    <div className="app-shell">
-      <Sidebar
-        nav={nav}
-        active={view}
-        onNavigate={navigate}
-        open={drawer}
-        onClose={() => setDrawer(false)}
-        onHelp={() => setHelp(true)}
-        onSignOut={signOut}
-        email={session.user.email}
-      />
-      <div className="app-main">
-        <header className="topbar">
-          <button className="icon-button mobile-menu" onClick={() => setDrawer(true)} aria-label="Open navigation"><MenuIcon /></button>
-          <div className="topbar-context">
-            <span>{context.organization?.name}</span>
-            <small>{context.member?.role}</small>
-            {isDeveloper && <span className="developer-badge">Developer workspace</span>}
-          </div>
-          {/* Точка показывается там, где от неё зависят данные — и нигде
-              больше: в Team или Customers она вводила бы в заблуждение. */}
-          {scoped && !noProducts && (
-            <LocationPicker locations={locations} locationId={locationId} onChange={changeLocation} />
-          )}
-        </header>
-        {/* Граница ошибки живёт внутри рабочей области и пересоздаётся при
-            смене раздела: упавший модуль не уносит навигацию, шапку и
-            возможность уйти в другой раздел. */}
-        <main className="content">
-          <ViewErrorBoundary
-            key={`${view}:${locationId ?? ''}:${route.tab ?? ''}`}
-            view={view}
-            onHome={() => navigate(DEFAULT_VIEW)}
-          >
-            {view === 'overview' && (noProducts
-              ? <ActivationHome context={context} onReloadContext={onReloadContext} />
-              : <Overview context={context} onNavigate={navigate} onReloadContext={onReloadContext} />)}
-            {view === 'orders' && <OrdersInbox context={context} {...scopedProps} />}
-            {view === 'reservations' && (
-              <ReservationsDesk context={context} {...scopedProps} tab={route.tab} onTabChange={changeTab} />
-            )}
-            {view === 'sales' && <SalesOverview context={context} />}
-            {view === 'activity' && <ActivityManager context={context} />}
-            {view === 'locations' && <LocationSettings context={context} {...scopedProps} />}
-            {view === 'menu' && <MenuManager context={context} {...scopedProps} />}
-            {view === 'team' && <TeamManager context={context} />}
-            {view === 'online' && <QrChannels context={context} {...scopedProps} />}
-            {view === 'devices' && <DevicesManager context={context} />}
-            {view === 'guests' && <GuestsManager context={context} />}
-            {view === 'settings' && <AccountSettingsPage email={session.user.email} onSignOut={signOut} />}
-            {PLANNED_SECTIONS[view] && <SectionPage section={view} context={context} onNavigate={navigate} />}
-          </ViewErrorBoundary>
-        </main>
-      </div>
+    <AppShell
+      nav={nav}
+      icons={NAV_ICONS}
+      view={view}
+      onNavigate={navigate}
+      email={session.user.email}
+      onSignOut={signOut}
+      onHelp={() => setHelp(true)}
+      organization={context.organization?.name}
+      role={context.member?.role}
+      isDeveloper={isDeveloper}
+      locations={locations}
+      locationId={locationId}
+      onLocationChange={changeLocation}
+      /* Точка показывается там, где от неё зависят данные — и нигде
+         больше: в Team или Customers она вводила бы в заблуждение. */
+      scoped={scoped && !noProducts}
+    >
+      {/* Граница ошибки живёт внутри рабочей области и пересоздаётся при
+          смене раздела: упавший модуль не уносит навигацию, шапку и
+          возможность уйти в другой раздел. */}
+      <ViewErrorBoundary
+        key={`${view}:${locationId ?? ''}:${route.tab ?? ''}`}
+        view={view}
+        onHome={() => navigate(DEFAULT_VIEW)}
+      >
+        {view === 'overview' && (noProducts
+          ? <ActivationHome context={context} onReloadContext={onReloadContext} />
+          : <Overview context={context} onNavigate={navigate} onReloadContext={onReloadContext} />)}
+        {view === 'orders' && <OrdersInbox context={context} {...scopedProps} />}
+        {view === 'reservations' && (
+          <ReservationsDesk context={context} {...scopedProps} {...tabProps} />
+        )}
+        {view === 'sales' && <SalesOverview context={context} />}
+        {view === 'activity' && <ActivityManager context={context} />}
+        {view === 'locations' && <LocationSettings context={context} {...scopedProps} {...tabProps} />}
+        {view === 'menu' && <MenuManager context={context} {...scopedProps} {...tabProps} />}
+        {view === 'team' && <TeamManager context={context} {...tabProps} />}
+        {view === 'online' && <QrChannels context={context} {...scopedProps} {...tabProps} />}
+        {view === 'devices' && <DevicesManager context={context} />}
+        {view === 'guests' && <GuestsManager context={context} {...tabProps} />}
+        {view === 'settings' && <AccountSettingsPage email={session.user.email} onSignOut={signOut} />}
+        {PLANNED_SECTIONS[view] && <SectionPage section={view} context={context} onNavigate={navigate} />}
+      </ViewErrorBoundary>
       {help && (
         <HelpPanel
           context={context}
@@ -1062,7 +891,7 @@ function Dashboard({ session, context, onReloadContext }) {
           onClose={() => setHelp(false)}
         />
       )}
-    </div>
+    </AppShell>
   )
 }
 

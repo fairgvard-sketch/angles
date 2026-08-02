@@ -185,6 +185,60 @@ before(async () => {
     createRoot(document.getElementById('root')).render(<Page dir={window.__DIR__ || 'ltr'} />)
   `)
 
+  await bundle('shell', `
+    import { useState } from 'react'
+    import { createRoot } from 'react-dom/client'
+    import AppShell from './ui/AppShell'
+
+    const nav = {
+      primary: [{ id: 'overview', label: 'Dashboard' }],
+      groups: [
+        { id: 'work', label: 'Work', items: [
+          { id: 'orders', label: 'Orders' }, { id: 'reservations', label: 'Reservations' },
+        ] },
+        { id: 'insights', label: 'Insights', items: [
+          { id: 'sales', label: 'Sales' }, { id: 'activity', label: 'Activity' },
+          { id: 'guests', label: 'Customers' }, { id: 'reports', label: 'Reports' },
+        ] },
+        { id: 'manage', label: 'Manage', items: [
+          { id: 'menu', label: 'Catalogue' }, { id: 'locations', label: 'Locations' },
+          { id: 'team', label: 'Team' },
+        ] },
+        { id: 'channels', label: 'Channels', items: [
+          { id: 'online', label: 'QR Menu & Online' }, { id: 'integrations', label: 'Integrations' },
+        ] },
+        { id: 'system', label: 'System', items: [{ id: 'devices', label: 'Devices' }] },
+      ],
+    }
+
+    function Page() {
+      const [view, setView] = useState('overview')
+      // Счётчик монтирований оболочки: она обязана пережить смену раздела
+      window.__SHELL_MOUNTS__ = (window.__SHELL_MOUNTS__ || 0)
+      return (
+        <AppShell
+          nav={nav}
+          icons={{}}
+          view={view}
+          onNavigate={setView}
+          email="owner@example.com"
+          onSignOut={() => {}}
+          onHelp={() => {}}
+          organization="Bulochka"
+          role="owner"
+          locations={[{ id: 'a', name: 'Пинскер 29' }, { id: 'b', name: 'Ротшильд 12' }]}
+          locationId="a"
+          onLocationChange={() => {}}
+          scoped
+        >
+          <p id="view">{view}</p>
+          <div className="tall">content</div>
+        </AppShell>
+      )
+    }
+    createRoot(document.getElementById('root')).render(<Page />)
+  `)
+
   await bundle('preview', `
     import { createRoot } from 'react-dom/client'
     import { GuestPreview } from './QrChannels'
@@ -250,6 +304,109 @@ describe('view error boundary', { skip }, () => {
     await page.click('#other')
     await page.waitForSelector('#other-section')
     assert.equal(await page.$('.view-crash'), null)
+    await page.close()
+  })
+})
+
+describe('mobile navigation drawer', { skip }, () => {
+  /**
+   * Шторка на 390×844 — единственный вход в разделы на телефоне. Phase 0
+   * зафиксировал, что «Integrations» и «Devices» остаются ниже сгиба и
+   * подсказки о продолжении списка нет. Здесь проверяется, что все
+   * пункты достижимы, край подсказывает прокрутку, а фокус ведёт себя
+   * как у любого оверлея.
+   */
+  const openDrawer = async () => {
+    const page = await browser.newPage()
+    await page.setViewport({ width: 390, height: 844 })
+    await page.goto(`${appOrigin}/shell`, { waitUntil: 'networkidle0' })
+    await page.click('.mobile-menu')
+    await new Promise((resolve) => setTimeout(resolve, 400))
+    return page
+  }
+
+  it('все разделы достижимы, а край подсказывает прокрутку', async () => {
+    const page = await openDrawer()
+    const before = await page.evaluate(() => {
+      const nav = document.querySelector('.side-nav')
+      const items = [...nav.querySelectorAll('button')]
+      return {
+        scrollable: nav.scrollHeight > nav.clientHeight,
+        hasEdgeHint: getComputedStyle(nav).backgroundImage.includes('radial-gradient'),
+        hidden: items.filter((b) => b.getBoundingClientRect().bottom > window.innerHeight).length,
+        total: items.length,
+      }
+    })
+    assert.ok(before.scrollable, 'список длиннее экрана — иначе проверять нечего')
+    assert.ok(before.hasEdgeHint, 'у прокручиваемого списка должна быть подсказка края')
+    assert.ok(before.hidden > 0, 'часть пунктов ниже сгиба — исходное состояние')
+
+    // Прокрутка внутри списка доводит до последнего раздела
+    const reached = await page.evaluate(() => {
+      const nav = document.querySelector('.side-nav')
+      nav.scrollTop = nav.scrollHeight
+      const last = [...nav.querySelectorAll('button')].pop()
+      return {
+        label: last.textContent.trim(),
+        visible: last.getBoundingClientRect().bottom <= window.innerHeight,
+      }
+    })
+    assert.equal(reached.label, 'Devices')
+    assert.ok(reached.visible, 'последний раздел должен доезжать до видимой области')
+
+    // Футер аккаунта не перекрывает список
+    const overlap = await page.evaluate(() => {
+      const nav = document.querySelector('.side-nav').getBoundingClientRect()
+      const foot = document.querySelector('.sidebar-bottom').getBoundingClientRect()
+      return nav.bottom - foot.top
+    })
+    assert.ok(overlap <= 1, `футер не должен наезжать на список (перекрытие ${overlap}px)`)
+    await page.close()
+  })
+
+  it('Escape закрывает шторку и возвращает фокус на бургер', async () => {
+    const page = await openDrawer()
+    assert.equal(
+      await page.evaluate(() => document.activeElement?.getAttribute('aria-label')),
+      'Close navigation',
+      'открытие уводит фокус в шторку'
+    )
+    await page.keyboard.press('Escape')
+    await new Promise((resolve) => setTimeout(resolve, 300))
+    const after = await page.evaluate(() => ({
+      open: document.querySelector('.sidebar').classList.contains('is-open'),
+      active: document.activeElement?.getAttribute('aria-label'),
+      expanded: document.querySelector('.mobile-menu').getAttribute('aria-expanded'),
+      bodyLocked: document.body.style.overflow === 'hidden',
+    }))
+    assert.equal(after.open, false)
+    assert.equal(after.active, 'Open navigation', 'фокус возвращается туда, откуда пришёл')
+    assert.equal(after.expanded, 'false')
+    assert.equal(after.bodyLocked, false, 'страница снова прокручивается')
+    await page.close()
+  })
+
+  it('переход по пункту закрывает шторку, а оболочка не перемонтируется', async () => {
+    const page = await openDrawer()
+    await page.evaluate(() => {
+      // Метка на живом узле: если оболочка перемонтируется, она пропадёт
+      document.querySelector('.sidebar').dataset.marker = 'kept'
+    })
+    await page.evaluate(() => {
+      [...document.querySelectorAll('.side-nav button')]
+        .find((b) => b.textContent.trim() === 'Catalogue').click()
+    })
+    await new Promise((resolve) => setTimeout(resolve, 300))
+    const after = await page.evaluate(() => ({
+      view: document.getElementById('view').textContent,
+      open: document.querySelector('.sidebar').classList.contains('is-open'),
+      marker: document.querySelector('.sidebar').dataset.marker,
+      current: document.querySelector('[aria-current="page"]')?.textContent.trim(),
+    }))
+    assert.equal(after.view, 'menu')
+    assert.equal(after.open, false)
+    assert.equal(after.marker, 'kept', 'сайдбар не должен пересоздаваться при смене раздела')
+    assert.equal(after.current, 'Catalogue', 'текущий раздел объявлен как aria-current')
     await page.close()
   })
 })

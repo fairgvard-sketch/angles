@@ -662,9 +662,21 @@ a { color: inherit; }
   .sidebar.is-open { visibility: visible; transform: translateX(0); }
   .sidebar-top, .sidebar-bottom { flex: 0 0 auto; }
   .sidebar-top { min-height: 52px; }
+  /*
+   * Список разделов прокручивается сам. Тень у края появляется ТОЛЬКО
+   * когда ниже (или выше) действительно есть ещё пункты: два слоя
+   * `local` закрывают её, когда список докручен до края. Без этой
+   * подсказки на 390px «Integrations» и «Devices» просто не существуют
+   * для владельца — он не догадывается, что список продолжается.
+   */
   .side-nav {
     flex: 1 1 auto; min-height: 0; margin-top: 22px; gap: 4px;
     overflow-y: auto; overscroll-behavior-y: contain; scrollbar-width: thin;
+    background:
+      linear-gradient(var(--c-surface) 30%, rgb(255 255 255 / 0%)) top / 100% 22px no-repeat local,
+      linear-gradient(rgb(255 255 255 / 0%), var(--c-surface) 70%) bottom / 100% 22px no-repeat local,
+      radial-gradient(farthest-side at 50% 0, rgb(20 24 31 / 14%), rgb(20 24 31 / 0%)) top / 100% 9px no-repeat scroll,
+      radial-gradient(farthest-side at 50% 100%, rgb(20 24 31 / 14%), rgb(20 24 31 / 0%)) bottom / 100% 9px no-repeat scroll;
   }
   .side-nav button, .sidebar-bottom > button { min-height: 52px; font-size: 16px; }
   .sidebar-mobile-action, .sidebar-close, .mobile-menu { display: inline-flex !important; }
