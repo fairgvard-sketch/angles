@@ -557,7 +557,7 @@ focus» и «must not load above the fold», касса на «гость ост
 | Команда | Результат |
 |---|---|
 | `anglesite: npm test` | 161 тест, 0 падений (было 140); 2 DOM-набора пропущены без локального Chrome |
-| `anglesite: npm run build` | ок — `index-BDVBLepc.js` 725.73 kB (gzip 204.08), `index-BWW-4vmC.css` 73.96 kB (gzip 14.02) |
+| `anglesite: npm run build` | ок — `index-BVUF6GPT.js` 725.75 kB (gzip 204.08), `index-BWW-4vmC.css` 73.96 kB (gzip 14.02) |
 | `kassa: npm run lint` | ок |
 | `kassa: npm run test:run` | 50 файлов, 393 теста, 0 падений |
 | `kassa: npm run build` | ок |

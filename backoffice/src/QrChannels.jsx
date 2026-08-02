@@ -518,16 +518,18 @@ export function GuestPreview({ url }) {
   const restore = () => {
     const anchor = anchorRef.current
     if (!anchor || !iframeRef.current) return
+    // Длинные контрольные таймеры не должны мешать владельцу скроллить
+    // страницу самому. Возвращаем якорь только когда кадр действительно
+    // забрал фокус без явного «Enter preview».
+    const stolenFocus = !enteredRef.current && document.activeElement === iframeRef.current
+    if (!stolenFocus) return
     if (window.scrollX !== anchor.x || window.scrollY !== anchor.y) {
       window.scrollTo(anchor.x, anchor.y)
     }
-    // Фокус забирают только если владелец не заходил в превью сам.
-    if (!enteredRef.current && document.activeElement === iframeRef.current) {
-      iframeRef.current.blur()
-      const back = anchor.active
-      if (back && back !== iframeRef.current && document.contains(back)) {
-        back.focus({ preventScroll: true })
-      }
+    iframeRef.current.blur()
+    const back = anchor.active
+    if (back && back !== iframeRef.current && document.contains(back)) {
+      back.focus({ preventScroll: true })
     }
   }
 
@@ -536,7 +538,11 @@ export function GuestPreview({ url }) {
   const restoreSoon = () => {
     restore()
     timersRef.current.forEach(clearTimeout)
-    timersRef.current = [0, 60, 200, 600].map((ms) => setTimeout(restore, ms))
+    // Hero/video внутри чужой страницы может поставить autofocus сильно
+    // позже события load. Редкие проверки ловят это без постоянного
+    // polling; restore выше ничего не делает, если фокус не украден.
+    timersRef.current = [0, 60, 200, 600, 1200, 2000, 3500, 6000, 9000]
+      .map((ms) => setTimeout(restore, ms))
   }
 
   // Раздел закрыли — никаких отложенных прыжков по чужой странице.
