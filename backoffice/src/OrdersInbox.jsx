@@ -781,9 +781,16 @@ export default function OrdersInbox({
                 <span>
                   <strong>Older unresolved</strong>
                   <small>
+                    {/*
+                      Подсказка обязана быть выполнимой. POS-точке нельзя
+                      советовать «закройте их»: запись из кабинета там
+                      запрещена, решение принимают на кассе.
+                    */}
                     {filtersOn
                       ? 'Matches from previous days'
-                      : 'Still open from previous days — close or cancel them so today’s list is honest.'}
+                      : desk?.mode === 'standalone'
+                        ? 'Still open from previous days — close or cancel them so today’s list is honest.'
+                        : 'Waiting for a decision at the register since a previous day.'}
                   </small>
                 </span>
                 <span className="order-count">{debtCount}</span>
