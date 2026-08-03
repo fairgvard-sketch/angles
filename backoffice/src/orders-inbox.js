@@ -45,16 +45,13 @@ export const NEXT_ACTIONS = {
   ],
 }
 
-/**
- * Режим обслуживания точки — зеркало online_fulfilment_mode (101):
- * явная настройка сильнее дефолта по модулю pos.
+/*
+ * `fulfilmentMode` жил здесь и повторял серверный online_fulfilment_mode
+ * (101) — ровно то дублирование, из-за которого кабинет показывал
+ * бухгалтеру кнопки, которые сервер отклонял. С 141 режим точки и право
+ * на действие приходят вместе со строками (`mode`, `can_manage`), и
+ * второй копии правила больше нет.
  */
-export function fulfilmentMode(products, settings) {
-  const explicit = settings?.online_orders?.fulfilment
-  if (explicit === 'pos' || explicit === 'standalone') return explicit
-  const hasPos = !Array.isArray(products) || products.includes('pos')
-  return hasPos ? 'pos' : 'standalone'
-}
 
 // ── Инбокс: возраст, корзины, поиск (Phase 3) ────────────────
 
@@ -70,6 +67,100 @@ export const ORDER_TYPE_LABELS = {
   here: 'Dine in',
   takeaway: 'Takeaway',
   delivery: 'Delivery',
+}
+
+/**
+ * Тон статуса — семантический токен, а не цвет.
+ *
+ * Раздел заказов описывает ИСПОЛНЕНИЕ (принят → готовится → готов), а не
+ * визит гостя, поэтому у него собственные состояния и собственные
+ * названия классов. Совпадение палитры с бронями допустимо и намеренно
+ * (это язык платформы), совпадение слов — нет: «Confirmed» и «Seated»
+ * в заказах не появляются.
+ */
+export const STATUS_TONE = {
+  new: 'new',
+  accepted: 'accepted',
+  preparing: 'progress',
+  ready: 'ready',
+  completed: 'done',
+  rejected: 'stopped',
+  cancelled: 'stopped',
+}
+
+/**
+ * Вкладки раздела. Список строится по данным: «Scheduled» показывается
+ * только там, где предзаказы действительно есть — вкладка, которая у
+ * заведения всегда пуста, отвечает на вопрос, которого никто не задавал.
+ */
+export function orderTabs(scheduledCount, current) {
+  const tabs = [{ key: 'active', label: 'Active' }]
+  if (scheduledCount > 0 || current === 'scheduled') {
+    tabs.push({ key: 'scheduled', label: 'Scheduled', count: scheduledCount })
+  }
+  tabs.push({ key: 'all', label: 'All orders' })
+  return tabs
+}
+
+/**
+ * Номер заявки (139). До миграции человеческого номера не было и
+ * приходилось звать заказ хвостом UUID; фолбэк оставлен на случай
+ * строки, пришедшей мимо рабочего стола.
+ */
+export function orderNumber(row) {
+  return row?.order_number ? `#${row.order_number}` : orderRef(row?.id)
+}
+
+/**
+ * Контекст строки — чей это заказ. У заказа со стола имя гостя не
+ * спрашивают вовсе (099), поэтому колонка обязана уметь показывать
+ * стол; безымянная заявка — это заказ у стойки, а не «—».
+ */
+export function rowContext(row) {
+  if (row?.customer_name) return row.customer_name
+  if (row?.table_label) return `Table ${row.table_label}`
+  return 'Counter'
+}
+
+/** «3 items» — штуки, а не строки меню (сервер считает qty, 141) */
+export function itemsLabel(count) {
+  const n = Number(count) || 0
+  return n === 1 ? '1 item' : `${n} items`
+}
+
+/**
+ * Деньги точки. Раньше знак шекеля был вшит в код: сеть с другой
+ * валютой увидела бы чужие суммы под ₪. Валюту отдаёт сервер вместе со
+ * строками (141), формат — по правилам локали.
+ */
+export function formatMoney(agorot, currency = 'ILS') {
+  const value = (agorot ?? 0) / 100
+  try {
+    return new Intl.NumberFormat('en-GB', {
+      style: 'currency', currency, currencyDisplay: 'narrowSymbol',
+    }).format(value)
+  } catch {
+    // Неизвестный код валюты не повод не показать сумму
+    return `${value.toFixed(2)} ${currency}`
+  }
+}
+
+/**
+ * Состояние живой связи. Зелёная точка раньше значила лишь «компонент
+ * подписался»: сокет мог быть жив, а данные — часовой давности, и
+ * раздел всё равно обещал «Live».
+ *
+ * Здесь состояние собирается из трёх фактов: что говорит подписка,
+ * когда последний раз УДАЛСЯ запрос и не упал ли он вовсе.
+ */
+export const REALTIME_STALE_MS = 90_000
+
+export function realtimeState({ socket, lastOkMs, nowMs, failed = false }) {
+  if (failed) return 'stale'
+  if (socket === 'offline') return 'reconnecting'
+  if (!Number.isFinite(lastOkMs)) return 'connecting'
+  if (nowMs - lastOkMs > REALTIME_STALE_MS) return 'stale'
+  return socket === 'live' ? 'live' : 'connecting'
 }
 
 /**
@@ -148,41 +239,12 @@ export function orderTimeLabel(iso, startOfDayMs, tz) {
   return `${date} · ${time}`
 }
 
-/** Текст заявки для поиска: имя, телефон, ссылка, стол и позиции */
-export function orderSearchText(order) {
-  const items = Array.isArray(order.items)
-    ? order.items.map((i) => [i.name, i.variant_name].filter(Boolean).join(' ')).join(' ')
-    : ''
-  return [
-    order.customer_name,
-    order.customer_phone,
-    orderRef(order.id),
-    order.table_label,
-    order.pos?.daily_number ? `#${order.pos.daily_number}` : '',
-    order.note,
-    items,
-  ].filter(Boolean).join(' ').toLowerCase()
-}
-
-/**
- * Фильтр инбокса. Пустой фильтр ничего не отсекает: менеджер, открывший
- * раздел, должен видеть работу, а не результат чужих настроек.
+/*
+ * Поиск и фильтры тоже уехали на сервер (141): здесь они могли отвечать
+ * только про загруженное окно в 30 дней, то есть на вопрос «есть ли
+ * такой заказ среди последних двухсот», а не «есть ли такой заказ».
+ * Правила отбора теперь одни и проверяются pgTAP.
  */
-export function filterOrders(orders, { query = '', status = 'all', type = 'all', channel = 'all' } = {}) {
-  const needle = query.trim().toLowerCase()
-  return (orders ?? []).filter((order) => {
-    if (status !== 'all' && order.status !== status) return false
-    if (type !== 'all' && order.order_type !== type) return false
-    if (channel !== 'all' && (order.order_channel ?? 'link') !== channel) return false
-    if (needle && !orderSearchText(order).includes(needle)) return false
-    return true
-  })
-}
-
-/** Деньги — целые агороты (инвариант кассы); наружу — шекели. */
-export function formatAgorot(agorot) {
-  return `₪${((agorot ?? 0) / 100).toFixed(2).replace(/\.00$/, '')}`
-}
 
 /** Строки позиций из снапшота заявки: «2 × Латте · גדול · שיבולת שועל». */
 export function orderItemLines(items) {

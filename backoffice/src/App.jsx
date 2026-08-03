@@ -871,7 +871,17 @@ function Dashboard({ session, context, onReloadContext }) {
               onReloadContext={onReloadContext}
             />
           ))}
-        {view === 'orders' && <OrdersInbox context={context} {...scopedProps} />}
+        {/* Вкладка и отбор заказов живут в адресе — как у броней. Дня в
+            адресе у раздела нет: «сегодня» ему задаёт сервер по часам
+            точки, а не выбор в шапке. */}
+        {view === 'orders' && (
+          <OrdersInbox
+            {...scopedProps}
+            {...tabProps}
+            filters={route.filters ?? {}}
+            onFiltersChange={changeFilters}
+          />
+        )}
         {view === 'reservations' && (
           <ReservationsDesk context={context} {...scopedProps} {...tabProps} {...dateProps} />
         )}

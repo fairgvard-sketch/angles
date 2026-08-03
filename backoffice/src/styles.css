@@ -2155,3 +2155,256 @@ a { color: inherit; }
   .floor-zone-row .text-button { min-height: 44px; padding-inline: var(--sp-2); }
   .floor-zone-row .icon-button { width: 44px; height: 44px; }
 }
+
+/* ============================================================
+ * Orders — рабочий стол заказов (редизайн, Phase 1).
+ *
+ * Отдельный префикс `ord-`, а не правка существующих `order-*`:
+ * `.order-toolbar` и `.order-search` давно переиспользуют Devices,
+ * Home и каталог, и менять их ради заказов означало бы менять чужие
+ * экраны. Старые `order-*` доживают до Phase 2 вместе с карточками.
+ *
+ * Палитра статусов совпадает с бронями намеренно — это язык платформы,
+ * а не заимствование раздела: значения ниже те же, что у `--rsv-*`
+ * (когда брони будут трогать в следующий раз, их стоит свести к этим
+ * общим токенам). Слова у заказов свои: Confirmed и Seated здесь не
+ * появляются.
+ * ============================================================ */
+:root {
+  --st-wait-bg: #f3c85b;   /* ждёт решения */
+  --st-wait-fg: #3a2a00;
+  --st-work-bg: #0b2345;   /* в работе */
+  --st-work-fg: #fff;
+  --st-done-bg: #168a4b;   /* готово */
+  --st-done-fg: #fff;
+  --st-past-bg: #d9dde2;   /* завершено, история */
+  --st-past-fg: #49515c;
+  --st-stop-bg: #fdf1f0;   /* остановлено, проблема */
+  --st-stop-fg: #9b2c22;
+  --st-accent: #2563eb;    /* сдержанный кобальт: выбор и фокус */
+  --st-accent-soft: #eef3fe;
+}
+
+/* Рабочая строка раздела: заголовок, поиск и состояние связи */
+.ord-header {
+  display: flex; flex-wrap: wrap; align-items: center; gap: var(--sp-3);
+  margin-bottom: var(--sp-3);
+}
+.ord-header h1 { margin: 0; font-size: 25px; font-weight: 730; line-height: 1.1; }
+.ord-header .order-search { flex: 1 1 220px; max-width: 340px; min-height: 40px; }
+.ord-header-live {
+  display: flex; align-items: center; gap: var(--sp-2);
+  margin-inline-start: auto;
+}
+
+.ord-tabs {
+  display: flex; gap: var(--sp-4); margin-bottom: var(--sp-4);
+  border-bottom: 1px solid var(--c-border-panel);
+  overflow-x: auto; overscroll-behavior-x: contain; scrollbar-width: none;
+}
+.ord-tabs::-webkit-scrollbar { display: none; }
+.ord-tabs button {
+  flex: 0 0 auto; min-height: 40px; padding: 0 2px;
+  border: 0; border-bottom: 2px solid transparent; background: transparent;
+  color: var(--c-text-muted); font: inherit; font-size: 14px; font-weight: 600;
+  white-space: nowrap; cursor: pointer;
+}
+.ord-tabs button:hover { color: var(--c-text); }
+.ord-tabs button.is-active {
+  border-bottom-color: var(--st-accent); color: var(--c-text); font-weight: 730;
+}
+
+.ord-toolbar {
+  display: flex; flex-wrap: wrap; align-items: center; gap: var(--sp-2);
+  margin-bottom: var(--sp-3);
+}
+.ord-select select {
+  min-height: 40px; padding: 0 30px 0 10px;
+  border: 1px solid var(--c-border); border-radius: var(--r-md);
+  background: var(--c-surface); font: inherit; font-size: 13px;
+}
+.ord-toolbar .text-button { min-height: 40px; }
+.ord-toolbar .text-button svg { width: 15px; height: 15px; }
+/* Кто владеет жизненным циклом заказа — справа, ровно одной строкой */
+.ord-owner {
+  display: inline-flex; align-items: center; gap: 6px;
+  margin-inline-start: auto;
+  color: var(--c-text-muted); font-size: 13px;
+}
+.ord-owner svg { width: 15px; height: 15px; }
+
+/*
+ * Состояние связи. Зелёная точка обещала «живые данные» всегда, стоило
+ * компоненту подписаться. Теперь Live — только пока запрос действительно
+ * удавался недавно; дальше жёлтое «может устареть» рядом с кнопкой
+ * обновления.
+ */
+.ord-live {
+  display: inline-flex; align-items: center; gap: 6px;
+  color: var(--c-text-muted); font-size: 13px; white-space: nowrap;
+}
+.ord-live i { width: 8px; height: 8px; border-radius: 50%; background: var(--c-text-faint); }
+.ord-live.is-live i { background: #1e9e5a; }
+.ord-live.is-reconnecting i { background: #d98324; }
+.ord-live.is-stale i { background: #d98324; }
+.ord-live.is-stale { color: #7a4d06; }
+
+/* Состояния заказа: слово всегда, цвет — усиление */
+.ord-status {
+  flex: 0 0 auto; display: inline-flex; align-items: center;
+  padding: 4px 10px; border-radius: var(--r-pill);
+  font-size: 12px; font-weight: 700; white-space: nowrap;
+  background: var(--st-past-bg); color: var(--st-past-fg);
+}
+.ord-status.is-new { background: var(--st-wait-bg); color: var(--st-wait-fg); }
+.ord-status.is-accepted { background: var(--st-accent-soft); color: #1c3f8f; }
+.ord-status.is-progress { background: var(--st-work-bg); color: var(--st-work-fg); }
+.ord-status.is-ready { background: var(--st-done-bg); color: var(--st-done-fg); }
+.ord-status.is-done { background: var(--st-past-bg); color: var(--st-past-fg); }
+.ord-status.is-stopped {
+  background: var(--st-stop-bg); color: var(--st-stop-fg);
+  box-shadow: inset 0 0 0 1px #f3d3d0;
+}
+
+/* Скелет той же геометрии, что карточка: раздел не прыгает при загрузке */
+.ord-skeleton-card {
+  display: flex; flex-direction: column; gap: 10px;
+  min-height: 180px; padding: 16px;
+  border: 1px solid var(--c-border-panel); border-radius: var(--r-lg);
+  background: var(--c-surface);
+}
+.ord-skeleton-card span {
+  height: 12px; border-radius: var(--r-sm);
+  background: var(--c-surface-sunken);
+  animation: timeline-shimmer 1.4s ease-in-out infinite;
+  background-image: linear-gradient(90deg, var(--c-surface-sunken), var(--c-surface-hover), var(--c-surface-sunken));
+  background-size: 200% 100%;
+}
+@media (prefers-reduced-motion: reduce) {
+  .ord-skeleton-card span { animation: none; }
+}
+
+@media (max-width: 720px) {
+  .ord-header .order-search { flex-basis: 100%; max-width: none; min-height: 44px; }
+  .ord-header-live { margin-inline-start: 0; }
+  .ord-toolbar .ord-select { flex: 1 1 140px; }
+  .ord-toolbar .ord-select select { width: 100%; min-height: 44px; }
+  .ord-toolbar .text-button { min-height: 44px; }
+  /* Владение циклом — подпись, а не действие: на телефоне уводим её
+     на свою строку, чтобы не сжимать отбор. */
+  .ord-owner { flex-basis: 100%; margin-inline-start: 0; }
+  .ord-header-live .icon-button { width: 44px; height: 44px; }
+}
+
+/*
+ * Таблица заказов (Phase 2).
+ *
+ * Карточка занимала 227×339 px: шесть заказов на десктопном экране, два
+ * на телефоне, страница в пять экранов. Строка отвечает на те же
+ * вопросы — номер, время, гость, выдача, канал, состояние, штуки,
+ * сумма — и умещает смену целиком.
+ */
+.ord-panel { padding: 0; overflow: hidden; }
+.ord-panel .panel-heading { padding: var(--sp-4) var(--sp-4) 0; }
+.ord-panel .empty-state { padding: var(--sp-6) var(--sp-4); }
+.ord-panel .timeline-hidden-note { margin: 0; padding: var(--sp-3) var(--sp-4); }
+.ord-panel.is-debt { margin-top: var(--sp-4); }
+
+.ord-table-scroll { width: 100%; overflow-x: auto; overscroll-behavior-x: contain; }
+.ord-table { width: 100%; border-collapse: collapse; font-size: 14px; }
+.ord-table th,
+.ord-table td {
+  padding: 8px var(--sp-3); text-align: start; vertical-align: middle;
+  border-bottom: 1px solid var(--c-border-hair); white-space: nowrap;
+}
+/* Шапка липнет: на длинном списке колонки не должны уезжать из виду */
+.ord-table thead th {
+  position: sticky; top: 0; z-index: 1;
+  background: var(--c-surface);
+  border-bottom: 1px solid var(--c-border-panel);
+  color: var(--c-text-muted); font-size: 12px; font-weight: 650;
+  text-transform: uppercase; letter-spacing: 0.02em;
+}
+.ord-table tbody tr:last-child td { border-bottom: 0; }
+.ord-row:hover { background: var(--c-surface-hover); }
+/* Выбранная строка — сдержанный кобальт слева, а не заливка целиком */
+.ord-row.is-selected { background: var(--st-accent-soft); }
+.ord-row.is-selected td:first-child { box-shadow: inset 3px 0 0 var(--st-accent); }
+
+.ord-open {
+  min-height: 36px; padding: 0 4px;
+  border: 0; background: transparent;
+  color: var(--c-text-strong); font: inherit; font-weight: 700;
+  font-variant-numeric: tabular-nums; cursor: pointer;
+}
+.ord-open:hover { text-decoration: underline; }
+.ord-cell-time { color: var(--c-text-2); font-variant-numeric: tabular-nums; }
+.ord-cell-time small,
+.ord-table td small {
+  display: block; color: var(--c-text-subtle); font-size: 12px;
+}
+.ord-cell-context { max-width: 220px; overflow: hidden; text-overflow: ellipsis; }
+.ord-col-total { text-align: end; font-variant-numeric: tabular-nums; font-weight: 650; }
+.ord-cell-menu { width: 44px; text-align: end; }
+
+/* Подробности выбранного заказа — до боковой панели (Phase 3) */
+.ord-detail td { background: var(--c-surface-muted); white-space: normal; }
+.ord-detail-body { display: grid; gap: var(--sp-2); padding: var(--sp-1) 0; }
+.ord-detail-body .order-lines { max-width: 520px; }
+.ord-detail-contact { margin: 0; font-size: 13px; }
+
+/* Меню действий строки */
+.ord-menu { position: relative; display: inline-flex; }
+.ord-menu-pop {
+  position: absolute; inset-inline-end: 0; top: calc(100% + 4px); z-index: 20;
+  min-width: 176px; padding: var(--sp-1);
+  border: 1px solid var(--c-border-panel); border-radius: var(--r-md);
+  background: var(--c-surface); box-shadow: var(--shadow-pop);
+}
+.ord-menu-pop button {
+  display: flex; width: 100%; min-height: 40px; align-items: center;
+  padding: 0 10px; border: 0; border-radius: var(--r-sm);
+  background: transparent; color: var(--c-text); font: inherit; font-size: 14px;
+  text-align: start; cursor: pointer;
+}
+.ord-menu-pop button:hover { background: var(--c-surface-hover); }
+.ord-menu-pop button.is-danger { color: var(--c-danger); }
+
+/* Скелет строки: та же геометрия, что у готовой таблицы */
+.ord-skeleton { padding: var(--sp-2) 0; }
+.ord-skeleton-row {
+  display: flex; align-items: center; gap: var(--sp-4);
+  height: 45px; padding: 0 var(--sp-3);
+  border-bottom: 1px solid var(--c-border-hair);
+}
+.ord-skeleton-row span {
+  height: 12px; border-radius: var(--r-sm);
+  background: var(--c-surface-sunken);
+  animation: timeline-shimmer 1.4s ease-in-out infinite;
+  background-image: linear-gradient(90deg, var(--c-surface-sunken), var(--c-surface-hover), var(--c-surface-sunken));
+  background-size: 200% 100%;
+}
+@media (prefers-reduced-motion: reduce) {
+  .ord-skeleton-row span { animation: none; }
+}
+
+/* Планшет: второстепенное уезжает в подробности, суть остаётся */
+@media (max-width: 1024px) {
+  .ord-col-secondary { display: none; }
+}
+@media (max-width: 720px) {
+  .ord-table th, .ord-table td { padding: 12px var(--sp-2); }
+  /* Палец, а не мышь: и номер, и меню — полноценные цели */
+  .ord-open { min-height: 44px; }
+  .ord-cell-menu .icon-button { width: 44px; height: 44px; }
+  .ord-cell-context { max-width: 140px; }
+}
+.ord-col-actions { text-align: end; }
+
+/* Телефон: пять колонок обязаны поместиться без бокового хода */
+@media (max-width: 480px) {
+  .ord-table { font-size: 13px; }
+  .ord-table th, .ord-table td { padding: 10px 6px; }
+  .ord-cell-context { max-width: 96px; }
+  .ord-status { padding: 3px 8px; font-size: 11px; }
+}

@@ -53,6 +53,50 @@ export async function fetchOnlineOrders(locationId, { historyFromIso = null, lim
   return { active: active.data ?? [], done: done.data ?? [] }
 }
 
+/**
+ * Рабочий стол заказов (141) — один вызов на весь экран раздела.
+ *
+ * До 141 кабинет тянул таблицу напрямую и решал сам, что такое «сегодня»
+ * (в часах браузера), где кончается история (30 дней, 200 строк без
+ * пагинации) и кому можно нажимать кнопки (по списку продуктов).
+ * Теперь на все три вопроса отвечает сервер: разрез, окно и `can_manage`
+ * приходят вместе со строками.
+ *
+ * Прямое чтение `online_orders` осталось у Home (`dashboard.js`) — там
+ * нужен счётчик, а не рабочий стол.
+ */
+export async function fetchOrdersDesk(locationId, {
+  scope = 'active', from = null, to = null,
+  status = null, channel = null, type = null, query = null,
+  limit = 100, offset = 0,
+} = {}) {
+  const { data, error } = await supabase.rpc('get_online_orders_web', {
+    p_location_id: locationId,
+    p_scope: scope,
+    p_from: from,
+    p_to: to,
+    p_status: status,
+    p_channel: channel,
+    p_type: type,
+    p_query: query,
+    p_limit: limit,
+    p_offset: offset,
+  })
+  if (error) throw error
+  return data
+}
+
+/** История переходов заявки (140) — читается по RLS, отдельным запросом. */
+export async function fetchOrderEvents(onlineId) {
+  const { data, error } = await supabase
+    .from('online_order_events')
+    .select('id, status, reason, actor_kind, actor_name, created_at')
+    .eq('online_order_id', onlineId)
+    .order('created_at', { ascending: true })
+  if (error) throw error
+  return data ?? []
+}
+
 export async function setOnlineOrderStatus(locationId, onlineId, status, reason = null) {
   const { data, error } = await supabase.rpc('set_online_order_status_web', {
     p_location_id: locationId,

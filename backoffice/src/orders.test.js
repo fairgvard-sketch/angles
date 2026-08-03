@@ -1,8 +1,10 @@
 import test from 'node:test'
 import assert from 'node:assert/strict'
 import {
-  bucketOrders, dayStartMs, elapsedLabel, filterOrders, fulfilmentMode,
-  orderItemLines, orderRef, orderSearchText, orderTimeLabel,
+  REALTIME_STALE_MS, STATUS_LABELS, STATUS_TONE,
+  bucketOrders, dayStartMs, elapsedLabel, formatMoney, itemsLabel,
+  orderItemLines, orderNumber, orderRef, orderTabs, orderTimeLabel,
+  realtimeState, rowContext,
 } from './orders-inbox.js'
 
 /**
@@ -94,55 +96,10 @@ test('возраст заказа читается словами', () => {
   assert.equal(elapsedLabel(at(1, 10, 25), NOW), '2 h 05 min')
 })
 
-test('поиск находит по имени, телефону, ссылке, столу и позиции', () => {
-  const list = [
-    order('3f2a1b4c-5d6e-7f80-9a1b-2c3d4e5f6a7b', {
-      customer_name: 'Yossi Cohen', customer_phone: '0521234567', table_label: '12',
-      items: [{ name: 'Latte', variant_name: 'Large' }],
-    }),
-    order('aaaabbbb-cccc-dddd-eeee-ffff00001111', { customer_name: 'Dana Levi' }),
-  ]
-  const ids = (q) => filterOrders(list, { query: q }).map((o) => o.id)
-  assert.equal(ids('yossi').length, 1)
-  assert.equal(ids('1234567').length, 1)
-  assert.equal(ids('#F6A7B').length, 1)
-  assert.equal(ids('latte').length, 1)
-  assert.equal(ids('дана').length, 0)
-  assert.equal(filterOrders(list, {}).length, 2)
-})
 
-test('фильтры по статусу, типу и каналу складываются', () => {
-  const list = [
-    order('a', { status: 'ready', order_type: 'here', order_channel: 'table_qr' }),
-    order('b', { status: 'ready', order_type: 'takeaway', order_channel: 'link' }),
-    order('c', { status: 'new', order_type: 'here', order_channel: 'table_qr' }),
-  ]
-  assert.deepEqual(filterOrders(list, { status: 'ready' }).map((o) => o.id), ['a', 'b'])
-  assert.deepEqual(filterOrders(list, { type: 'here' }).map((o) => o.id), ['a', 'c'])
-  assert.deepEqual(
-    filterOrders(list, { status: 'ready', channel: 'table_qr' }).map((o) => o.id),
-    ['a']
-  )
-})
 
-test('заявка без канала считается ссылкой — старые строки не пропадают', () => {
-  const list = [order('a', { order_channel: undefined })]
-  assert.equal(filterOrders(list, { channel: 'link' }).length, 1)
-  assert.equal(filterOrders(list, { channel: 'website' }).length, 0)
-})
 
-test('номер заказа на кассе попадает в поиск — по нему и спрашивают', () => {
-  const withPos = order('x', { pos: { daily_number: 42, status: 'paid' } })
-  assert.ok(orderSearchText(withPos).includes('#42'))
-  assert.equal(filterOrders([withPos], { query: '#42' }).length, 1)
-})
 
-test('режим обслуживания: явная настройка сильнее продукта', () => {
-  assert.equal(fulfilmentMode(['pos'], {}), 'pos')
-  assert.equal(fulfilmentMode(['online_orders'], {}), 'standalone')
-  assert.equal(fulfilmentMode(['pos'], { online_orders: { fulfilment: 'standalone' } }), 'standalone')
-  assert.equal(fulfilmentMode(['online_orders'], { online_orders: { fulfilment: 'pos' } }), 'pos')
-})
 
 test('строки позиций собираются из снапшота заявки', () => {
   const lines = orderItemLines([
@@ -151,4 +108,75 @@ test('строки позиций собираются из снапшота з�
   assert.equal(lines[0].text, 'Latte · Large · Oat')
   assert.equal(lines[0].qty, 2)
   assert.equal(lines[0].total, 2400)
+})
+
+// ── Каркас и строка таблицы (Phase 1–2) ──────────────────────
+
+
+
+test('вкладка предзаказов появляется только когда они есть', () => {
+  assert.deepEqual(orderTabs(0, 'active').map((t) => t.key), ['active', 'all'])
+  assert.deepEqual(orderTabs(2, 'active').map((t) => t.key), ['active', 'scheduled', 'all'])
+  // Открытая по ссылке вкладка не должна исчезать под руками, даже если
+  // последний предзаказ только что выдали.
+  assert.deepEqual(orderTabs(0, 'scheduled').map((t) => t.key), ['active', 'scheduled', 'all'])
+})
+
+test('Live обещает свежесть, а не факт подписки', () => {
+  const nowMs = NOW
+  const fresh = { socket: 'live', lastOkMs: nowMs - 5_000, nowMs }
+  assert.equal(realtimeState(fresh), 'live')
+  // Сокет жив, а данные протухли — молчать об этом нельзя
+  assert.equal(
+    realtimeState({ ...fresh, lastOkMs: nowMs - REALTIME_STALE_MS - 1 }),
+    'stale'
+  )
+  assert.equal(realtimeState({ ...fresh, failed: true }), 'stale')
+  assert.equal(realtimeState({ ...fresh, socket: 'offline' }), 'reconnecting')
+  // До первого удавшегося запроса «живым» называть нечего
+  assert.equal(realtimeState({ socket: 'live', lastOkMs: null, nowMs }), 'connecting')
+})
+
+test('у каждого состояния заказа есть слово и свой тон', () => {
+  for (const status of Object.keys(STATUS_LABELS)) {
+    assert.ok(STATUS_LABELS[status], `${status}: нет подписи`)
+    assert.ok(STATUS_TONE[status], `${status}: нет тона`)
+  }
+  // Отказ и отмена — одна и та же остановка, разные причины
+  assert.equal(STATUS_TONE.rejected, STATUS_TONE.cancelled)
+  // Тона броней в заказах не переиспользуются
+  assert.ok(!Object.values(STATUS_TONE).includes('confirmed'))
+  assert.ok(!Object.values(STATUS_TONE).includes('seated'))
+})
+
+test('заказ зовут номером, а не хвостом UUID', () => {
+  assert.equal(orderNumber({ order_number: 1042, id: 'x' }), '#1042')
+  // Строка без номера (сервер до 139) всё равно должна быть адресуемой
+  assert.equal(
+    orderNumber({ id: '3f2a1b4c-5d6e-7f80-9a1b-2c3d4e5f6a7b' }),
+    '#F6A7B'
+  )
+})
+
+test('в колонке гостя всегда есть чей это заказ', () => {
+  assert.equal(rowContext({ customer_name: 'Yossi' }), 'Yossi')
+  // За столом имя не спрашивают вовсе (099) — показываем стол
+  assert.equal(rowContext({ table_label: '7' }), 'Table 7')
+  // Безымянная заявка — это заказ у стойки, а не «—»
+  assert.equal(rowContext({}), 'Counter')
+})
+
+test('позиции считаются штуками', () => {
+  assert.equal(itemsLabel(3), '3 items')
+  assert.equal(itemsLabel(1), '1 item')
+  assert.equal(itemsLabel(0), '0 items')
+  assert.equal(itemsLabel(undefined), '0 items')
+})
+
+test('сумма показывается в валюте точки, а не всегда в шекелях', () => {
+  assert.equal(formatMoney(8600, 'ILS'), '₪86.00')
+  assert.equal(formatMoney(8600, 'EUR'), '€86.00')
+  assert.equal(formatMoney(null, 'ILS'), '₪0.00')
+  // Неизвестный код валюты не повод спрятать сумму
+  assert.match(formatMoney(1250, 'XYZ'), /12\.50/)
 })
