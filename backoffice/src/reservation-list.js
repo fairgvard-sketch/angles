@@ -28,20 +28,26 @@ export function zoneOf(reservation, tableById) {
 }
 
 /**
- * Откуда бронь.
+ * Каким путём заведён визит (миграция 136).
  *
- * Колонку `source` заполняет только ручная бронь кабинета (127) — гость
- * и касса идут общим путём и оставляют её пустой. Поэтому «пусто» здесь
- * значит «не из кабинета», а не «неизвестно», и называть это неизвестным
- * источником было бы враньём в интерфейсе.
+ * Не путать с `source`: там канал привода гостя — instagram, qr, site.
+ * Здесь то, кто нажал кнопку: гость сам, касса, кабинет или согласие из
+ * листа ожидания.
+ *
+ * Пусто означает «путь не записан» — так выглядят брони, заведённые до
+ * 136. Назвать их гостевыми было бы догадкой, выданной за факт.
  */
-export function sourceOf(reservation) {
-  return reservation.source === 'backoffice' ? 'backoffice' : 'guest'
+export function createdVia(reservation) {
+  const via = reservation?.created_via
+  return VIA_LABEL[via] ? via : 'unknown'
 }
 
-export const SOURCE_LABEL = {
+export const VIA_LABEL = {
+  public: 'Website',
+  pos: 'Register',
   backoffice: 'Back office',
-  guest: 'Guest',
+  waitlist: 'Waitlist',
+  unknown: 'Not recorded',
 }
 
 /** Совпадает ли бронь с поиском по имени или телефону */
@@ -57,12 +63,12 @@ export function matchesQuery(reservation, query) {
  * Пустой фильтр означает «всё», а не «ничего».
  */
 export function filterReservations(rows, {
-  status = null, zone = null, source = null, query = '', tableById = null,
+  status = null, zone = null, via = null, query = '', tableById = null,
 } = {}) {
   return (rows ?? []).filter((r) => {
     if (status && visitState(r) !== status) return false
     if (zone && zoneOf(r, tableById) !== zone) return false
-    if (source && sourceOf(r) !== source) return false
+    if (via && createdVia(r) !== via) return false
     return matchesQuery(r, query)
   })
 }

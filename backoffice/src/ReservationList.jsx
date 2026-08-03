@@ -8,8 +8,7 @@ import {
 import { isConflict } from './desk-availability'
 import { statusClass, statusLabel, visitState } from './reservation-status'
 import {
-  PAGE_SIZE, SOURCE_LABEL, filterReservations, groupByDay, paginate, sortByTime,
-  sourceOf, zoneOf,
+  PAGE_SIZE, VIA_LABEL, createdVia, filterReservations, groupByDay, paginate, sortByTime,
 } from './reservation-list'
 import { zonedToUtc } from './timeline'
 import { supabase } from './supabase'
@@ -47,10 +46,14 @@ const STATUS_FILTERS = [
   { key: 'cancelled', label: 'Cancelled' },
 ]
 
-const SOURCE_FILTERS = [
-  { key: null, label: 'All sources' },
-  { key: 'guest', label: SOURCE_LABEL.guest },
-  { key: 'backoffice', label: SOURCE_LABEL.backoffice },
+/** Пути заведения визита — фильтр «кто нажал кнопку» */
+const VIA_FILTERS = [
+  { key: null, label: 'Any origin' },
+  { key: 'public', label: VIA_LABEL.public },
+  { key: 'pos', label: VIA_LABEL.pos },
+  { key: 'backoffice', label: VIA_LABEL.backoffice },
+  { key: 'waitlist', label: VIA_LABEL.waitlist },
+  { key: 'unknown', label: VIA_LABEL.unknown },
 ]
 
 /** Время визита в часах точки */
@@ -139,7 +142,7 @@ export default function ReservationList({ locationId, date, query = '', filters,
   const visible = useMemo(() => sortByTime(filterReservations(raw ?? [], {
     status: filters.st ?? null,
     zone: filters.zn ?? null,
-    source: filters.sr ?? null,
+    via: filters.sr ?? null,
     query,
     tableById,
   }), sortDir), [raw, filters.st, filters.zn, filters.sr, query, tableById, sortDir])
@@ -222,9 +225,9 @@ export default function ReservationList({ locationId, date, query = '', filters,
           </label>
         )}
         <label className="rsv-select">
-          <span className="visually-hidden">Source</span>
+          <span className="visually-hidden">Origin</span>
           <select value={filters.sr ?? ''} onChange={(e) => setFilter('sr', e.target.value)}>
-            {SOURCE_FILTERS.map((s) => (
+            {VIA_FILTERS.map((s) => (
               <option key={s.key ?? 'all'} value={s.key ?? ''}>{s.label}</option>
             ))}
           </select>
@@ -272,7 +275,7 @@ export default function ReservationList({ locationId, date, query = '', filters,
                   <th scope="col">Party</th>
                   <th scope="col" className="rsv-col-table">Table</th>
                   <th scope="col">Status</th>
-                  <th scope="col" className="rsv-col-source">Source</th>
+                  <th scope="col" className="rsv-col-source">Origin</th>
                   <th scope="col" className="rsv-col-note">Note</th>
                 </tr>
               </thead>
@@ -311,7 +314,7 @@ export default function ReservationList({ locationId, date, query = '', filters,
                         <td>
                           <span className={`rsv-status ${statusClass(state)}`}>{statusLabel(state)}</span>
                         </td>
-                        <td className="rsv-col-source">{SOURCE_LABEL[sourceOf(r)]}</td>
+                        <td className="rsv-col-source">{VIA_LABEL[createdVia(r)]}</td>
                         <td className="rsv-col-note">
                           {/* Заметка обрезается безопасно: целиком она
                               есть в панели визита */}

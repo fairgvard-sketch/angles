@@ -1,7 +1,7 @@
 import assert from 'node:assert/strict'
 import { describe, it } from 'node:test'
 import {
-  dayLabel, filterReservations, groupByDay, paginate, sortByTime, sourceOf, zoneOf,
+  createdVia, dayLabel, filterReservations, groupByDay, paginate, sortByTime, zoneOf,
 } from './reservation-list.js'
 
 /**
@@ -18,14 +18,15 @@ const at = (iso) => new Date(iso).toISOString()
 
 const rows = [
   { id: 'a', customer_name: 'Emma Lewis', customer_phone: '0501112233', status: 'confirmed',
-    reserved_at: at('2026-05-17T16:30:00Z'), table_id: 't1', source: null },
+    reserved_at: at('2026-05-17T16:30:00Z'), table_id: 't1', created_via: 'public',
+    source: 'instagram' },
   { id: 'b', customer_name: 'Walk-in', customer_phone: '', status: 'new',
-    reserved_at: at('2026-05-17T15:00:00Z'), table_id: 't2', source: 'backoffice' },
+    reserved_at: at('2026-05-17T15:00:00Z'), table_id: 't2', created_via: 'backoffice' },
   { id: 'c', customer_name: 'Noa Levi', customer_phone: '0509998877', status: 'confirmed',
     arrived_at: at('2026-05-17T17:05:00Z'), reserved_at: at('2026-05-17T17:00:00Z'),
-    table_id: 't3', source: null },
+    table_id: 't3', created_via: 'pos' },
   { id: 'd', customer_name: 'James Lee', customer_phone: '', status: 'completed',
-    reserved_at: at('2026-05-18T10:00:00Z'), table_id: 't1', source: null },
+    reserved_at: at('2026-05-18T10:00:00Z'), table_id: 't1' },
 ]
 
 const tableById = new Map([
@@ -51,11 +52,27 @@ describe('отбор броней', () => {
     assert.deepEqual(ids(filterReservations(rows, { zone: 'z2', tableById })), ['b'])
   })
 
-  it('источник различает ручную бронь кабинета и всё остальное', () => {
-    // Пусто в базе значит «не из кабинета»: колонку заполняет только он
-    assert.equal(sourceOf(rows[1]), 'backoffice')
-    assert.equal(sourceOf(rows[0]), 'guest')
-    assert.deepEqual(ids(filterReservations(rows, { source: 'backoffice' })), ['b'])
+  it('путь заведения различает гостя, кассу и кабинет', () => {
+    assert.equal(createdVia(rows[1]), 'backoffice')
+    assert.equal(createdVia(rows[0]), 'public')
+    assert.equal(createdVia(rows[2]), 'pos')
+    assert.deepEqual(ids(filterReservations(rows, { via: 'backoffice' })), ['b'])
+    assert.deepEqual(ids(filterReservations(rows, { via: 'pos' })), ['c'])
+  })
+
+  it('бронь до миграции 136 честно называется незаписанной, а не гостевой', () => {
+    // Догадка задним числом («раз пусто — значит гость») превратила бы
+    // пробел в факт, на который потом сошлётся отчёт
+    assert.equal(createdVia(rows[3]), 'unknown')
+    assert.deepEqual(ids(filterReservations(rows, { via: 'unknown' })), ['d'])
+  })
+
+  it('канал привода — не путь заведения: их не путают между собой', () => {
+    // Гость пришёл из Instagram и забронировал сам: канал instagram,
+    // путь public. Фильтр путей на канал не реагирует.
+    assert.equal(rows[0].source, 'instagram')
+    assert.equal(createdVia(rows[0]), 'public')
+    assert.deepEqual(ids(filterReservations(rows, { via: 'instagram' })), [])
   })
 
   it('поиск идёт по имени и телефону', () => {

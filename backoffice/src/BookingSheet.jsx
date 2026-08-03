@@ -116,18 +116,22 @@ export default function BookingSheet({
   const zoneName = seatedAt.find((t) => t.zoneName)?.zoneName ?? null
 
   /*
-   * Источник называется только тогда, когда он ДЕЙСТВИТЕЛЬНО известен.
+   * Две разные вещи, которые легко перепутать:
+   *   `created_via` — кто завёл визит (гость, касса, кабинет, лист);
+   *   `source`      — по какому каналу гость пришёл (instagram, qr…).
    *
-   * Колонку `source` заполняет одна лишь ручная бронь кабинета (127);
-   * гостевая страница и касса идут через общий `create_reservation` и
-   * оставляют её пустой. Поэтому пусто здесь означает не «неизвестно
-   * откуда», а «не из кабинета» — и написать «Source unknown» значило бы
-   * выдать нормальную гостевую бронь за подозрительную.
+   * Показываем то, что действительно записано. У броней до миграции 136
+   * пути нет, и выдумывать его нельзя: «Added in the back office» на
+   * чужой броне отправит хостес искать несуществующий звонок.
    */
-  const SOURCE_LABEL = {
+  const VIA_LABEL = {
+    public: 'Booked by the guest online',
+    pos: 'Added on the register',
     backoffice: 'Added in the back office',
+    waitlist: 'Accepted a waitlist offer',
   }
-  const sourceLabel = SOURCE_LABEL[reservation.source] ?? null
+  const sourceLabel = VIA_LABEL[reservation.created_via] ?? null
+  const channel = reservation.source || null
 
   return (
     <Drawer
@@ -387,7 +391,8 @@ export default function BookingSheet({
         {(sourceLabel || reservation.created_at) && (
           <p className="sheet-meta">
             {sourceLabel}
-            {sourceLabel && reservation.created_at && ' · '}
+            {channel && `${sourceLabel ? ' · ' : ''}came from ${channel}`}
+            {(sourceLabel || channel) && reservation.created_at && ' · '}
             {reservation.created_at && `booked ${new Date(reservation.created_at).toLocaleString([], {
               day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit',
             })}`}
