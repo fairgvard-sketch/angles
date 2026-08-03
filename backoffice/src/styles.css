@@ -2044,3 +2044,20 @@ a { color: inherit; }
 .stat-delta.is-flat { color: var(--c-text-subtle); }
 .ov-hero-delta { display: flex; flex-wrap: wrap; align-items: baseline; gap: 10px; margin: 6px 0 0; }
 .ov-hero-prev { color: #868b93; font-size: 13px; font-variant-numeric: tabular-nums; }
+
+/* ── Очередь ожидания (Kassa 137) ─────────────────────────────
+   Та же таблица, что у списка броней: очередь и список — родственные
+   поверхности, и разный вид сбивал бы больше, чем помогал. */
+.rsv-queue-count { color: var(--c-text-muted); font-size: 13px; font-weight: 650; }
+.rsv-cell-wait { font-variant-numeric: tabular-nums; white-space: nowrap; }
+/* Перебор обещанного времени: очередь превращается в скандал именно
+   здесь, и увидеть это хостес должен раньше гостя. Не только цветом —
+   рядом стоит слово. */
+.rsv-cell-wait.is-overdue, .sheet-facts dd.is-overdue { color: #9b2c22; font-weight: 750; }
+.rsv-overdue-mark { font-size: 11px; font-weight: 750; text-transform: uppercase; }
+.rsv-queue-move { display: inline-flex; gap: 2px; }
+.rsv-queue-move .icon-button { width: 32px; height: 32px; }
+.rsv-queue-move svg { width: 16px; height: 16px; }
+@media (max-width: 720px) {
+  .rsv-queue-move .icon-button { width: 44px; height: 44px; }
+}

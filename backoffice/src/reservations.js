@@ -317,3 +317,79 @@ export async function requestConfirmations(locationId) {
   if (error) throw new Error(error.message)
   return data ?? 0
 }
+
+// ── Очередь ожидания в кабинете (Kassa 137) ──────────────────
+
+/**
+ * Записать подошедшего гостя в очередь.
+ *
+ * `clientUuid` создаётся ЗДЕСЬ, до первой попытки: повтор после
+ * таймаута вернёт ту же запись, а не заведёт второго Ивана в очередь.
+ */
+export async function addWaitlistEntry(locationId, {
+  clientUuid, name, phone = '', partySize = 2, quotedMin = null,
+  zoneIds = null, note = null,
+}) {
+  const { data, error } = await supabase.rpc('add_waitlist_entry_web', {
+    p_location_id: locationId,
+    p_client_uuid: clientUuid || crypto.randomUUID(),
+    p_name: name,
+    p_phone: phone,
+    p_party_size: partySize,
+    p_quoted_min: quotedMin,
+    p_zone_ids: zoneIds,
+    p_note: note,
+  })
+  if (error) throw new Error(error.message)
+  return data
+}
+
+/**
+ * Посадить гостя из очереди. Столы подбирает сервер тем же алгоритмом,
+ * что и обычную бронь: экран может отставать на минуту, и этой минуты
+ * хватает на двойную посадку.
+ */
+export async function seatWaitlistEntry(locationId, id, tableIds = null) {
+  const { data, error } = await supabase.rpc('seat_waitlist_entry_web', {
+    p_location_id: locationId,
+    p_id: id,
+    p_table_ids: tableIds,
+  })
+  if (error) throw new Error(error.message)
+  return data
+}
+
+/** Порядок «кого зовём следующим» — решение хостес, а не арифметика */
+export async function reorderWaitlist(locationId, ids) {
+  const { data, error } = await supabase.rpc('reorder_waitlist_web', {
+    p_location_id: locationId,
+    p_ids: ids,
+  })
+  if (error) throw new Error(error.message)
+  return data
+}
+
+/** Убрать из очереди (гость ушёл) или вернуть обратно */
+export async function setWaitlistStatus(locationId, id, status) {
+  const { data, error } = await supabase.rpc('set_waitlist_status_web', {
+    p_location_id: locationId,
+    p_id: id,
+    p_status: status,
+  })
+  if (error) throw new Error(error.message)
+  return data
+}
+
+/** Записи очереди целиком: и ждущие, и закрытые за сегодня */
+export async function fetchWaitlistQueue(locationId, dateStr) {
+  const { data, error } = await supabase
+    .from('waitlist_entries')
+    .select('id, customer_name, customer_phone, party_size, wanted_date, '
+      + 'time_from, time_to, zone_ids, note, status, position, quoted_min, '
+      + 'offer_at, offer_expires, reservation_id, created_at')
+    .eq('location_id', locationId)
+    .eq('wanted_date', dateStr)
+    .order('created_at')
+  if (error) throw new Error(error.message)
+  return data ?? []
+}

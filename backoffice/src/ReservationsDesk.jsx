@@ -238,7 +238,9 @@ export default function ReservationsDesk({
       {view === 'timeline' && locationId && (
         <TimelineDesk locationId={locationId} date={day} query={query} />
       )}
-      {view === 'waitlist' && locationId && <WaitlistPanel locationId={locationId} />}
+      {view === 'waitlist' && locationId && (
+        <WaitlistPanel locationId={locationId} date={day} query={query} />
+      )}
       {view === 'floor' && locationId && <FloorPlanEditor locationId={locationId} />}
       {/* Аналитика намеренно смотрит на всю организацию: сравнение точек
           и есть её смысл, поэтому выбранная точка тут не сужает данные. */}
