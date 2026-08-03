@@ -54,12 +54,17 @@ describe('раздел броней', () => {
     assert.match(html, /value="2026-05-17"/)
   })
 
-  it('без дня в адресе открыт сегодняшний день точки, и «Today» уже не действие', () => {
+  it('без дня в адресе открыт сегодняшний день точки, и кнопки «Today» нет', () => {
     const html = render()
     const today = todayInZone(Date.now(), 'Asia/Jerusalem')
     assert.match(html, new RegExp(`value="${today}"`))
-    // Кнопка, которая ничего не изменит, не должна выглядеть доступной
-    assert.match(html, /class="rsv-today"[^>]*disabled/)
+    // Кнопка, которая ничего не изменит, не сообщает ничего: дата в
+    // селекторе и есть ответ «сегодня»
+    assert.equal(html.includes('rsv-today'), false)
+  })
+
+  it('на другом дне «Today» возвращает обратно', () => {
+    assert.match(render({ date: '2026-05-17' }), /class="rsv-today"[^>]*>Today</)
   })
 
   it('над полотном нет метрик — место отдано столам', () => {

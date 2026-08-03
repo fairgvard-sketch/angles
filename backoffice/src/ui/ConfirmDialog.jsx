@@ -1,5 +1,6 @@
 import { useEffect, useRef, useState } from 'react'
 import { Button } from './Button'
+import { isTopLayer, pushLayer } from './overlay-stack'
 
 /**
  * Подтверждение действия — с необязательным полем причины.
@@ -27,14 +28,21 @@ export default function ConfirmDialog({
   const panelRef = useRef(null)
   const returnRef = useRef(null)
   const firstRef = useRef(null)
+  const layerRef = useRef({})
   const [text, setText] = useState('')
+
+  // Слой берётся один раз, на монтирование: диалог открывается поверх
+  // панели, и клавиатура принадлежит ему, пока он жив.
+  useEffect(() => pushLayer(layerRef.current), [])
 
   useEffect(() => {
     returnRef.current = document.activeElement
     firstRef.current?.focus()
     const panel = panelRef.current
+    const layer = layerRef.current
 
     function onKey(event) {
+      if (!isTopLayer(layer)) return
       if (event.key === 'Escape') {
         event.stopPropagation()
         onCancel()

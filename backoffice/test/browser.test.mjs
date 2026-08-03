@@ -370,6 +370,55 @@ before(async () => {
     createRoot(document.getElementById('root')).render(<Page />)
   `)
 
+  await bundle('layers', `
+    import { useState } from 'react'
+    import { createRoot } from 'react-dom/client'
+    import Drawer from './ui/Drawer'
+    import ConfirmDialog from './ui/ConfirmDialog'
+    import { Button } from './ui/Button'
+
+    /** Панель визита с диалогом отмены поверх — два слоя сразу */
+    function Page() {
+      const [open, setOpen] = useState(true)
+      const [asking, setAsking] = useState(false)
+      const [cancelled, setCancelled] = useState(false)
+      return (
+        <main className="content">
+          <button id="opener" className="secondary-button" onClick={() => setOpen(true)}>
+            Open the visit
+          </button>
+          {cancelled && <p id="did-cancel">cancelled</p>}
+          {open && (
+            <Drawer
+              title="Мири Леви"
+              subtitle="Sun 2 Aug 19:00 · 2 guests"
+              onClose={() => setOpen(false)}
+              footer={<Button onClick={() => setOpen(false)}>Close</Button>}
+            >
+              <input id="field-a" aria-label="Guest name" />
+              <button id="ask" className="secondary-button" onClick={() => setAsking(true)}>
+                Cancel booking
+              </button>
+              {asking && (
+                <ConfirmDialog
+                  title="Cancel this booking?"
+                  description="The table is freed immediately."
+                  confirmLabel="Cancel booking"
+                  cancelLabel="Keep the booking"
+                  tone="danger"
+                  reason={{ label: 'Reason for the guest' }}
+                  onCancel={() => setAsking(false)}
+                  onConfirm={() => { setAsking(false); setCancelled(true) }}
+                />
+              )}
+            </Drawer>
+          )}
+        </main>
+      )
+    }
+    createRoot(document.getElementById('root')).render(<Page />)
+  `)
+
   await bundle('booking-conflict', `
     import { createRoot } from 'react-dom/client'
     import BookingForm from './BookingForm'
@@ -973,6 +1022,63 @@ describe('guest preview iframe', { skip }, () => {
     }))
     assert.equal(entered.activeTag, 'IFRAME')
     assert.equal(entered.tabIndex, '0')
+    await page.close()
+  })
+})
+
+describe('слои: панель и диалог поверх неё', { skip }, () => {
+  /**
+   * Escape закрывает ВЕРХНИЙ слой.
+   *
+   * Регресс, ради которого набор и написан: панель визита и диалог
+   * отмены оба слушают клавиатуру на документе в фазе перехвата.
+   * Обработчики вызываются в порядке регистрации, поэтому панель —
+   * открытая первой — закрывалась раньше диалога, и хостес, передумав
+   * отменять бронь, терял всю карточку вместе с несохранёнными правками.
+   */
+  const open = async () => {
+    const page = await browser.newPage()
+    await page.setViewport({ width: 1440, height: 900 })
+    await page.goto(`${appOrigin}/layers`, { waitUntil: 'networkidle0' })
+    await page.waitForSelector('.drawer')
+    await page.click('#ask')
+    await page.waitForSelector('.confirm-dialog')
+    return page
+  }
+
+  it('Escape закрывает диалог, а панель визита остаётся открытой', async () => {
+    const page = await open()
+    await page.keyboard.press('Escape')
+    await new Promise((resolve) => setTimeout(resolve, 150))
+    const state = await page.evaluate(() => ({
+      dialogs: document.querySelectorAll('.confirm-dialog').length,
+      drawers: document.querySelectorAll('.drawer').length,
+      cancelled: !!document.getElementById('did-cancel'),
+    }))
+    assert.equal(state.dialogs, 0, 'диалог закрылся')
+    assert.equal(state.drawers, 1, 'панель осталась')
+    // Отказ от диалога не должен ничего выполнять
+    assert.equal(state.cancelled, false)
+    await page.close()
+  })
+
+  it('второй Escape закрывает уже панель', async () => {
+    const page = await open()
+    await page.keyboard.press('Escape')
+    await new Promise((resolve) => setTimeout(resolve, 150))
+    await page.keyboard.press('Escape')
+    await new Promise((resolve) => setTimeout(resolve, 150))
+    assert.equal(await page.evaluate(() => document.querySelectorAll('.drawer').length), 0)
+    await page.close()
+  })
+
+  it('пока диалог открыт, Tab не уводит в панель под ним', async () => {
+    const page = await open()
+    for (let i = 0; i < 6; i += 1) await page.keyboard.press('Tab')
+    const inside = await page.evaluate(
+      () => !!document.querySelector('.confirm-dialog')?.contains(document.activeElement)
+    )
+    assert.equal(inside, true)
     await page.close()
   })
 })

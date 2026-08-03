@@ -253,14 +253,14 @@ export default function ReservationsDesk({
           <IconButton label="Next day" onClick={() => setDay(shiftDate(day, 1))}>
             <ChevronRight />
           </IconButton>
-          <button
-            type="button"
-            className="rsv-today"
-            disabled={day === today}
-            onClick={() => setDay(today)}
-          >
-            Today
-          </button>
+          {/* «Today» — способ вернуться, а не подпись к дате. Когда в
+              селекторе и так сегодняшний день, кнопка ничего не сообщает
+              и только занимает место в рабочей строке. */}
+          {day !== today && (
+            <button type="button" className="rsv-today" onClick={() => setDay(today)}>
+              Today
+            </button>
+          )}
         </div>
 
         <SearchField

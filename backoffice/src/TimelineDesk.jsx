@@ -4,7 +4,8 @@ import {
   blockState, buildRows, groupByZone, hourTicks, nowMarkerPct,
   timelineWindow, todayInZone,
 } from './timeline'
-import { statusClass, statusLabel } from './reservation-status'
+import { statusClass, statusLabel, visitActions } from './reservation-status'
+import ConfirmDialog from './ui/ConfirmDialog'
 import {
   blockDetail, blockWidthPx, halfHourMarks, overlappingVisits, showsMeta, showsName,
 } from './timeline-view'
@@ -13,6 +14,7 @@ import {
   markReservationArrived, setReservationTables, setReservationStatus, deskErrorText,
   updateReservation, updateReservationGuest, toLocalInput, fromLocalInput,
 } from './reservations'
+import { conflictAlternatives, isConflict } from './desk-availability'
 import { supabase } from './supabase'
 import Drawer from './ui/Drawer'
 import { Button } from './ui/Button'
@@ -72,6 +74,8 @@ export default function TimelineDesk({ locationId, date, query = '' }) {
   const [detail, setDetail] = useState(null)
   // Отказ действия принадлежит панели визита, а не полотну под ней
   const [sheetError, setSheetError] = useState('')
+  // Занятость — единственный отказ, к которому есть что добавить
+  const [sheetConflict, setSheetConflict] = useState(false)
   const [zoneFilter, setZoneFilter] = useState(null)
 
   const tz = meta.timezone
@@ -227,6 +231,7 @@ export default function TimelineDesk({ locationId, date, query = '' }) {
   async function act(fn) {
     setBusy(true)
     setSheetError('')
+    setSheetConflict(false)
     try {
       await fn()
       setDetail(null)
@@ -234,6 +239,7 @@ export default function TimelineDesk({ locationId, date, query = '' }) {
       setError('')
     } catch (e) {
       setSheetError(deskErrorText(e.message))
+      setSheetConflict(isConflict(e.message))
     } finally {
       setBusy(false)
     }
@@ -434,10 +440,14 @@ export default function TimelineDesk({ locationId, date, query = '' }) {
           tz={tz}
           busy={busy}
           error={sheetError}
+          conflict={sheetConflict}
+          // Подсказки считаются из тех же визитов, что уже на экране
+          bookings={raw ?? []}
           // С кем именно столкнулась бронь — из тех же строк, что рисуют
           // полотно: панель и сетка не могут расходиться в этом ответе.
           clashes={overlappingVisits(operationalRows, detail.id)}
-          onClose={() => { setDetail(null); setSheetError('') }}
+          onClearError={() => { setSheetError(''); setSheetConflict(false) }}
+          onClose={() => { setDetail(null); setSheetError(''); setSheetConflict(false) }}
           onEdit={(patch) => act(async () => {
             // Контакты и «когда/сколько» — разные функции сервера: у
             // второй пересчёт занятости, у первой его не нужно.
@@ -448,10 +458,17 @@ export default function TimelineDesk({ locationId, date, query = '' }) {
               await updateReservation(locationId, detail.id, patch)
             }
           })}
-          onConfirm={() => act(() => setReservationStatus(locationId, detail.id, 'confirmed'))}
-          onArrived={() => act(() => markReservationArrived(locationId, detail.id))}
-          onCompleted={() => act(() => setReservationStatus(locationId, detail.id, 'completed'))}
-          onNoShow={() => act(() => setReservationStatus(locationId, detail.id, 'no_show'))}
+          /*
+           * Одна дверь для всех переходов визита. Посадка — отдельная
+           * функция сервера (она не меняет статус, а отмечает приход),
+           * остальное идёт через set_reservation_status_web, который и
+           * решает, разрешён ли переход.
+           */
+          onAction={(key, reason = null) => act(() => (
+            key === 'arrived'
+              ? markReservationArrived(locationId, detail.id)
+              : setReservationStatus(locationId, detail.id, key, reason)
+          ))}
           onTables={(ids) => act(() => setReservationTables(locationId, detail.id, ids))}
         />
       )}
@@ -500,17 +517,27 @@ function TimelineSkeleton({ rows }) {
  * как назначение одного.
  */
 function BookingSheet({
-  reservation, tables, tz, busy, error, clashes = [], onClose, onConfirm, onArrived,
-  onCompleted, onNoShow, onTables, onEdit,
+  reservation, tables, tz, busy, error, conflict = false, bookings = [], clashes = [],
+  onClose, onAction, onTables, onEdit, onClearError,
 }) {
   const linked = (reservation.tables_link ?? []).map((l) => l.table_id)
   const initial = linked.length > 0
     ? linked
     : [reservation.table_id, ...(reservation.hold_table_ids ?? [])].filter(Boolean)
   const [picked, setPicked] = useState(initial)
-  const seated = reservation.arrived_at != null || reservation.order_id != null
   const posSeated = reservation.order_id != null
   const active = reservation.status === 'new' || reservation.status === 'confirmed'
+
+  const actions = visitActions(reservation)
+  /*
+   * Отмена и отказ спрашивают причину — её увидит гость.
+   *
+   * Раньше с полотна отменить визит было нельзя вовсе: карточка
+   * предлагала «Completed / No-show», а за отменой хостес уходил в
+   * список. Диалог здесь тот же, что в списке, — с Escape, фокусом и
+   * необязательной причиной, а не `window.confirm`.
+   */
+  const [asking, setAsking] = useState(null)
 
   // Правка визита открывается по кнопке: обычно карточку открывают,
   // чтобы посадить гостя, а не переписать его данные.
@@ -525,6 +552,31 @@ function BookingSheet({
 
   const changed = picked.length !== initial.length
     || picked.some((id, i) => id !== initial[i])
+
+  /*
+   * Отказ по занятости — единственный, к которому есть что добавить: что
+   * свободно в это время и когда освободится. Считается из тех же
+   * визитов, что уже на экране, и САМ визит из расчёта исключается —
+   * иначе перенос на полчаса упирался бы в собственную бронь.
+   *
+   * Это подсказка, а не разрешение: занятость всё равно перепроверит
+   * сервер при сохранении.
+   */
+  const alternatives = useMemo(() => {
+    if (!conflict) return null
+    const wantedMs = fromLocalInput(form.at, tz)
+    return conflictAlternatives({
+      tables,
+      bookings,
+      wantedMs: wantedMs ? new Date(wantedMs).getTime() : NaN,
+      partySize: Number(form.party) || reservation.party_size || 1,
+      ignoreId: reservation.id,
+    })
+  }, [conflict, form.at, form.party, tz, tables, bookings, reservation.id, reservation.party_size])
+
+  const hhmm = (ms) => new Date(ms).toLocaleTimeString('en-GB', {
+    hour: '2-digit', minute: '2-digit', timeZone: tz,
+  })
 
   function saveEdit() {
     const at = fromLocalInput(form.at, tz)
@@ -663,13 +715,16 @@ function BookingSheet({
               </label>
               <label className="qr-field">
                 <span>Guests</span>
+                {/* Сообщение сервера живёт ровно до того, как хостес
+                    изменил то, из-за чего оно появилось: «стол занят»
+                    рядом с уже другим временем — ложь про текущую форму. */}
                 <input type="number" min={1} max={50} value={form.party}
-                  onChange={(e) => setForm((f) => ({ ...f, party: e.target.value }))} />
+                  onChange={(e) => { setForm((f) => ({ ...f, party: e.target.value })); onClearError?.() }} />
               </label>
               <label className="qr-field">
                 <span>Date and time</span>
                 <input type="datetime-local" value={form.at}
-                  onChange={(e) => setForm((f) => ({ ...f, at: e.target.value }))} />
+                  onChange={(e) => { setForm((f) => ({ ...f, at: e.target.value })); onClearError?.() }} />
               </label>
             </div>
             <label className="qr-field">
@@ -683,6 +738,60 @@ function BookingSheet({
               Moving the visit or growing the party is re-checked against the
               floor — a clash comes back as an error, not a double booking.
             </p>
+
+            {/* Отказ по занятости — единственный, к которому есть что
+                добавить: что свободно сейчас и когда освободится. */}
+            {alternatives && (
+              <div className="conflict-hint">
+                {alternatives.tables.length > 0 && (
+                  <>
+                    <p className="form-hint">Free at this time — tap to move the visit:</p>
+                    <div className="conflict-options">
+                      {alternatives.tables.slice(0, 6).map((table) => (
+                        <Button
+                          key={table.id}
+                          onClick={() => { setPicked([table.id]); onClearError?.() }}
+                        >
+                          {table.label} · {table.seats} seats
+                        </Button>
+                      ))}
+                    </div>
+                    <p className="form-hint">
+                      Picking a table only changes the selection below — press
+                      Save tables to apply it.
+                    </p>
+                  </>
+                )}
+                {alternatives.times.length > 0 && (
+                  <>
+                    <p className="form-hint">Nearest free times:</p>
+                    <div className="conflict-options">
+                      {alternatives.times.map((slot) => (
+                        <Button
+                          key={slot.at}
+                          onClick={() => {
+                            setForm((f) => ({ ...f, at: toLocalInput(slot.at, tz) }))
+                            onClearError?.()
+                          }}
+                        >
+                          {hhmm(slot.at)}
+                        </Button>
+                      ))}
+                    </div>
+                  </>
+                )}
+                {alternatives.tables.length === 0 && alternatives.times.length === 0 && (
+                  <p className="form-hint">
+                    Nothing is free nearby on this screen — try another day or
+                    free a table first.
+                  </p>
+                )}
+                <p className="form-hint">
+                  Suggestions come from what this screen already knows; the
+                  server checks availability again when you save.
+                </p>
+              </div>
+            )}
             <div className="order-actions">
               <button type="button" className="secondary-button" onClick={() => setEditing(false)}>
                 Cancel
@@ -727,33 +836,42 @@ function BookingSheet({
               </button>
             </div>
 
+            {/* Набор действий решает `visitActions`: экран не должен
+                предлагать переход, который сервер всё равно отклонит. */}
             <div className="order-actions">
-              {reservation.status === 'new' && (
-                <button type="button" className="primary-button compact" disabled={busy} onClick={onConfirm}>
-                  Confirm
+              {actions.map((action) => (
+                <button
+                  key={action.key}
+                  type="button"
+                  className={action.tone === 'primary' ? 'primary-button compact' : 'secondary-button'}
+                  data-danger={action.tone === 'danger' || undefined}
+                  disabled={busy}
+                  onClick={() => (action.confirm ? setAsking(action) : onAction(action.key))}
+                >
+                  {action.label}
                 </button>
-              )}
-              {reservation.status === 'confirmed' && !seated && (
-                <button type="button" className="primary-button compact" disabled={busy} onClick={onArrived}>
-                  Guest seated
-                </button>
-              )}
-              {reservation.status === 'confirmed' && (
-                <>
-                  <button type="button" className="secondary-button" disabled={busy} onClick={onCompleted}>
-                    Completed
-                  </button>
-                  <button type="button" className="secondary-button" disabled={busy} onClick={onNoShow}>
-                    No-show
-                  </button>
-                </>
-              )}
+              ))}
             </div>
           </>
         )}
 
         {/* Служебное — внизу и тихо: нужно, когда с визитом что-то не
             так, а не при каждом открытии карточки. */}
+        {asking && (
+          <ConfirmDialog
+            title={asking.key === 'rejected' ? 'Reject this booking?' : 'Cancel this booking?'}
+            description={`${reservation.customer_name || 'Guest'} · ${when}, ${span} · ${
+              reservation.party_size} guests. The table is freed immediately.`}
+            confirmLabel={asking.key === 'rejected' ? 'Reject booking' : 'Cancel booking'}
+            cancelLabel="Keep the booking"
+            tone="danger"
+            reason={{ label: 'Reason for the guest', placeholder: 'Fully booked, closed for a private event…' }}
+            busy={busy}
+            onCancel={() => setAsking(null)}
+            onConfirm={(text) => { setAsking(null); onAction(asking.key, text) }}
+          />
+        )}
+
         {(sourceLabel || reservation.created_at) && (
           <p className="sheet-meta">
             {sourceLabel}

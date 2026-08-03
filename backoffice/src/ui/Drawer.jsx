@@ -1,6 +1,7 @@
 import { useEffect, useRef } from 'react'
 import { X } from 'lucide-react'
 import { IconButton } from './Button'
+import { isTopLayer, pushLayer } from './overlay-stack'
 
 /**
  * Боковая панель для деталей и правки.
@@ -21,11 +22,23 @@ export default function Drawer({
 }) {
   const panelRef = useRef(null)
   const returnRef = useRef(null)
+  const layerRef = useRef({})
   const titleId = labelledBy || 'drawer-title'
+
+  /*
+   * Место в стеке слоёв берётся ОДИН раз, на монтирование.
+   *
+   * Соблазнительно было положить это в общий эффект ниже, но он зависит
+   * от `onClose` — а его экраны создают заново на каждом рендере.
+   * Перерегистрация возвращала панель на вершину стека, и открытый
+   * поверх неё диалог снова терял Escape.
+   */
+  useEffect(() => pushLayer(layerRef.current), [])
 
   useEffect(() => {
     returnRef.current = document.activeElement
     const panel = panelRef.current
+    const layer = layerRef.current
     // Первый фокус — на саму панель: читалка объявит заголовок целиком,
     // а не первое попавшееся поле.
     panel?.focus()
@@ -37,6 +50,7 @@ export default function Drawer({
     }
 
     function onKey(event) {
+      if (!isTopLayer(layer)) return
       if (event.key === 'Escape') {
         event.stopPropagation()
         onClose()
