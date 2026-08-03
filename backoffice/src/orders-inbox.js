@@ -25,7 +25,16 @@ export const STATUS_LABELS = {
   cancelled: 'Cancelled',
 }
 
-/** Кнопки перевода статуса — зеркало переходов set_online_order_status_web. */
+/**
+ * Кнопки перевода статуса — зеркало переходов
+ * `set_online_order_status_web` (101/105), теперь дословное.
+ *
+ * Клиент был беднее сервера: `accepted → completed` и
+ * `preparing → completed` сервер разрешает, а кабинет не предлагал —
+ * заказ, который отдали сразу с прилавка, приходилось вести через
+ * «Ready». Обратного тоже быть не должно: показать кнопку, которую
+ * сервер отклонит, хуже, чем не показать разрешённую.
+ */
 export const NEXT_ACTIONS = {
   new: [
     { to: 'accepted', label: 'Accept', tone: 'primary' },
@@ -33,10 +42,12 @@ export const NEXT_ACTIONS = {
   ],
   accepted: [
     { to: 'preparing', label: 'Start preparing' },
+    { to: 'completed', label: 'Complete' },
     { to: 'ready', label: 'Ready', tone: 'primary' },
     { to: 'cancelled', label: 'Cancel', tone: 'danger' },
   ],
   preparing: [
+    { to: 'completed', label: 'Complete' },
     { to: 'ready', label: 'Ready', tone: 'primary' },
     { to: 'cancelled', label: 'Cancel', tone: 'danger' },
   ],

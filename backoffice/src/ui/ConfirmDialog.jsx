@@ -21,6 +21,12 @@ export default function ConfirmDialog({
   cancelLabel = 'Cancel',
   tone = 'primary',
   reason = null, // { label, placeholder, optional }
+  /*
+   * Ошибка сервера показывается ЗДЕСЬ, а не на странице за диалогом:
+   * иначе человек видит закрывшийся диалог, набранную причину теряет и
+   * не понимает, изменилось ли что-нибудь.
+   */
+  error = '',
   busy = false,
   onConfirm,
   onCancel,
@@ -95,6 +101,7 @@ export default function ConfirmDialog({
             />
           </label>
         )}
+        {error && <p className="form-error" role="alert">{error}</p>}
         <div className="order-actions">
           <Button ref={reason ? undefined : firstRef} onClick={onCancel}>{cancelLabel}</Button>
           <Button

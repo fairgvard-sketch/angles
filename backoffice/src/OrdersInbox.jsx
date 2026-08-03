@@ -13,6 +13,7 @@ import {
   orderTabs, orderTimeLabel, realtimeState, rowContext,
 } from './orders-inbox'
 import OrderSheet from './OrderSheet'
+import ConfirmDialog from './ui/ConfirmDialog'
 import Tabs from './ui/Tabs'
 import { IconButton } from './ui/Button'
 import { SearchField } from './ui/Layout'
@@ -223,58 +224,6 @@ function TableSkeleton() {
   )
 }
 
-/**
- * Причина отказа/отмены. Была `window.prompt`: без заголовка, без
- * контекста заказа и с блокировкой вкладки — а текст едет гостю.
- */
-function ReasonDialog({ row, action, currency, busy, onCancel, onConfirm }) {
-  const [reason, setReason] = useState('')
-  const inputRef = useRef(null)
-
-  useEffect(() => {
-    inputRef.current?.focus()
-    function onKey(event) { if (event.key === 'Escape') onCancel() }
-    document.addEventListener('keydown', onKey)
-    return () => document.removeEventListener('keydown', onKey)
-  }, [onCancel])
-
-  const title = action === 'rejected' ? 'Reject this order' : 'Cancel this order'
-  return (
-    <div className="sheet-backdrop" onClick={onCancel} role="presentation">
-      <form
-        className="sheet"
-        onClick={(e) => e.stopPropagation()}
-        role="dialog"
-        aria-modal="true"
-        aria-labelledby="reason-title"
-        onSubmit={(e) => { e.preventDefault(); onConfirm(reason.trim() || null) }}
-      >
-        <h3 id="reason-title">{title}</h3>
-        <p className="sheet-sub">
-          {orderNumber(row)} · {rowContext(row)} · {formatMoney(row.total, currency)}
-        </p>
-        <label className="qr-field">
-          <span>Reason (optional)</span>
-          <textarea
-            ref={inputRef}
-            rows={3}
-            value={reason}
-            maxLength={200}
-            placeholder="Shown to the guest — for example: out of stock."
-            onChange={(e) => setReason(e.target.value)}
-          />
-        </label>
-        <div className="order-actions">
-          <button type="button" className="secondary-button" onClick={onCancel}>Keep the order</button>
-          <button type="submit" className="primary-button compact" data-danger disabled={busy}>
-            {busy ? '…' : (action === 'rejected' ? 'Reject' : 'Cancel order')}
-          </button>
-        </div>
-      </form>
-    </div>
-  )
-}
-
 /** Понятный текст вместо кода ошибки RPC */
 function deskError(message) {
   if (message === 'pos_mode') return 'This location is served by the register — orders are handled on the POS.'
@@ -297,6 +246,10 @@ export default function OrdersInbox({
   const [error, setError] = useState('')
   const [busy, setBusy] = useState(null) // { id, to }
   const [pendingReason, setPendingReason] = useState(null) // { row, action }
+  const [askError, setAskError] = useState('')
+  // Успешный перевод не должен быть беззвучным: строка уезжает из
+  // разреза, и без объявления непонятно, случилось ли что-нибудь.
+  const [announce, setAnnounce] = useState('')
   const [socket, setSocket] = useState('connecting')
   const [lastOkMs, setLastOkMs] = useState(null)
   const [nowMs, setNowMs] = useState(() => Date.now())
@@ -314,6 +267,14 @@ export default function OrdersInbox({
     const id = setInterval(() => setNowMs(Date.now()), 30_000)
     return () => clearInterval(id)
   }, [])
+
+  // Объявление живёт несколько секунд: это подтверждение действия, а не
+  // состояние экрана.
+  useEffect(() => {
+    if (!announce) return undefined
+    const id = setTimeout(() => setAnnounce(''), 4000)
+    return () => clearTimeout(id)
+  }, [announce])
 
   // Поиск ходит на сервер, поэтому ждёт паузы в наборе, а не каждой буквы
   useEffect(() => {
@@ -413,8 +374,14 @@ export default function OrdersInbox({
   }, [refresh])
 
   async function act(row, to) {
-    // Отказ и отмена уезжают гостю — причину спрашиваем диалогом
+    /*
+     * Спрашиваем только там, где последствие уходит наружу: отказ и
+     * отмена едут гостю вместе с причиной. «Принять», «Готовится»,
+     * «Готов» и «Выдан» — один тап без диалога: подтверждение на каждый
+     * шаг превращает смену в череду «вы уверены?».
+     */
     if (to === 'rejected' || to === 'cancelled') {
+      setAskError('')
       setPendingReason({ row, action: to })
       return
     }
@@ -426,9 +393,15 @@ export default function OrdersInbox({
     try {
       await setOnlineOrderStatus(locationId, row.id, to, reason)
       setPendingReason(null)
+      setAskError('')
+      setAnnounce(`${orderNumber(row)} is now ${STATUS_LABELS[to] ?? to}`)
       await refresh()
     } catch (e) {
-      setError(deskError(e.message))
+      const text = deskError(e.message)
+      // Пока открыт диалог, ошибка принадлежит ему: там же осталась
+      // набранная причина, и заново её печатать не придётся.
+      if (pendingReason) setAskError(text)
+      else setError(text)
     } finally {
       setBusy(null)
     }
@@ -653,15 +626,22 @@ export default function OrdersInbox({
       )}
 
       {pendingReason && (
-        <ReasonDialog
-          row={pendingReason.row}
-          action={pendingReason.action}
-          currency={currency}
+        <ConfirmDialog
+          title={pendingReason.action === 'rejected' ? 'Reject this order?' : 'Cancel this order?'}
+          description={`${orderNumber(pendingReason.row)} · ${rowContext(pendingReason.row)} · ${formatMoney(pendingReason.row.total, currency)}`}
+          confirmLabel={pendingReason.action === 'rejected' ? 'Reject' : 'Cancel order'}
+          cancelLabel="Keep the order"
+          tone="danger"
+          reason={{ label: 'Reason', placeholder: 'Shown to the guest — for example: out of stock.' }}
+          error={askError}
           busy={busy?.id === pendingReason.row.id}
-          onCancel={() => setPendingReason(null)}
+          onCancel={() => { setPendingReason(null); setAskError('') }}
           onConfirm={(reason) => commit(pendingReason.row, pendingReason.action, reason)}
         />
       )}
+
+      {/* Результат перевода — словами, для читалки и для глаза */}
+      <p className="ord-announce" role="status" aria-live="polite">{announce}</p>
     </>
   )
 }

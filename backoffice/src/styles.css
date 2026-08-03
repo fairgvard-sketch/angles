@@ -2509,3 +2509,12 @@ a { color: inherit; }
   text-transform: uppercase; letter-spacing: 0.02em;
 }
 .ord-day-row th span { font-weight: 550; text-transform: none; }
+/* Объявление результата перевода: слышно читалке, видно глазом */
+.ord-announce:empty { display: none; }
+.ord-announce {
+  position: fixed; inset-block-end: var(--sp-4); inset-inline-start: 50%;
+  transform: translateX(-50%); z-index: 60; margin: 0;
+  padding: 10px var(--sp-4); border-radius: var(--r-pill);
+  background: var(--c-ink); color: var(--c-on-ink); font-size: 14px;
+  box-shadow: var(--shadow-pop);
+}
