@@ -149,7 +149,21 @@ export default function WaitlistPanel({ locationId, date, query = '' }) {
       {error && <p className="form-error" role="alert">{error}</p>}
 
       {entries === null ? (
-        <p className="empty-state">Loading…</p>
+        /* Скелет держит геометрию таблицы: строка «Loading…» схлопывала
+           панель и через секунду возвращала её обратно, утаскивая
+           кнопки из-под пальца. */
+        <div className="rsv-table-scroll rsv-list-skeleton">
+          <div role="status" aria-live="polite" className="visually-hidden">Loading the queue…</div>
+          {Array.from({ length: 6 }, (_, i) => (
+            <div key={i} className="rsv-skeleton-row" aria-hidden>
+              <span style={{ width: '5%' }} />
+              <span style={{ width: '26%' }} />
+              <span style={{ width: '8%' }} />
+              <span style={{ width: '12%' }} />
+              <span style={{ width: '14%' }} />
+            </div>
+          ))}
+        </div>
       ) : groups.length === 0 ? (
         <p className="empty-state">
           {needle

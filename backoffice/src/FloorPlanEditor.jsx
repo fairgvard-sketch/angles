@@ -183,7 +183,16 @@ export default function FloorPlanEditor({ locationId }) {
     setHistory({ past: [], future: [] })
   })
 
-  if (plan === null) return <p className="empty-state">Loading…</p>
+  // Холст той же геометрии, что и готовый план: иначе раздел схлопывается
+  // в строку и через секунду прыгает обратно на весь экран.
+  if (plan === null) {
+    return (
+      <section className="panel form-panel floor-panel">
+        <div role="status" aria-live="polite" className="visually-hidden">Loading the floor plan…</div>
+        <div className="floor-canvas is-loading" aria-hidden />
+      </section>
+    )
+  }
 
   return (
     <>

@@ -2071,6 +2071,21 @@ a { color: inherit; }
   .rsv-queue-move .icon-button { width: 44px; height: 44px; }
 }
 
+/*
+ * Пальцевые цели на телефоне.
+ *
+ * Пройдено измерением, а не на глаз: кнопки шага по времени были 32 px,
+ * заголовок сортировки — 13 px, а имя гостя (оно же кнопка карточки) —
+ * 17 px. Всё это попадает пальцем через раз, а промах в час пик стоит
+ * дороже, чем пара лишних пикселей строки.
+ */
+@media (max-width: 720px) {
+  .timeline-pan .text-button { min-height: 44px; }
+  .rsv-sort { min-height: 44px; display: inline-flex; align-items: center; }
+  .rsv-open { min-height: 44px; justify-content: center; }
+  .order-search input { align-self: stretch; }
+}
+
 /* ── План зала: холст (Kassa 138) ─────────────────────────────
    Столы позиционируются в ПРОЦЕНТАХ холста (017): план тянется под
    любой экран и держит взаимное расположение. Холст — обычные
@@ -2122,9 +2137,21 @@ a { color: inherit; }
 /* Стол, который хостес раздаёт руками, помечен — иначе «почему его не
    выбирает автоподбор» превращается в загадку */
 .floor-table.is-manual { border-style: dotted; border-color: #a15c07; }
+.floor-canvas.is-loading {
+  background-color: var(--c-surface-muted);
+  animation: timeline-shimmer 1.4s ease-in-out infinite;
+  background-image: linear-gradient(90deg, var(--c-surface-muted), var(--c-surface-hover), var(--c-surface-muted));
+  background-size: 200% 100%;
+}
+@media (prefers-reduced-motion: reduce) {
+  .floor-canvas.is-loading { animation: none; }
+}
 .floor-zone-row { display: flex; align-items: center; justify-content: space-between; gap: var(--sp-3); }
 @media (max-width: 720px) {
   .floor-canvas { aspect-ratio: 4 / 5; background-size: 10% 6%; }
   .floor-toolbar-actions { width: 100%; }
   .floor-toolbar-actions button { min-height: 44px; }
+  /* Правка и удаление зоны — тоже пальцевые цели */
+  .floor-zone-row .text-button { min-height: 44px; padding-inline: var(--sp-2); }
+  .floor-zone-row .icon-button { width: 44px; height: 44px; }
 }
