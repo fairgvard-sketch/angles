@@ -2061,3 +2061,61 @@ a { color: inherit; }
 @media (max-width: 720px) {
   .rsv-queue-move .icon-button { width: 44px; height: 44px; }
 }
+
+/* ── План зала: холст (Kassa 138) ─────────────────────────────
+   Столы позиционируются в ПРОЦЕНТАХ холста (017): план тянется под
+   любой экран и держит взаимное расположение. Холст — обычные
+   элементы, а не canvas: стол остаётся кнопкой, и клавиатура работает
+   без изобретения своей доступности. */
+.floor-toolbar {
+  display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between;
+  gap: var(--sp-3); margin-bottom: var(--sp-3);
+}
+.floor-toolbar-actions { display: flex; flex-wrap: wrap; align-items: center; gap: var(--sp-2); }
+.floor-canvas {
+  position: relative; width: 100%; aspect-ratio: 16 / 10;
+  border: 1px solid var(--c-border-panel); border-radius: var(--r-lg);
+  background-color: var(--c-surface);
+  /* Сетка выравнивания — тихая: она помогает прицелиться, а не рисует
+     миллиметровку поверх зала. */
+  background-image:
+    linear-gradient(to right, var(--c-border-hair) 1px, transparent 1px),
+    linear-gradient(to bottom, var(--c-border-hair) 1px, transparent 1px);
+  background-size: 5% 8%;
+  overflow: hidden; touch-action: none;
+}
+.floor-table {
+  position: absolute; transform: translate(-50%, -50%);
+  display: flex; flex-direction: column; align-items: center; justify-content: center;
+  gap: 2px; padding: 4px; cursor: grab;
+  border: 1.5px solid var(--c-border); border-radius: var(--r-md);
+  background: var(--c-surface-muted); color: var(--c-text); font: inherit;
+  min-width: 44px; min-height: 44px;
+}
+.floor-table:active { cursor: grabbing; }
+/* Круглый стол должен быть круглым: холст не квадратный, и одинаковые
+   проценты по ширине и высоте дали бы овал (см. комментарий в 018). */
+.floor-table.is-circle { border-radius: 50%; height: auto !important; aspect-ratio: 1; }
+.floor-table strong { font-size: 14px; font-weight: 750; line-height: 1; }
+.floor-table small { font-size: 10px; color: var(--c-text-muted); line-height: 1; }
+.floor-table.is-selected {
+  border-color: var(--rsv-accent); background: #eef3fe;
+  box-shadow: 0 0 0 3px rgb(37 99 235 / 22%);
+}
+.floor-table:focus-visible { outline: 2px solid var(--rsv-accent); outline-offset: 3px; }
+/* Стол вне обслуживания виден, но приглушён: он остаётся частью зала */
+.floor-table.is-off {
+  border-style: dashed; background: repeating-linear-gradient(
+    45deg, var(--c-surface-muted), var(--c-surface-muted) 6px,
+    var(--c-surface-sunken) 6px, var(--c-surface-sunken) 12px);
+  color: var(--c-text-subtle);
+}
+/* Стол, который хостес раздаёт руками, помечен — иначе «почему его не
+   выбирает автоподбор» превращается в загадку */
+.floor-table.is-manual { border-style: dotted; border-color: #a15c07; }
+.floor-zone-row { display: flex; align-items: center; justify-content: space-between; gap: var(--sp-3); }
+@media (max-width: 720px) {
+  .floor-canvas { aspect-ratio: 4 / 5; background-size: 10% 6%; }
+  .floor-toolbar-actions { width: 100%; }
+  .floor-toolbar-actions button { min-height: 44px; }
+}

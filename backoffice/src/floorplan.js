@@ -21,7 +21,10 @@ export async function fetchFloorPlan(locationId) {
       .eq('location_id', locationId).eq('is_active', true)
       .order('sort_order'),
     supabase.from('tables')
-      .select('id, label, seats, combinable, zone_id, sort_order, status')
+      // Координаты, размер и форма (017/018) плюс свойства подбора (138):
+      // без них план зала остаётся списком, а инспектор — обманкой.
+      .select('id, label, seats, combinable, zone_id, sort_order, status, '
+        + 'pos_x, pos_y, width, height, shape, min_party, auto_assign')
       .eq('location_id', locationId).eq('is_active', true)
       .order('sort_order'),
   ])
@@ -74,9 +77,15 @@ export async function reorderZones(locationId, zoneIds) {
   if (error) throw new Error(error.message)
 }
 
-/** Создание и правка стола — один RPC, идемпотентный по id. */
+/**
+ * Создание и правка стола — один RPC, идемпотентный по id.
+ *
+ * `minParty`/`autoAssign` = null означают «не трогать» (138): обычное
+ * переименование стола не должно сбрасывать настройки подбора.
+ */
 export async function saveTable(locationId, {
   id, label, zoneId = null, seats = 2, combinable = false, sortOrder = 0,
+  shape = null, minParty = null, autoAssign = null,
 }) {
   const { data, error } = await supabase.rpc('save_table_web', {
     p_location_id: locationId,
@@ -86,9 +95,36 @@ export async function saveTable(locationId, {
     p_seats: seats,
     p_combinable: combinable,
     p_sort_order: sortOrder,
+    p_shape: shape,
+    p_min_party: minParty,
+    p_auto_assign: autoAssign,
   })
   if (error) throw new Error(error.message)
   return data
+}
+
+/**
+ * Сохранить план зала целиком (138).
+ *
+ * Пакетом и по кнопке: пять отдельных запросов на пять перетаскиваний —
+ * это пять шансов сохранить половину зала, а автосохранение каждого
+ * перетаскивания лишает возможности передумать.
+ */
+export async function saveFloorLayout(locationId, layout) {
+  const { data, error } = await supabase.rpc('save_floor_layout_web', {
+    p_location_id: locationId,
+    p_layout: layout,
+  })
+  if (error) throw new Error(error.message)
+  return data
+}
+
+/** Снять порог «минимальная компания»: null в saveTable значит «не трогать» */
+export async function clearTableMinParty(locationId, id) {
+  const { error } = await supabase.rpc('clear_table_min_party_web', {
+    p_location_id: locationId, p_id: id,
+  })
+  if (error) throw new Error(error.message)
 }
 
 /** Сервер откажет, если на столе открытый счёт или живая бронь впереди. */
@@ -120,6 +156,12 @@ export function floorErrorText(message) {
   if (m.includes('table_label_too_long')) return 'Table name is too long (24 characters max).'
   if (m.includes('zone_name_required')) return 'Give the zone a name.'
   if (m.includes('invalid_seats')) return 'Seats must be between 1 and 100.'
+  if (m.includes('invalid_min_party')) {
+    return 'Minimum party cannot be larger than the table — nobody would fit it.'
+  }
+  if (m.includes('position out of range')) return 'That spot is outside the floor.'
+  if (m.includes('invalid shape')) return 'Unknown table shape — reload the page.'
+  if (m.includes('too_many_tables')) return 'Too many tables in one save — split the floor into zones.'
   if (m.includes('invalid_table_count')) return 'Create up to 50 tables at a time.'
   if (m.includes('invalid_zone')) return 'That zone no longer exists — reload the page.'
   if (m.includes('table_not_found') || m.includes('zone_not_found')) {
