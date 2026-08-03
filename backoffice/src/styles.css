@@ -1748,6 +1748,20 @@ a { color: inherit; }
   border-radius: 16px 16px 0 0; padding: 20px; display: flex; flex-direction: column; gap: 10px;
   max-height: 88vh; overflow-y: auto;
 }
+/*
+ * Лист снизу — раскладка для ТЕЛЕФОНА: диалог приходит под большой
+ * палец, и снизу его удобно закрывать. На десктопе та же раскладка
+ * прижимала форму к нижнему краю — далеко от кнопки, которой её
+ * открыли, и с виду будто она уезжает за экран.
+ *
+ * Поэтому от 561 px диалог центрируется и получает все четыре угла, а
+ * листом остаётся ровно там, где он листом и задуман (ниже 560 px тот же
+ * файл добавляет ему safe-area снизу).
+ */
+@media (min-width: 561px) {
+  .sheet-backdrop { align-items: center; }
+  .sheet { border-radius: 16px; }
+}
 .sheet h3 { font-size: 18px; color: var(--c-text); }
 .sheet-sub { color: var(--c-text-muted); font-size: 14px; }
 
