@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import {
-  MoreHorizontal, RefreshCw, Store, StickyNote, X,
+  ChevronRight, MoreHorizontal, RefreshCw, Store, X,
 } from 'lucide-react'
 import { supabase } from './supabase'
 import {
@@ -9,7 +9,7 @@ import {
 import {
   ACTIVE_STATUSES, DONE_STATUSES, NEXT_ACTIONS, ORDER_CHANNEL_LABELS,
   ORDER_TYPE_LABELS, STATUS_LABELS, STATUS_TONE,
-  elapsedLabel, formatMoney, itemsLabel, orderItemLines, orderNumber,
+  elapsedLabel, formatMoney, groupByDay, itemsLabel, orderNumber,
   orderTabs, orderTimeLabel, realtimeState, rowContext,
 } from './orders-inbox'
 import OrderSheet from './OrderSheet'
@@ -20,18 +20,19 @@ import { SearchField } from './ui/Layout'
 /**
  * «Orders» — рабочий стол онлайн-заказов.
  *
- * Phase 2 редизайна (`docs/claude-orders-approved-redesign-plan.md`):
- * галерея карточек заменена рабочей таблицей, а разрезы, отбор, поиск и
- * право на действие приехали с сервера (`get_online_orders_web`, 141).
+ * Редизайн по `docs/claude-orders-approved-redesign-plan.md`, фазы 1–4:
+ * галерея карточек заменена рабочей таблицей, разрезы, отбор, поиск и
+ * право на действие приехали с сервера (`get_online_orders_web`, 141),
+ * подробности живут в боковой панели (`OrderSheet`), а незакрытое из
+ * прошлых дней свёрнуто в один блок.
  *
  * Почему таблица. Карточка занимала 227×339 px: на десктопе помещалось
  * шесть заказов, на телефоне — два, а страница вытягивалась на пять
  * экранов. Строка отвечает на те же вопросы одним взглядом — номер,
  * время, гость, способ выдачи, канал, состояние, штуки и сумма.
  *
- * Что осталось на потом: боковая панель заказа с историей переходов
- * (Phase 3) и сворачивание давнего долга (Phase 4). Пока подробности
- * раскрываются строкой под выбранным заказом.
+ * Что осталось на потом: осознанный список вместо таблицы на телефоне
+ * (Phase 7).
  */
 
 /** Колонки, которые прячутся на планшете: строка обязана оставаться читаемой */
@@ -97,14 +98,18 @@ function RowMenu({ label, items, disabled, onPick }) {
 }
 
 function OrdersTable({
-  rows, scope, currency, tz, dayStartMs, nowMs, selectedId, onSelect,
+  rows, groups, scope, currency, tz, dayStartMs, nowMs, selectedId, onSelect,
   canManage, busy, onAction, empty,
 }) {
   // В предзаказах смысл времени другой: важно не когда заявку оставили,
   // а к какому часу её ждут.
   const byPickup = scope === 'scheduled'
+  // Без группировки таблица — одна безымянная группа: разметка одна,
+  // а не две почти одинаковые.
+  const blocks = groups ?? [{ key: 'all', label: null, rows }]
+  const total = blocks.reduce((n, block) => n + block.rows.length, 0)
 
-  if (rows.length === 0) return <p className="empty-state">{empty}</p>
+  if (total === 0) return <p className="empty-state">{empty}</p>
 
   return (
     <div className="ord-table-scroll">
@@ -122,8 +127,17 @@ function OrdersTable({
             <th scope="col" className="ord-col-actions">Actions</th>
           </tr>
         </thead>
-        <tbody>
-          {rows.map((row) => {
+        {blocks.map((block) => (
+        <tbody key={block.key}>
+          {block.label && (
+            <tr className="ord-day-row">
+              <th scope="colgroup" colSpan={9}>
+                {block.label}
+                <span> · {block.rows.length}</span>
+              </th>
+            </tr>
+          )}
+          {block.rows.map((row) => {
             const selected = row.id === selectedId
             const at = byPickup ? row.pickup_at : row.created_at
             const active = ACTIVE_STATUSES.includes(row.status)
@@ -184,6 +198,7 @@ function OrdersTable({
             )
           })}
         </tbody>
+        ))}
       </table>
     </div>
   )
@@ -288,6 +303,9 @@ export default function OrdersInbox({
   const [selectedId, setSelectedId] = useState(null)
   const [query, setQuery] = useState('')
   const [search, setSearch] = useState('')
+  // Долг прошлых дней свёрнут по умолчанию: это чужая вчерашняя работа,
+  // а не то, ради чего раздел открыли.
+  const [debtOpen, setDebtOpen] = useState(false)
   const knownIds = useRef(new Set())
   const requestRef = useRef(0)
 
@@ -309,6 +327,14 @@ export default function OrdersInbox({
   const setFilter = (key, value) => onFiltersChange?.({
     ...filters, [key]: value === 'all' ? null : value,
   })
+
+  const filtersOn = search !== '' || status !== 'all' || channel !== 'all' || type !== 'all'
+  /*
+   * Свёрнутый долг не должен прятать результат поиска: если владелец
+   * ищет заказ, он ищет его среди ВСЕХ, а не среди сегодняшних. При
+   * активном отборе долг подгружается и раскрывается сам.
+   */
+  const debtWanted = debtOpen || filtersOn
 
   const counts = desk?.counts ?? {}
   const tabs = orderTabs(Number(counts.scheduled) || 0, tab)
@@ -335,7 +361,7 @@ export default function OrdersInbox({
        */
       const [next, debt] = await Promise.all([
         fetchOrdersDesk(locationId, params),
-        view === 'active'
+        view === 'active' && debtWanted
           ? fetchOrdersDesk(locationId, { ...params, scope: 'older' })
           : Promise.resolve(null),
       ])
@@ -353,7 +379,7 @@ export default function OrdersInbox({
       if (requestRef.current !== ticket) return
       setError(deskError(e.message))
     }
-  }, [locationId, view, status, channel, type, search])
+  }, [locationId, view, status, channel, type, search, debtWanted])
 
   // Realtime + страховочный поллинг
   useEffect(() => {
@@ -410,6 +436,13 @@ export default function OrdersInbox({
 
   const rows = desk?.rows ?? []
   const debtRows = older?.rows ?? []
+  // Пока долг не загружен, счётчик берётся из ответа сервера: свёрнутый
+  // блок обязан честно называть, сколько там лежит.
+  const debtCount = filtersOn ? debtRows.length : (Number(counts.older) || 0)
+  const debtGroups = useMemo(
+    () => groupByDay(debtRows, desk?.timezone || 'Asia/Jerusalem', nowMs),
+    [debtRows, desk?.timezone, nowMs]
+  )
   const selected = selectedId
     ? [...rows, ...debtRows].find((row) => row.id === selectedId) ?? null
     : null
@@ -428,7 +461,6 @@ export default function OrdersInbox({
   const tz = desk?.timezone || 'Asia/Jerusalem'
   const dayStart = desk?.day_start ? new Date(desk.day_start).getTime() : null
   const canManage = Boolean(desk?.can_manage)
-  const filtersOn = query.trim() !== '' || status !== 'all' || channel !== 'all' || type !== 'all'
   const realtime = realtimeState({ socket, lastOkMs, nowMs, failed: Boolean(error) })
 
   /*
@@ -512,7 +544,7 @@ export default function OrdersInbox({
             ))}
           </select>
         </label>
-        {filtersOn && (
+        {(filtersOn || query.trim() !== '') && (
           <button
             type="button"
             className="text-button"
@@ -557,18 +589,50 @@ export default function OrdersInbox({
             )}
           </section>
 
-          {/* Долг из прошлых дней — под работой дня и своим списком, с
-              полной датой у каждой строки. Ничего не закрываем
-              автоматически: решение всегда за владельцем. */}
-          {view === 'active' && debtRows.length > 0 && (
+          {/*
+            Долг из прошлых дней. Свёрнут по умолчанию: это чужая
+            вчерашняя работа, и четырнадцать строк не должны вытеснять
+            сегодняшнюю. Разворачивается одним щелчком, при поиске
+            раскрывается сам, а внутри разложен по дням — «вчера» и «29
+            июля» требуют разных решений.
+
+            Ничего не закрываем автоматически: решение всегда за
+            владельцем.
+          */}
+          {view === 'active' && debtCount > 0 && (
             <section className="panel form-panel ord-panel is-debt">
-              <div className="panel-heading">
-                <div>
-                  <h2>Older unresolved <span className="order-count">{debtRows.length}</span></h2>
-                  <p>Still open from previous days — close or cancel them so today’s list is honest.</p>
+              <button
+                type="button"
+                className="ord-debt-toggle"
+                aria-expanded={debtWanted}
+                aria-controls="ord-debt"
+                onClick={() => setDebtOpen((v) => !v)}
+              >
+                <ChevronRight aria-hidden className={debtWanted ? 'is-open' : undefined} />
+                <span>
+                  <strong>Older unresolved</strong>
+                  <small>
+                    {filtersOn
+                      ? 'Matches from previous days'
+                      : 'Still open from previous days — close or cancel them so today’s list is honest.'}
+                  </small>
+                </span>
+                <span className="order-count">{debtCount}</span>
+              </button>
+              {debtWanted && (
+                <div id="ord-debt">
+                  {older === null ? (
+                    <p className="empty-state">Loading…</p>
+                  ) : (
+                    <OrdersTable
+                      groups={debtGroups}
+                      scope="older"
+                      empty="No order from previous days matches these filters."
+                      {...tableProps}
+                    />
+                  )}
                 </div>
-              </div>
-              <OrdersTable rows={debtRows} scope="older" empty="" {...tableProps} />
+              )}
             </section>
           )}
         </>

@@ -143,6 +143,54 @@ export function activityActor(event) {
   return null
 }
 
+/**
+ * Долг из прошлых дней, разложенный по дням.
+ *
+ * Четырнадцать незакрытых заявок одним списком — это стена, в которой не
+ * видно, вчерашняя это забывчивость или заказ месячной давности.
+ * Заголовок дня отвечает на вопрос «насколько это старое» до того, как
+ * владелец начнёт читать строки.
+ *
+ * День считается в часах ТОЧКИ: у владельца в другом поясе «вчера»
+ * всё равно вчерашний день его заведения.
+ */
+export function groupByDay(rows, tz, nowMs = Date.now()) {
+  const dayKey = (iso) => {
+    try {
+      return new Intl.DateTimeFormat('en-CA', { timeZone: tz }).format(new Date(iso))
+    } catch {
+      return String(iso).slice(0, 10)
+    }
+  }
+  const today = dayKey(new Date(nowMs).toISOString())
+  const yesterday = dayKey(new Date(nowMs - 86_400_000).toISOString())
+  const groups = new Map()
+  for (const row of rows ?? []) {
+    const key = dayKey(row.created_at)
+    if (!groups.has(key)) groups.set(key, [])
+    groups.get(key).push(row)
+  }
+  return [...groups.entries()]
+    // Свежий долг важнее давнего: с ним ещё можно что-то сделать
+    .sort((a, b) => (a[0] < b[0] ? 1 : -1))
+    .map(([key, list]) => ({
+      key,
+      label: key === today ? 'Today' : key === yesterday ? 'Yesterday' : humanDay(key, tz),
+      rows: list,
+    }))
+}
+
+/** «2 Aug» вместо «2026-08-02»: дату читают, а не парсят */
+function humanDay(key, tz) {
+  try {
+    return new Intl.DateTimeFormat('en-GB', {
+      timeZone: tz, day: 'numeric', month: 'short',
+    }).format(new Date(`${key}T12:00:00Z`))
+  } catch {
+    return key
+  }
+}
+
 /** «3 items» — штуки, а не строки меню (сервер считает qty, 141) */
 export function itemsLabel(count) {
   const n = Number(count) || 0

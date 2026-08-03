@@ -3,7 +3,7 @@ import assert from 'node:assert/strict'
 import {
   REALTIME_STALE_MS, STATUS_LABELS, STATUS_TONE,
   activityActor, activityLabel,
-  bucketOrders, dayStartMs, elapsedLabel, formatMoney, itemsLabel,
+  bucketOrders, dayStartMs, elapsedLabel, formatMoney, groupByDay, itemsLabel,
   orderItemLines, orderNumber, orderRef, orderTabs, orderTimeLabel,
   realtimeState, rowContext,
 } from './orders-inbox.js'
@@ -196,4 +196,22 @@ test('у каждого события есть автор — человек и
   assert.equal(activityActor({ actor_kind: 'backoffice' }), 'Back office')
   assert.equal(activityActor({ actor_kind: 'pos' }), 'Register')
   assert.equal(activityActor({ actor_kind: 'system' }), null)
+})
+
+test('долг прошлых дней разложен по дням, свежий сверху', () => {
+  const rows = [
+    { id: 'a', created_at: at(0, 19) },   // 31 июля
+    { id: 'b', created_at: at(1, 9) },    // 1 августа — «сегодня» теста
+    { id: 'c', created_at: at(0, 10) },   // 31 июля
+  ]
+  const groups = groupByDay(rows, TZ, NOW)
+  assert.deepEqual(groups.map((g) => g.label), ['Today', 'Yesterday'])
+  assert.deepEqual(groups[0].rows.map((r) => r.id), ['b'])
+  assert.deepEqual(groups[1].rows.map((r) => r.id), ['a', 'c'])
+})
+
+test('давние дни подписаны датой, а не «2026-07-28»', () => {
+  // at(-3, …) — это 28 июля: в августе день 0 приходится на 31 июля
+  const groups = groupByDay([{ id: 'x', created_at: at(-3, 12) }], TZ, NOW)
+  assert.equal(groups[0].label, '28 Jul')
 })

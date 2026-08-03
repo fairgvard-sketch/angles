@@ -2479,3 +2479,33 @@ a { color: inherit; }
    соседней строке списка можно попасть, не закрывая панель */
 .drawer-backdrop.is-bare { background: transparent; pointer-events: none; }
 .drawer-backdrop.is-bare .drawer { pointer-events: auto; }
+
+/* Свёрнутый долг прошлых дней (Phase 4) */
+.ord-panel.is-debt { padding: 0; }
+.ord-debt-toggle {
+  display: flex; width: 100%; align-items: center; gap: var(--sp-3);
+  min-height: 56px; padding: var(--sp-3) var(--sp-4);
+  border: 0; background: transparent; font: inherit; text-align: start;
+  cursor: pointer;
+}
+.ord-debt-toggle:hover { background: var(--c-surface-hover); }
+.ord-debt-toggle > span { display: grid; gap: 2px; min-width: 0; }
+.ord-debt-toggle strong { font-size: 15px; font-weight: 700; color: var(--c-text-strong); }
+.ord-debt-toggle small { color: var(--c-text-muted); font-size: 13px; }
+.ord-debt-toggle .order-count { margin-inline-start: auto; flex: none; }
+.ord-debt-toggle svg {
+  width: 18px; height: 18px; flex: none; color: var(--c-text-muted);
+  transition: transform .15s ease-out;
+}
+.ord-debt-toggle svg.is-open { transform: rotate(90deg); }
+@media (prefers-reduced-motion: reduce) {
+  .ord-debt-toggle svg { transition: none; }
+}
+/* Заголовок дня внутри долга: «вчера» и «29 июля» требуют разных решений */
+.ord-day-row th {
+  padding: 8px var(--sp-3);
+  background: var(--c-surface-muted);
+  color: var(--c-text-muted); font-size: 12px; font-weight: 650;
+  text-transform: uppercase; letter-spacing: 0.02em;
+}
+.ord-day-row th span { font-weight: 550; text-transform: none; }
