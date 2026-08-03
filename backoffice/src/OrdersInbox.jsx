@@ -12,6 +12,7 @@ import {
   elapsedLabel, formatMoney, itemsLabel, orderItemLines, orderNumber,
   orderTabs, orderTimeLabel, realtimeState, rowContext,
 } from './orders-inbox'
+import OrderSheet from './OrderSheet'
 import Tabs from './ui/Tabs'
 import { IconButton } from './ui/Button'
 import { SearchField } from './ui/Layout'
@@ -95,48 +96,6 @@ function RowMenu({ label, items, disabled, onPick }) {
   )
 }
 
-/** Подробности выбранного заказа — до боковой панели (Phase 3) */
-function DetailRow({ row, currency, columns }) {
-  const lines = orderItemLines(row.items)
-  return (
-    <tr className="ord-detail">
-      <td colSpan={columns}>
-        <div className="ord-detail-body">
-          <ul className="order-lines">
-            {lines.map((line) => (
-              <li key={line.key}>
-                <span className="order-qty">{line.qty} ×</span>
-                <span className="order-line-text">{line.text}</span>
-                <span className="order-line-total">{formatMoney(line.total, currency)}</span>
-              </li>
-            ))}
-          </ul>
-          {row.note && <p className="order-note"><StickyNote /> {row.note}</p>}
-          {row.reject_reason && DONE_STATUSES.includes(row.status) && (
-            <p className="order-note">{row.reject_reason}</p>
-          )}
-          {/* Честный хендофф: настоящий номер заказа на кассе, без ссылки
-              в интерфейс терминала — открыть его отсюда нечем. */}
-          {row.order_id && (
-            <p className="order-handoff">
-              <Store aria-hidden />
-              {row.pos_daily_number
-                ? <>On the register as order <strong>#{row.pos_daily_number}</strong>
-                  {row.pos_status ? ` · ${row.pos_status}` : ''}</>
-                : 'Accepted on the register — the visit continues there.'}
-            </p>
-          )}
-          {row.customer_phone && (
-            <p className="ord-detail-contact">
-              <a href={`tel:${row.customer_phone}`}>{row.customer_phone}</a>
-            </p>
-          )}
-        </div>
-      </td>
-    </tr>
-  )
-}
-
 function OrdersTable({
   rows, scope, currency, tz, dayStartMs, nowMs, selectedId, onSelect,
   canManage, busy, onAction, empty,
@@ -144,7 +103,6 @@ function OrdersTable({
   // В предзаказах смысл времени другой: важно не когда заявку оставили,
   // а к какому часу её ждут.
   const byPickup = scope === 'scheduled'
-  const columns = 9
 
   if (rows.length === 0) return <p className="empty-state">{empty}</p>
 
@@ -172,7 +130,7 @@ function OrdersTable({
             const actions = canManage && !row.order_id
               ? (NEXT_ACTIONS[row.status] ?? [])
               : []
-            return [
+            return (
               <tr
                 key={row.id}
                 className={`ord-row${selected ? ' is-selected' : ''}`}
@@ -184,8 +142,8 @@ function OrdersTable({
                   <button
                     type="button"
                     className="ord-open"
-                    aria-pressed={selected}
-                    onClick={() => onSelect(selected ? null : row.id)}
+                    aria-expanded={selected}
+                    onClick={() => onSelect(row.id)}
                   >
                     {orderNumber(row)}
                   </button>
@@ -222,16 +180,8 @@ function OrdersTable({
                     onPick={(to) => onAction(row, to)}
                   />
                 </td>
-              </tr>,
-              selected && (
-                <DetailRow
-                  key={`${row.id}-detail`}
-                  row={row}
-                  currency={currency}
-                  columns={columns}
-                />
-              ),
-            ]
+              </tr>
+            )
           })}
         </tbody>
       </table>
@@ -460,6 +410,20 @@ export default function OrdersInbox({
 
   const rows = desk?.rows ?? []
   const debtRows = older?.rows ?? []
+  const selected = selectedId
+    ? [...rows, ...debtRows].find((row) => row.id === selectedId) ?? null
+    : null
+
+  /*
+   * Заказ мог уйти из разреза, пока панель открыта: «Готово» уводит его
+   * из работы дня, а отбор — из выборки. Панель, потерявшая свой заказ,
+   * закрывается, а не показывает пустоту.
+   */
+  useEffect(() => {
+    if (selectedId && desk && !selected) setSelectedId(null)
+  }, [selectedId, desk, selected])
+
+  const closeSheet = useCallback(() => setSelectedId(null), [])
   const currency = desk?.currency || 'ILS'
   const tz = desk?.timezone || 'Asia/Jerusalem'
   const dayStart = desk?.day_start ? new Date(desk.day_start).getTime() : null
@@ -608,6 +572,20 @@ export default function OrdersInbox({
             </section>
           )}
         </>
+      )}
+
+      {selected && (
+        <OrderSheet
+          row={selected}
+          currency={currency}
+          tz={tz}
+          mode={desk?.mode}
+          canManage={canManage}
+          posShiftOpen={Boolean(desk?.pos?.shift_open)}
+          busy={busy?.id === selected.id ? busy.to : null}
+          onClose={closeSheet}
+          onAction={(to) => act(selected, to)}
+        />
       )}
 
       {pendingReason && (

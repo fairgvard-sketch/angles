@@ -1,9 +1,10 @@
 /**
  * Правила инбокса онлайн-заказов — чистые функции без сети.
  *
- * Отделено от `orders.js` намеренно: статусы, возраст, корзины и поиск
- * решают, как менеджер видит работу, и должны проверяться тестами, а не
- * кликами. Всё, что ходит в Supabase, осталось в `orders.js`.
+ * Отделено от `orders.js` намеренно: подписи, состояния, возраст и
+ * деньги решают, как владелец читает работу, и должны проверяться
+ * тестами, а не кликами. Всё, что ходит в Supabase, осталось в
+ * `orders.js`; отбор, поиск и разрезы дня живут в SQL (141).
  */
 
 // Зональные помощники общие для кабинета: «сегодня» в часах точки
@@ -53,7 +54,7 @@ export const NEXT_ACTIONS = {
  * второй копии правила больше нет.
  */
 
-// ── Инбокс: возраст, корзины, поиск (Phase 3) ────────────────
+// ── Подписи строки, ленты и денег ────────────────────────────
 
 export const ORDER_CHANNEL_LABELS = {
   link: 'Link',
@@ -120,6 +121,26 @@ export function rowContext(row) {
   if (row?.customer_name) return row.customer_name
   if (row?.table_label) return `Table ${row.table_label}`
   return 'Counter'
+}
+
+/**
+ * Что произошло с заявкой (140). Служебное `new` в ленте выглядит как
+ * «новый», хотя означает «получен» — а получен он ровно один раз.
+ */
+export function activityLabel(status) {
+  return status === 'new' ? 'Received' : (STATUS_LABELS[status] ?? status)
+}
+
+/**
+ * Кто это сделал. Имя снапшотится в момент события, поэтому уволенный
+ * сотрудник не превращает историю в «—»; если имени нет вовсе, честнее
+ * назвать место, чем оставить пустоту.
+ */
+export function activityActor(event) {
+  if (event?.actor_kind === 'guest') return 'Guest'
+  if (event?.actor_kind === 'pos') return event.actor_name || 'Register'
+  if (event?.actor_kind === 'backoffice') return event.actor_name || 'Back office'
+  return null
 }
 
 /** «3 items» — штуки, а не строки меню (сервер считает qty, 141) */

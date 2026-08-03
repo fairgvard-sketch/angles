@@ -2,6 +2,7 @@ import test from 'node:test'
 import assert from 'node:assert/strict'
 import {
   REALTIME_STALE_MS, STATUS_LABELS, STATUS_TONE,
+  activityActor, activityLabel,
   bucketOrders, dayStartMs, elapsedLabel, formatMoney, itemsLabel,
   orderItemLines, orderNumber, orderRef, orderTabs, orderTimeLabel,
   realtimeState, rowContext,
@@ -179,4 +180,20 @@ test('сумма показывается в валюте точки, а не в
   assert.equal(formatMoney(null, 'ILS'), '₪0.00')
   // Неизвестный код валюты не повод спрятать сумму
   assert.match(formatMoney(1250, 'XYZ'), /12\.50/)
+})
+
+test('лента переходов говорит словами владельца, а не кодами', () => {
+  // «new» в ленте читается как «новый», хотя означает «получен»
+  assert.equal(activityLabel('new'), 'Received')
+  assert.equal(activityLabel('preparing'), 'Preparing')
+  assert.equal(activityLabel('weird'), 'weird')
+})
+
+test('у каждого события есть автор — человек или место', () => {
+  assert.equal(activityActor({ actor_kind: 'guest' }), 'Guest')
+  assert.equal(activityActor({ actor_kind: 'backoffice', actor_name: 'Дана' }), 'Дана')
+  // Имени может не быть (старая запись) — тогда честнее назвать место
+  assert.equal(activityActor({ actor_kind: 'backoffice' }), 'Back office')
+  assert.equal(activityActor({ actor_kind: 'pos' }), 'Register')
+  assert.equal(activityActor({ actor_kind: 'system' }), null)
 })

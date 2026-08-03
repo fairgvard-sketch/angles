@@ -16,9 +16,18 @@ import { isTopLayer, pushLayer } from './overlay-stack'
  *   • держать фокус внутри, пока открыта (Tab не уводит на фон);
  *   • возвращать фокус туда, откуда её открыли;
  *   • объявляться как диалог с именем.
+ *
+ * `modal` — перехватывает ли панель работу со страницей. По умолчанию
+ * да: визит открывают, чтобы принять по нему решение. Заказам нужно
+ * другое — там панель стоит рядом с таблицей, и щелчок по соседней
+ * строке обязан ОТКРЫТЬ её, а не закрыть панель. Немодальный вариант
+ * отличается четырьмя вещами: фон не ловит клики, прокрутка страницы не
+ * блокируется, Tab может уйти в список, и для скринридера остальная
+ * страница остаётся доступной (`aria-modal` снят). Escape закрывает в
+ * обоих случаях.
  */
 export default function Drawer({
-  title, subtitle, onClose, children, footer, actions, labelledBy,
+  title, subtitle, onClose, children, footer, actions, labelledBy, modal = true,
 }) {
   const panelRef = useRef(null)
   const returnRef = useRef(null)
@@ -56,7 +65,9 @@ export default function Drawer({
         onClose()
         return
       }
-      if (event.key !== 'Tab') return
+      // Ловушка фокуса — свойство модального слоя: рядом с немодальной
+      // панелью список остаётся рабочим, и уводить из неё Tab нормально.
+      if (event.key !== 'Tab' || !modal) return
       const items = focusables()
       if (items.length === 0) return
       const first = items[0]
@@ -74,24 +85,31 @@ export default function Drawer({
 
     document.addEventListener('keydown', onKey, true)
     const prevOverflow = document.body.style.overflow
-    document.body.style.overflow = 'hidden'
+    if (modal) document.body.style.overflow = 'hidden'
     return () => {
       document.removeEventListener('keydown', onKey, true)
-      document.body.style.overflow = prevOverflow
+      if (modal) document.body.style.overflow = prevOverflow
       // Фокус возвращаем туда, откуда пришли: иначе клавиатурный
       // пользователь после закрытия оказывается в начале документа.
       if (returnRef.current instanceof HTMLElement) returnRef.current.focus()
     }
-  }, [onClose])
+  }, [onClose, modal])
 
   return (
-    <div className="drawer-backdrop" onClick={onClose} role="presentation">
+    <div
+      className={modal ? 'drawer-backdrop' : 'drawer-backdrop is-bare'}
+      onClick={modal ? onClose : undefined}
+      role="presentation"
+    >
       <aside
         className="drawer"
         ref={panelRef}
         tabIndex={-1}
         role="dialog"
-        aria-modal="true"
+        // Ложный aria-modal хуже отсутствующего: он объявляет остальную
+        // страницу недоступной, а рядом с немодальной панелью список
+        // работает и им пользуются.
+        aria-modal={modal || undefined}
         aria-labelledby={titleId}
         onClick={(event) => event.stopPropagation()}
       >

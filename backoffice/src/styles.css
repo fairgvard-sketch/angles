@@ -2408,3 +2408,74 @@ a { color: inherit; }
   .ord-cell-context { max-width: 96px; }
   .ord-status { padding: 3px 8px; font-size: 11px; }
 }
+
+/*
+ * Панель заказа (Phase 3).
+ *
+ * Строка отвечает «что у нас сейчас», панель — «что с этим заказом»:
+ * позиции, модификаторы, заметка гостя и история переходов. Без них
+ * решение «принять или отказать» принимали вслепую.
+ */
+.ord-sheet-status { align-self: flex-start; }
+.ord-sheet-meta { display: grid; gap: var(--sp-2); margin: 0; }
+.ord-sheet-meta > div {
+  display: flex; align-items: baseline; justify-content: space-between;
+  gap: var(--sp-3);
+}
+.ord-sheet-meta dt {
+  display: inline-flex; align-items: center; gap: 6px;
+  color: var(--c-text-muted); font-size: 13px;
+}
+.ord-sheet-meta dt svg { width: 15px; height: 15px; }
+.ord-sheet-meta dd {
+  margin: 0; color: var(--c-text); font-size: 14px; text-align: end;
+}
+.ord-sheet-block { display: grid; gap: var(--sp-2); }
+.ord-sheet-block h4 {
+  margin: 0; color: var(--c-text-muted); font-size: 12px; font-weight: 650;
+  text-transform: uppercase; letter-spacing: 0.02em;
+}
+.ord-sheet-total {
+  display: flex; justify-content: space-between; align-items: baseline;
+  margin: 0; padding-top: var(--sp-2);
+  border-top: 1px solid var(--c-border-soft);
+}
+.ord-sheet-total strong { font-size: 17px; font-variant-numeric: tabular-nums; }
+.ord-sheet-muted { margin: 0; color: var(--c-text-muted); font-size: 13px; }
+
+/* История переходов: что произошло, кто и когда */
+.ord-activity { list-style: none; display: grid; gap: var(--sp-2); margin: 0; padding: 0; }
+.ord-activity li {
+  display: flex; align-items: flex-start; justify-content: space-between;
+  gap: var(--sp-3); padding-inline-start: var(--sp-3);
+  border-inline-start: 2px solid var(--c-border);
+}
+.ord-activity li strong { display: block; font-size: 14px; font-weight: 650; }
+.ord-activity li small { display: block; color: var(--c-text-muted); font-size: 12px; }
+.ord-activity-at {
+  flex: none; color: var(--c-text-subtle); font-size: 12px;
+  font-variant-numeric: tabular-nums;
+}
+/* Цвет ступени — тот же язык, что у пилюль состояния */
+.ord-activity li.is-new { border-inline-start-color: var(--st-wait-bg); }
+.ord-activity li.is-accepted { border-inline-start-color: var(--st-accent); }
+.ord-activity li.is-progress { border-inline-start-color: var(--st-work-bg); }
+.ord-activity li.is-ready { border-inline-start-color: var(--st-done-bg); }
+.ord-activity li.is-stopped { border-inline-start-color: var(--st-stop-fg); }
+
+/* Хендофф на кассу — факт и номер, а не кнопка, которой некуда вести */
+.ord-handoff {
+  display: grid; gap: 4px; padding: var(--sp-3);
+  border: 1px solid var(--c-border-panel); border-radius: var(--r-md);
+  background: var(--c-surface-muted);
+}
+.ord-handoff p { margin: 0; font-size: 13px; color: var(--c-text-2); }
+.ord-handoff-head {
+  display: flex; align-items: center; gap: 6px;
+  font-weight: 650; color: var(--c-text) !important;
+}
+.ord-handoff-head svg { width: 15px; height: 15px; }
+/* Немодальная панель: фон не гасит страницу и не ловит клики — по
+   соседней строке списка можно попасть, не закрывая панель */
+.drawer-backdrop.is-bare { background: transparent; pointer-events: none; }
+.drawer-backdrop.is-bare .drawer { pointer-events: auto; }
