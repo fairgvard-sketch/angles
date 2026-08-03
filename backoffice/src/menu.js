@@ -207,12 +207,19 @@ export async function deleteModifierGroup(id) {
   if (error) throw new Error(error.message)
 }
 
-export async function createModifier(context, groupId, name, priceDelta, isDefault, sortOrder) {
-  const { error } = await supabase.from('modifiers').insert({
-    org_id: orgId(context), group_id: groupId, name,
-    price_delta: priceDelta, is_default: isDefault, sort_order: sortOrder,
-  })
+/** Создать модификатор. Возвращает id — он нужен, чтобы назначить выбор по умолчанию. */
+export async function createModifier(context, groupId, patch) {
+  const { data, error } = await supabase.from('modifiers').insert({
+    org_id: orgId(context),
+    group_id: groupId,
+    name: patch.name,
+    price_delta: patch.price_delta ?? 0,
+    is_default: patch.is_default ?? false,
+    is_available: patch.is_available ?? true,
+    sort_order: patch.sort_order ?? 0,
+  }).select('id').single()
   if (error) throw new Error(error.message)
+  return data.id
 }
 
 export async function updateModifier(id, patch) {
@@ -222,6 +229,48 @@ export async function updateModifier(id, patch) {
 
 export async function deleteModifier(id) {
   const { error } = await supabase.from('modifiers').delete().eq('id', id)
+  if (error) throw new Error(error.message)
+}
+
+/**
+ * Порядок внутри группы модификаторов.
+ *
+ * Атомарного RPC для модификаторов нет (`reorder_menu` знает только
+ * категории, товары и станции), поэтому порядок пишется построчно под
+ * RLS. Список приходит ПОЛНЫЙ и по нему проставляются индексы: так
+ * «поменять два местами» не оставляет дыр в нумерации.
+ */
+export async function reorderModifiers(orderedIds) {
+  for (const [index, id] of (orderedIds ?? []).entries()) {
+    const { error } = await supabase.from('modifiers').update({ sort_order: index }).eq('id', id)
+    if (error) throw new Error(error.message)
+  }
+}
+
+/** Порядок групп модификаторов — тем же построчным способом */
+export async function reorderModifierGroups(orderedIds) {
+  for (const [index, id] of (orderedIds ?? []).entries()) {
+    const { error } = await supabase.from('modifier_groups').update({ sort_order: index }).eq('id', id)
+    if (error) throw new Error(error.message)
+  }
+}
+
+/**
+ * Выбор по умолчанию в группе.
+ *
+ * В схеме нет ограничения «один default на группу», а касса применяет
+ * КАЖДЫЙ `is_default` одним тапом: два выбора по умолчанию в группе
+ * «Молоко» — это две порции молока в заказе. Поэтому сначала снимаем
+ * флаг со всей группы, потом ставим один; `modifierId = null` означает
+ * «без выбора по умолчанию».
+ */
+export async function setDefaultModifier(groupId, modifierId) {
+  const cleared = await supabase.from('modifiers')
+    .update({ is_default: false }).eq('group_id', groupId).eq('is_default', true)
+  if (cleared.error) throw new Error(cleared.error.message)
+  if (!modifierId) return
+  const { error } = await supabase.from('modifiers')
+    .update({ is_default: true }).eq('id', modifierId)
   if (error) throw new Error(error.message)
 }
 
@@ -244,5 +293,28 @@ export async function updateStation(id, name) {
 
 export async function deleteStation(id) {
   const { error } = await supabase.from('stations').delete().eq('id', id)
+  if (error) throw new Error(error.message)
+}
+
+/** Порядок станций — атомарным RPC (`reorder_menu` знает станции с 087) */
+export async function reorderStations(orderedIds) {
+  const { error } = await supabase.rpc('reorder_menu', {
+    p_kind: 'station', p_ids: orderedIds, p_staff_session: null,
+  })
+  if (error) throw new Error(error.message)
+}
+
+/**
+ * Снять позицию со станции или назначить её.
+ *
+ * Массового контракта для этого нет, а `save_menu_item` пересоздаёт
+ * варианты и связки модификаторов — гнать через него «сними станцию»
+ * значит переписать товару состав. Поэтому одно поле правится прямым
+ * запросом под RLS, по одной позиции, с честным отчётом о том, что
+ * прошло, а что нет.
+ */
+export async function setItemStation(itemId, stationId) {
+  const { error } = await supabase.from('menu_items')
+    .update({ station_id: stationId }).eq('id', itemId)
   if (error) throw new Error(error.message)
 }

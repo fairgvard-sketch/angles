@@ -1,32 +1,45 @@
-import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
+import { useCallback, useEffect, useMemo, useState } from 'react'
 import {
-  ArrowDown, ArrowRight, ArrowUp, CheckSquare, ChevronDown, ChevronRight,
-  Plus, Search, Trash2, X,
+  ArrowRight, CheckSquare, ChevronDown, ChevronRight, ImageOff, MapPin, Plus, X,
 } from 'lucide-react'
 import {
-  agorotToShekels, shekelsToAgorot,
   fetchCategories, fetchItems, fetchModifierGroups, fetchStations,
-  createCategory, updateCategory, deleteCategory,
+  createCategory, deleteCategory,
   saveItem, deleteItem, uploadItemImage,
-  createModifierGroup, updateModifierGroup, deleteModifierGroup,
-  createModifier, updateModifier, deleteModifier,
-  createStation, updateStation, deleteStation,
   bulkUpdateItems, bulkErrorText, reorderItems,
 } from './menu'
 import {
-  GAP_LABELS, bulkOutcome, bulkPreview, changedCount, filterItems, itemGaps, moveInOrder,
-  undoPlan,
+  GAP_LABELS, SORT_MODES, bulkOutcome, bulkPreview, canReorder, changedCount,
+  filterItems, itemGaps, moveInOrder, priceLabel, sizesLabel, sortItems, undoPlan,
 } from './catalog'
 import ItemEditor from './ItemEditor'
-import { hasCapability } from './navigation'
+import ModifiersTab from './CatalogueModifiers'
+import StationsTab from './CatalogueStations'
 import Tabs from './ui/Tabs'
 import { Button, IconButton } from './ui/Button'
-import { PageHeader } from './ui/Layout'
+import { RowMenu, OrderButtons } from './ui/RowMenu'
+import FormDialog from './ui/FormDialog'
+import { SearchField } from './ui/Layout'
+import useNarrow from './ui/useNarrow'
 
 /**
- * Меню в бэкофисе — паритет с POS: товары (создание/правка/удаление, варианты,
- * модификаторы, фото, станция), категории, группы модификаторов, станции.
- * Три вкладки, как в кассе.
+ * Catalogue — рабочая поверхность всего, что заведение продаёт.
+ *
+ * Редизайн по `docs/claude-catalogue-approved-redesign-plan.md`. Раздел
+ * остаётся универсальным «Каталогом», а не «Меню»: ресторанные блюда —
+ * первый случай применения, а не предел продукта.
+ *
+ * Что изменилось по сравнению со списком-витриной. Каталог отвечает
+ * одним взглядом на восемь вопросов — что это, где лежит, как
+ * опознаётся, сколько стоит (включая размеры), продаётся ли сейчас,
+ * чего не хватает, куда маршрутизируется и что изменится до применения
+ * массовой правки. Для этого нужна таблица, а не карточки.
+ *
+ * Чего здесь намеренно НЕТ, хотя есть в макете: колонки `Channels`,
+ * действий `Duplicate` и `Archive`, страниц по 48 позиций. В
+ * `menu_items` одно поле `is_available` — вывести из него три
+ * независимых канала нельзя, а рисовать всегда включённые галочки
+ * значит врать. Разбор — `docs/catalogue-audit-phase0.md`.
  */
 
 const TABS = [
@@ -35,149 +48,91 @@ const TABS = [
   { key: 'stations', label: 'Stations' },
 ]
 
-/** Отбор по умолчанию: ничего не отфильтровано. */
-export const EMPTY_FILTERS = { query: '', category: 'all', availability: 'all', state: 'all' }
+/** Колонки, которые прячутся на планшете: строка обязана оставаться читаемой */
+const SECONDARY = 'cat-col-secondary'
 
+/**
+ * Отбор живёт в АДРЕСЕ, как у заказов и броней.
+ *
+ * До редизайна вкладка переживала перезагрузку, а отбор молча слетал:
+ * ссылка «покажи неполные позиции» открывала полный каталог. Ключи
+ * общие для всех разделов и безопасны — переход в другой раздел отбор
+ * обнуляет, поэтому `st` каталога и `st` заказа не встречаются вместе.
+ */
+const KEYS = {
+  // Товары
+  category: 'zn', availability: 'st', state: 'fl', sort: 'so',
+  // Модификаторы — свои ключи: «неполные» у товаров и у групп это
+  // разные вопросы, и переход на соседнюю вкладку не должен молча
+  // переносить туда чужой отбор.
+  groupUsage: 'ch', groupState: 'sr', groupSort: 'rg',
+}
+
+export const EMPTY_FILTERS = {
+  category: 'all', availability: 'all', state: 'all', sort: 'manual',
+  groupUsage: 'all', groupState: 'all', groupSort: 'manual',
+}
+
+/** Значения отбора из адреса; пустое — «не выбрано» */
+export function readFilters(urlFilters = {}) {
+  const out = {}
+  for (const [name, key] of Object.entries(KEYS)) {
+    out[name] = urlFilters[key] || EMPTY_FILTERS[name]
+  }
+  return out
+}
+
+/** Отбор обратно в адрес: значения по умолчанию не пишем */
+export function writeFilters(next) {
+  const out = {}
+  for (const [name, key] of Object.entries(KEYS)) {
+    const value = next[name]
+    if (value && value !== EMPTY_FILTERS[name]) out[key] = value
+  }
+  return out
+}
+
+/** Цена в шапке каталога — теми же правилами, что в кассе */
 function money(agorot) {
-  return `${agorotToShekels(agorot).toLocaleString('he-IL', { minimumFractionDigits: agorot % 100 ? 2 : 0 })} ₪`
+  return `₪${((agorot ?? 0) / 100).toFixed(2).replace(/\.00$/, '')}`
 }
 
 /**
- * Набор свёрнутых секций по id. По умолчанию секции СВЁРНУТЫ: при первом
- * появлении данных все известные id схлопываются один раз (дальше — ручное
- * управление, initedRef не даёт повторно свернуть уже раскрытое пользователем).
+ * Фото позиции. Размер коробки фиксирован ДО загрузки: иначе строка
+ * прыгает, пока едут картинки, и попасть в нужную невозможно.
  */
-function useCollapsed(allIds) {
-  const [collapsed, setCollapsed] = useState(() => new Set())
-  const inited = useRef(false)
-
-  useEffect(() => {
-    if (inited.current || allIds.length === 0) return
-    inited.current = true
-    setCollapsed(new Set(allIds))
-  }, [allIds])
-
-  const isCollapsed = (id) => collapsed.has(id)
-  const toggle = (id) => setCollapsed((prev) => {
-    const next = new Set(prev)
-    next.has(id) ? next.delete(id) : next.add(id)
-    return next
-  })
-  const collapseAll = (ids) => setCollapsed(new Set(ids))
-  const expandAll = () => setCollapsed(new Set())
-  return { isCollapsed, toggle, collapseAll, expandAll, anyCollapsed: collapsed.size > 0 }
-}
-
-/** Кликабельная шапка секции с шевроном сворачивания. */
-function CollapsibleHead({ collapsed, onToggle, title, subtitle, action }) {
+function Thumb({ item }) {
+  if (!item.image_url) {
+    return (
+      <span className="cat-thumb is-empty" aria-hidden>
+        <ImageOff />
+      </span>
+    )
+  }
   return (
-    <div className="panel-heading collapsible">
-      <button className="collapse-toggle" onClick={onToggle} aria-expanded={!collapsed}>
-        {collapsed ? <ChevronRight /> : <ChevronDown />}
-        <span><strong>{title}</strong>{subtitle && <small>{subtitle}</small>}</span>
-      </button>
-      {action}
-    </div>
+    <span className="cat-thumb">
+      <img src={item.image_url} alt="" loading="lazy" decoding="async" />
+    </span>
   )
 }
 
-/**
- * Строка позиции. Чекбокс появляется только в режиме выбора: обычная
- * работа — открыть карточку, а не отмечать галочки.
- *
- * Стрелки порядка — вместо перетаскивания: пальцем и с клавиатуры оно
- * одинаково недоступно, а поменять местами два блюда владельцу нужно.
- */
-function ItemRow({ item, index, total, selecting, selected, onToggleSelect, onOpen, onMove }) {
+/** Состояние позиции словом: цвет только усиливает текст, но не заменяет */
+function ItemStatus({ item }) {
   const gaps = itemGaps(item)
-  const label = `${item.name}, ${money(item.price)}${item.is_available ? '' : ', hidden'}`
+  if (gaps.length === 0) return <span className="cat-state is-ok">Complete</span>
   return (
-    <div className={`menu-row-wrap${selected ? ' is-selected' : ''}`}>
-      {selecting && (
-        <label className="menu-select">
-          <input type="checkbox" checked={selected} onChange={onToggleSelect} />
-          <span className="visually-hidden">Select {item.name}</span>
-        </label>
-      )}
-      <button
-        className={`menu-row as-button ${item.is_available ? '' : 'is-off'}`}
-        aria-label={`Edit ${label}`}
-        onClick={onOpen}
-      >
-        <span className="menu-name">
-          {item.name}
-          {/* Артикул виден прямо в строке: иначе поиск по нему нечем
-              проверить и незачем использовать. */}
-          {item.sku && <small className="menu-sku"> · {item.sku}</small>}
-          {!item.is_available && <small> · hidden</small>}
-          {/* Пробел подписан словом, а не только цветом */}
-          {gaps.length > 0 && (
-            <small className="menu-gap"> · {gaps.map((g) => GAP_LABELS[g]).join(', ')}</small>
-          )}
-        </span>
-        <span className="menu-price">{money(item.price)}</span>
-      </button>
-      <div className="menu-order">
-        <button
-          type="button"
-          className="icon-button"
-          disabled={index === 0}
-          aria-label={`Move ${item.name} up`}
-          onClick={() => onMove('up')}
-        >
-          <ArrowUp />
-        </button>
-        <button
-          type="button"
-          className="icon-button"
-          disabled={index === total - 1}
-          aria-label={`Move ${item.name} down`}
-          onClick={() => onMove('down')}
-        >
-          <ArrowDown />
-        </button>
-      </div>
-    </div>
+    <span className="cat-state is-attention">
+      Needs attention
+      <small>{gaps.map((g) => GAP_LABELS[g]).join(', ')}</small>
+    </span>
   )
 }
 
-/**
- * Строка компактного списка: то, по чему работают, а не любуются —
- * название, артикул, категория, пробелы и цена в одной строке.
- *
- * Стрелок порядка здесь нет намеренно: порядок существует ВНУТРИ
- * категории, и менять его имеет смысл там, где категории видны, — в
- * режиме «By category».
- */
-function CatalogRow({ item, categoryName, selecting, selected, onToggleSelect, onOpen }) {
-  const gaps = itemGaps(item)
-  const label = `${item.name}, ${money(item.price)}${item.is_available ? '' : ', hidden'}`
-  return (
-    <div className={`menu-row-wrap catalog-row${selected ? ' is-selected' : ''}`}>
-      {selecting && (
-        <label className="menu-select">
-          <input type="checkbox" checked={selected} onChange={onToggleSelect} />
-          <span className="visually-hidden">Select {item.name}</span>
-        </label>
-      )}
-      <button
-        className={`menu-row as-button ${item.is_available ? '' : 'is-off'}`}
-        aria-label={`Edit ${label}`}
-        onClick={onOpen}
-      >
-        <span className="menu-name">
-          {item.name}
-          {item.sku && <small className="menu-sku"> · {item.sku}</small>}
-          {!item.is_available && <small> · hidden</small>}
-          {gaps.length > 0 && (
-            <small className="menu-gap"> · {gaps.map((g) => GAP_LABELS[g]).join(', ')}</small>
-          )}
-        </span>
-        <span className="catalog-row-cat">{categoryName || 'Uncategorised'}</span>
-        <span className="menu-price">{money(item.price)}</span>
-      </button>
-    </div>
-  )
+/** Продаётся или скрыта. Скрытая — нейтрально-серая, это не ошибка. */
+function Availability({ item }) {
+  return item.is_available
+    ? <span className="cat-avail is-on">On sale</span>
+    : <span className="cat-avail is-off">Hidden</span>
 }
 
 /**
@@ -192,8 +147,14 @@ function BulkReview({ rows, action, busy, error, onCancel, onApply }) {
     price: 'Change prices',
   }
   return (
-    <div className="sheet-backdrop" onClick={onCancel} role="presentation">
-      <div className="sheet" onClick={(e) => e.stopPropagation()} role="dialog" aria-modal="true" aria-labelledby="bulk-title">
+    <div className="sheet-backdrop" onClick={busy ? undefined : onCancel} role="presentation">
+      <div
+        className="sheet"
+        onClick={(e) => e.stopPropagation()}
+        role="dialog"
+        aria-modal="true"
+        aria-labelledby="bulk-title"
+      >
         <h3 id="bulk-title">{titles[action]}</h3>
         <p className="sheet-sub">
           {changing} of {rows.length} selected items change. The rest already look like this.
@@ -210,55 +171,103 @@ function BulkReview({ rows, action, busy, error, onCancel, onApply }) {
         </div>
         {error && <p className="form-error" role="alert">{error}</p>}
         <div className="order-actions">
-          <button type="button" className="secondary-button" onClick={onCancel}>Cancel</button>
-          <button
-            type="button"
-            className="primary-button compact"
-            disabled={busy || changing === 0}
+          <Button onClick={onCancel} disabled={busy}>Cancel</Button>
+          <Button
+            variant="primary"
+            size="compact"
+            disabled={changing === 0}
+            busy={busy}
+            busyLabel="Applying…"
             onClick={onApply}
           >
-            {busy ? 'Applying…' : `Apply to ${changing} item${changing === 1 ? '' : 's'}`}
-          </button>
+            {`Apply to ${changing} item${changing === 1 ? '' : 's'}`}
+          </Button>
         </div>
       </div>
     </div>
   )
 }
 
-// ── Вкладка «Товары» ─────────────────────────────────────────
-export function ItemsTab({ context, locationId, data, reload, filters, onFilters }) {
-  const [editorItem, setEditorItem] = useState(null) // {} = новый, {id...} = правка
-  const [addingCat, setAddingCat] = useState(false)
-  const [catName, setCatName] = useState('')
-  // Каталог общий, но новая категория принадлежит точке: по умолчанию —
-  // та, с которой владелец работает в кабинете.
-  const [catLoc, setCatLoc] = useState(locationId || context.locations?.[0]?.id || '')
+/** Диалог новой категории: имя и точка, которой она принадлежит */
+function CategoryDialog({ context, locationId, count, onDone, onCancel }) {
+  const [name, setName] = useState('')
+  const [location, setLocation] = useState(locationId || context.locations?.[0]?.id || '')
+  const [busy, setBusy] = useState(false)
   const [error, setError] = useState('')
+  const many = (context.locations?.length ?? 0) > 1
 
-  // Поиск и фильтры живут в разделе, а не во вкладке: заглянуть в
-  // «Модификаторы» и вернуться — не повод потерять отбор, который
-  // владелец только что набрал.
-  const { query, category: catFilter, availability, state: stateFilter } = filters
-  const setQuery = (value) => onFilters({ query: value })
-  const setCatFilter = (value) => onFilters({ category: value })
-  const setAvailability = (value) => onFilters({ availability: value })
-  const setStateFilter = (value) => onFilters({ state: value })
-  // Массовая правка
+  async function submit() {
+    if (!name.trim()) { setError('Give the category a name.'); return }
+    if (!location) { setError('Choose the location this category belongs to.'); return }
+    setBusy(true)
+    setError('')
+    try {
+      await createCategory(context, location, name.trim(), count)
+      await onDone()
+    } catch (e) {
+      setError(bulkErrorText(e.message))
+      setBusy(false)
+    }
+  }
+
+  return (
+    <FormDialog
+      title="Add category"
+      description={many
+        ? 'Categories belong to one location — items follow their category.'
+        : undefined}
+      submitLabel="Add category"
+      busy={busy}
+      error={error}
+      onSubmit={submit}
+      onCancel={onCancel}
+    >
+      <label className="qr-field">
+        <span>Category name</span>
+        <input
+          value={name}
+          maxLength={64}
+          placeholder="Hot drinks"
+          onChange={(e) => setName(e.target.value)}
+        />
+      </label>
+      {many && (
+        <label className="qr-field">
+          <span>Location</span>
+          <select value={location} onChange={(e) => setLocation(e.target.value)}>
+            {context.locations.map((l) => (
+              <option key={l.id} value={l.id}>{l.name}</option>
+            ))}
+          </select>
+        </label>
+      )}
+    </FormDialog>
+  )
+}
+
+// ── Вкладка «Товары» ─────────────────────────────────────────
+export function ItemsTab({
+  context, locationId, data, reload, filters, onFilters, query, creating, onCreating,
+}) {
+  const [openItem, setOpenItem] = useState(null) // выбранная позиция
+  const [editing, setEditing] = useState(false)
+  const [error, setError] = useState('')
   const [selecting, setSelecting] = useState(false)
   const [selected, setSelected] = useState(new Set())
   const [pending, setPending] = useState(null) // { action, params, rows }
   const [busy, setBusy] = useState(false)
-  /*
-   * Каталог по умолчанию — рабочая поверхность, а не витрина: плоский
-   * список, где видно цену, категорию и пробелы позиции. Разбивка по
-   * категориям остаётся вторым режимом: в ней живёт порядок внутри
-   * категории, ради которого она и нужна.
-   */
-  const [mode, setMode] = useState('list')
-  // Последняя массовая правка — чтобы её можно было отменить
   const [lastChange, setLastChange] = useState(null)
   const [undoing, setUndoing] = useState(false)
+  const [moving, setMoving] = useState(false)
+  /*
+   * Каталог по умолчанию — рабочая таблица. Разбивка по категориям
+   * остаётся вторым режимом: в ней живёт порядок внутри категории,
+   * ради которого она и нужна.
+   */
+  const [mode, setMode] = useState('list')
+  const narrow = useNarrow()
 
+  const { category: catFilter, availability, state: stateFilter, sort } = filters
   const filtersOn = query.trim() !== '' || catFilter !== 'all'
     || availability !== 'all' || stateFilter !== 'all'
 
@@ -266,12 +275,35 @@ export function ItemsTab({ context, locationId, data, reload, filters, onFilters
     () => data.items.map((i) => ({ ...i, variantCount: (i.item_variants ?? []).length })),
     [data.items]
   )
-  const visible = useMemo(
+  const matched = useMemo(
     () => filterItems(withVariants, data.categories, {
       query, categoryId: catFilter, availability, state: stateFilter,
     }),
     [withVariants, data.categories, query, catFilter, availability, stateFilter]
   )
+  const visible = useMemo(() => sortItems(matched, sort), [matched, sort])
+  const catNames = useMemo(
+    () => new Map(data.categories.map((c) => [c.id, c.name])),
+    [data.categories]
+  )
+  const stationNames = useMemo(
+    () => new Map(data.stations.map((s) => [s.id, s.name])),
+    [data.stations]
+  )
+  const attentionCount = useMemo(
+    () => withVariants.filter((i) => itemGaps(i).length > 0).length,
+    [withVariants]
+  )
+  // Порядок существует внутри категории: в смешанном списке стрелка
+  // переставила бы позицию относительно чужих блюд.
+  const reorderable = canReorder({ categoryId: catFilter, sort })
+
+  // Выбранная позиция обязана пережить перезагрузку каталога после
+  // сохранения: панель показывает свежие данные, а не снимок до правки.
+  const current = openItem ? data.items.find((i) => i.id === openItem) ?? null : null
+  useEffect(() => {
+    if (openItem && !current && !editing) setOpenItem(null)
+  }, [openItem, current, editing])
 
   function toggleSelected(id) {
     setSelected((prev) => {
@@ -341,17 +373,56 @@ export function ItemsTab({ context, locationId, data, reload, filters, onFilters
   }
 
   /**
+   * Полный порядок каждой категории — БЕЗ поиска и фильтров.
+   *
+   * Считать его по видимому списку нельзя: `reorder_menu` расставляет
+   * присланным id номера 0..n−1, и отправка отфильтрованной части
+   * присвоила бы эти же номера позициям, которых на экране нет. Порядок
+   * категории после такого «перемещения на шаг» рассыпается.
+   */
+  const fullOrders = useMemo(() => {
+    const map = new Map()
+    for (const item of sortItems(withVariants, 'manual')) {
+      const key = catNames.has(item.category_id) ? item.category_id : '__orphans__'
+      const list = map.get(key) ?? []
+      list.push(item.id)
+      map.set(key, list)
+    }
+    return map
+  }, [withVariants, catNames])
+
+  /** Где позиция стоит в порядке СВОЕЙ категории и сколько их всего */
+  const orderOf = useCallback((item) => {
+    const key = catNames.has(item.category_id) ? item.category_id : '__orphans__'
+    const ids = fullOrders.get(key) ?? []
+    return { ids, index: ids.indexOf(item.id), total: ids.length }
+  }, [fullOrders, catNames])
+
+  /**
    * Порядок внутри категории. Сервер принимает полный список id, поэтому
    * отправляем порядок всей категории, а не «поменять два местами».
    */
-  async function moveItem(list, id, direction) {
-    const ids = moveInOrder(list.map((i) => i.id), id, direction)
+  async function moveItem(item, direction) {
+    const { ids } = orderOf(item)
+    const next = moveInOrder(ids, item.id, direction)
+    setMoving(true)
+    setError('')
     try {
-      await reorderItems(ids)
+      await reorderItems(next)
       await reload()
     } catch (e) {
-      setError(e.message)
+      setError(bulkErrorText(e.message))
+    } finally {
+      setMoving(false)
     }
+  }
+
+  async function hideOne(item, available) {
+    setError('')
+    try {
+      await bulkUpdateItems([item.id], 'availability', { available })
+      await reload()
+    } catch (e) { setError(bulkErrorText(e.message)) }
   }
 
   const byCat = useMemo(() => {
@@ -366,115 +437,68 @@ export function ItemsTab({ context, locationId, data, reload, filters, onFilters
     return { list, orphans }
   }, [data.categories, visible, filtersOn])
 
-  async function addCategory() {
-    if (!catName.trim()) return
-    setError('')
-    try {
-      await createCategory(context, catLoc, catName.trim(), data.categories.length)
-      setCatName(''); setAddingCat(false); reload()
-    } catch (e) { setError(e.message) }
+  async function removeCategory(id, name) {
+    if (!confirm(`Delete category “${name}”? Items keep existing but lose their category.`)) return
+    try { await deleteCategory(id); await reload() } catch (e) { setError(bulkErrorText(e.message)) }
   }
 
-  async function removeCategory(id) {
-    if (!confirm('Delete this category? Items keep existing but lose their category.')) return
-    try { await deleteCategory(id); reload() } catch (e) { setError(e.message) }
+  const rowMenu = (item) => [
+    { key: 'edit', label: 'Edit item' },
+    item.is_available
+      ? { key: 'hide', label: 'Hide from sale' }
+      : { key: 'show', label: 'Put on sale' },
+  ]
+  function onRowAction(item, key) {
+    if (key === 'edit') { setOpenItem(item.id); setEditing(true) }
+    if (key === 'hide') hideOne(item, false)
+    if (key === 'show') hideOne(item, true)
   }
 
-  const allCatIds = useMemo(
-    () => byCat.list.map((c) => c.id).concat(byCat.orphans.length ? ['__orphans__'] : []),
-    [byCat]
-  )
-  const {
-    isCollapsed: isCollapsedByUser, toggle, collapseAll, expandAll, anyCollapsed,
-  } = useCollapsed(allCatIds)
-  // При активном поиске/фильтре категории раскрыты принудительно: иначе
-  // найденное лежит внутри свёрнутой категории, и поиск выглядит как
-  // «ничего не нашлось».
-  const isCollapsed = (id) => !filtersOn && isCollapsedByUser(id)
+  const allShownSelected = visible.length > 0 && visible.every((i) => selected.has(i.id))
 
   return (
     <>
-      {/* Поиск и фильтры выше кнопок создания: чаще ищут существующее,
-          чем заводят новое. Скрыть позицию на телефоне — путь в три
-          касания: найти, выбрать, «Hide». */}
-      <div className="catalog-filters">
-        <label className="order-search">
-          <Search aria-hidden />
-          <span className="visually-hidden">Search the catalogue</span>
-          <input
-            type="search"
-            value={query}
-            placeholder="Name, SKU, description or category"
-            onChange={(e) => setQuery(e.target.value)}
-          />
-        </label>
-        <label className="order-filter">
+      <div className="cat-toolbar">
+        <label className="cat-select-filter">
           <span className="visually-hidden">Category</span>
-          <select value={catFilter} onChange={(e) => setCatFilter(e.target.value)}>
-            <option value="all">Any category</option>
+          <select value={catFilter} onChange={(e) => onFilters({ category: e.target.value })}>
+            <option value="all">All categories</option>
             {data.categories.map((c) => <option key={c.id} value={c.id}>{c.name}</option>)}
           </select>
         </label>
-        <label className="order-filter">
+        <label className="cat-select-filter">
           <span className="visually-hidden">Availability</span>
-          <select value={availability} onChange={(e) => setAvailability(e.target.value)}>
-            <option value="all">On sale and hidden</option>
+          <select value={availability} onChange={(e) => onFilters({ availability: e.target.value })}>
+            <option value="all">All statuses</option>
             <option value="available">On sale</option>
             <option value="hidden">Hidden</option>
           </select>
         </label>
-        <label className="order-filter">
-          <span className="visually-hidden">Completeness</span>
-          <select value={stateFilter} onChange={(e) => setStateFilter(e.target.value)}>
-            <option value="all">Complete and not</option>
-            <option value="incomplete">Needs attention</option>
-          </select>
-        </label>
-        {filtersOn && (
-          <button
-            type="button"
-            className="text-button"
-            onClick={() => onFilters(EMPTY_FILTERS)}
-          >
-            <X /> Clear
-          </button>
-        )}
-        <span className="catalog-count">{visible.length} of {data.items.length}</span>
-      </div>
-
-      <div className="menu-toolbar">
-        <button className="primary-button narrow" onClick={() => setEditorItem({})}>
-          <Plus /> New item
-        </button>
+        {/* Счётчик считается по каталогу, а не берётся из макета */}
         <button
           type="button"
-          className={selecting ? 'primary-button narrow' : 'secondary-button'}
+          className={`cat-chip${stateFilter === 'incomplete' ? ' is-on' : ''}`}
+          aria-pressed={stateFilter === 'incomplete'}
+          onClick={() => onFilters({
+            state: stateFilter === 'incomplete' ? 'all' : 'incomplete',
+          })}
+        >
+          Needs attention <span>{attentionCount}</span>
+        </button>
+        <label className="cat-select-filter">
+          <span className="visually-hidden">Sort</span>
+          <select value={sort} onChange={(e) => onFilters({ sort: e.target.value })}>
+            {SORT_MODES.map((s) => <option key={s.key} value={s.key}>{s.label}</option>)}
+          </select>
+        </label>
+        <Button
+          className={selecting ? 'is-on' : undefined}
           aria-pressed={selecting}
           onClick={() => { setSelecting((v) => !v); setSelected(new Set()) }}
         >
-          <CheckSquare /> {selecting ? 'Done selecting' : 'Select'}
-        </button>
-        {!addingCat ? (
-          <button className="secondary-button" onClick={() => setAddingCat(true)}>
-            <Plus /> New category
-          </button>
-        ) : (
-          <div className="inline-add">
-            <input placeholder="Category name" value={catName} onChange={(e) => setCatName(e.target.value)} autoFocus />
-            {context.locations?.length > 1 && (
-              <select
-                value={catLoc}
-                aria-label="Location for the new category"
-                onChange={(e) => setCatLoc(e.target.value)}
-              >
-                {context.locations.map((l) => <option key={l.id} value={l.id}>{l.name}</option>)}
-              </select>
-            )}
-            <button className="icon-button" onClick={addCategory} aria-label="Add"><Plus /></button>
-            <button className="icon-button" onClick={() => { setAddingCat(false); setCatName('') }} aria-label="Cancel"><X /></button>
-          </div>
-        )}
-        <div className="menu-mode">
+          <CheckSquare /> {selecting ? 'Done' : 'Select'}
+        </Button>
+        <div className="cat-mode">
           <Tabs
             className="period-switch"
             label="Catalogue view"
@@ -483,28 +507,29 @@ export function ItemsTab({ context, locationId, data, reload, filters, onFilters
             onChange={setMode}
           />
         </div>
-        {mode === 'groups' && byCat.list.length > 0 && (
-          <button className="text-button collapse-all" onClick={() => anyCollapsed ? expandAll() : collapseAll(allCatIds)}>
-            {anyCollapsed ? 'Expand all' : 'Collapse all'}
+        {filtersOn && (
+          <button type="button" className="text-button" onClick={() => onFilters(EMPTY_FILTERS)}>
+            <X /> Clear
           </button>
         )}
+        <span className="cat-count">{visible.length} of {data.items.length}</span>
       </div>
 
       {selecting && (
-        <div className="bulk-bar" role="group" aria-label="Bulk actions">
-          <span className="bulk-count">{selected.size} selected</span>
-          <button
-            type="button"
-            className="secondary-button"
-            onClick={() => setSelected(new Set(visible.map((i) => i.id)))}
+        <div className="cat-bulk" role="group" aria-label="Bulk actions">
+          <span className="cat-bulk-count">{selected.size} selected</span>
+          <Button
+            onClick={() => setSelected(allShownSelected ? new Set() : new Set(visible.map((i) => i.id)))}
           >
-            Select all shown
-          </button>
-          <button type="button" className="secondary-button" disabled={selected.size === 0}
-            onClick={() => askBulk('availability', { available: false })}>Hide</button>
-          <button type="button" className="secondary-button" disabled={selected.size === 0}
-            onClick={() => askBulk('availability', { available: true })}>Put on sale</button>
-          <label className="order-filter">
+            {allShownSelected ? 'Clear selection' : 'Select all shown'}
+          </Button>
+          <Button disabled={selected.size === 0} onClick={() => askBulk('availability', { available: false })}>
+            Hide
+          </Button>
+          <Button disabled={selected.size === 0} onClick={() => askBulk('availability', { available: true })}>
+            Put on sale
+          </Button>
+          <label className="cat-select-filter">
             <span className="visually-hidden">Move to category</span>
             <select
               value=""
@@ -515,7 +540,7 @@ export function ItemsTab({ context, locationId, data, reload, filters, onFilters
               {data.categories.map((c) => <option key={c.id} value={c.id}>{c.name}</option>)}
             </select>
           </label>
-          <label className="order-filter">
+          <label className="cat-select-filter">
             <span className="visually-hidden">Change prices</span>
             <select
               value=""
@@ -537,7 +562,7 @@ export function ItemsTab({ context, locationId, data, reload, filters, onFilters
       {/* Что именно произошло и можно ли это вернуть. Цена не
           отменяется: сервер применяет правило, округление необратимо. */}
       {lastChange && (
-        <div className="bulk-result" role="status">
+        <div className="cat-result" role="status">
           <span>{lastChange.summary}</span>
           {lastChange.plan?.length > 0 ? (
             <Button size="compact" onClick={undoLast} busy={undoing} busyLabel="Undoing…">
@@ -554,105 +579,95 @@ export function ItemsTab({ context, locationId, data, reload, filters, onFilters
         </div>
       )}
 
-      {visible.length === 0 && (
-        <section className="panel form-panel">
+      {visible.length === 0 ? (
+        <section className="panel cat-panel">
           <p className="empty-state">
-            {filtersOn ? 'Nothing matches these filters.' : 'The catalogue is empty — add the first item.'}
+            {filtersOn
+              ? 'No item matches these filters.'
+              : 'The catalogue is empty — add the first item.'}
           </p>
         </section>
-      )}
-
-      {mode === 'list' && visible.length > 0 && (
-        <section className="panel">
-          <div className="menu-list">
-            {visible.map((it) => (
-              <CatalogRow
-                key={it.id}
-                item={it}
-                categoryName={data.categories.find((c) => c.id === it.category_id)?.name}
-                selecting={selecting}
-                selected={selected.has(it.id)}
-                onToggleSelect={() => toggleSelected(it.id)}
-                onOpen={() => setEditorItem(it)}
-              />
-            ))}
-          </div>
+      ) : mode === 'list' ? (
+        <section className="panel cat-panel">
+          {narrow ? (
+            <ItemCards
+              items={visible}
+              catNames={catNames}
+              selecting={selecting}
+              selected={selected}
+              onToggle={toggleSelected}
+              openId={openItem}
+              onOpen={setOpenItem}
+              onAction={onRowAction}
+              menuFor={rowMenu}
+            />
+          ) : (
+            <ItemsTable
+              items={visible}
+              catNames={catNames}
+              stationNames={stationNames}
+              selecting={selecting}
+              selected={selected}
+              onToggle={toggleSelected}
+              onToggleAll={() => setSelected(
+                allShownSelected ? new Set() : new Set(visible.map((i) => i.id))
+              )}
+              allSelected={allShownSelected}
+              openId={openItem}
+              onOpen={setOpenItem}
+              onAction={onRowAction}
+              menuFor={rowMenu}
+              reorderable={reorderable}
+              moving={moving}
+              onMove={moveItem}
+              orderOf={orderOf}
+            />
+          )}
         </section>
+      ) : (
+        <div className="cat-groups">
+          {byCat.list.map((cat) => (
+            <CategorySection
+              key={cat.id}
+              title={cat.name}
+              items={cat.items}
+              catNames={catNames}
+              stationNames={stationNames}
+              narrow={narrow}
+              selecting={selecting}
+              selected={selected}
+              onToggle={toggleSelected}
+              openId={openItem}
+              onOpen={setOpenItem}
+              onAction={onRowAction}
+              menuFor={rowMenu}
+              moving={moving}
+              onMove={moveItem}
+              orderOf={orderOf}
+              onDelete={() => removeCategory(cat.id, cat.name)}
+            />
+          ))}
+          {byCat.orphans.length > 0 && (
+            <CategorySection
+              title="Uncategorised"
+              items={byCat.orphans}
+              catNames={catNames}
+              stationNames={stationNames}
+              narrow={narrow}
+              selecting={selecting}
+              selected={selected}
+              onToggle={toggleSelected}
+              openId={openItem}
+              onOpen={setOpenItem}
+              onAction={onRowAction}
+              menuFor={rowMenu}
+              moving={moving}
+              onMove={moveItem}
+              orderOf={orderOf}
+            />
+          )}
+        </div>
       )}
-
-      <div className="menu-groups">
-        {mode === 'groups' && byCat.list.map((cat) => {
-          const collapsed = isCollapsed(cat.id)
-          return (
-            <section className="panel menu-category" key={cat.id}>
-              {/* Корзина не в шапке: в свёрнутом списке она визуально шумит.
-                  Удаление — строкой внутри раскрытой категории. */}
-              <CollapsibleHead
-                collapsed={collapsed}
-                onToggle={() => toggle(cat.id)}
-                title={cat.name}
-                subtitle={`${cat.items.length} item${cat.items.length === 1 ? '' : 's'}`}
-              />
-              {!collapsed && (
-                <div className="menu-list">
-                  {cat.items.length === 0
-                    ? <p className="empty-state">No items.</p>
-                    : cat.items.map((it, index) => (
-                      <ItemRow
-                        key={it.id}
-                        item={it}
-                        index={index}
-                        total={cat.items.length}
-                        selecting={selecting}
-                        selected={selected.has(it.id)}
-                        onToggleSelect={() => toggleSelected(it.id)}
-                        onOpen={() => setEditorItem(it)}
-                        onMove={(dir) => moveItem(cat.items, it.id, dir)}
-                      />
-                    ))}
-                  <button
-                    className="menu-delete-row"
-                    aria-label={`Delete category ${cat.name}`}
-                    onClick={() => removeCategory(cat.id)}
-                  >
-                    <Trash2 /> Delete category
-                  </button>
-                </div>
-              )}
-            </section>
-          )
-        })}
-        {mode === 'groups' && byCat.orphans.length > 0 && (() => {
-          const collapsed = isCollapsed('__orphans__')
-          return (
-            <section className="panel menu-category">
-              <CollapsibleHead
-                collapsed={collapsed}
-                onToggle={() => toggle('__orphans__')}
-                title="Uncategorised"
-                subtitle={`${byCat.orphans.length} items`}
-              />
-              {!collapsed && (
-                <div className="menu-list">
-                  {byCat.orphans.map((it, index) => (
-                    <ItemRow
-                      key={it.id}
-                      item={it}
-                      index={index}
-                      total={byCat.orphans.length}
-                      selecting={selecting}
-                      selected={selected.has(it.id)}
-                      onToggleSelect={() => toggleSelected(it.id)}
-                      onOpen={() => setEditorItem(it)}
-                      onMove={(dir) => moveItem(byCat.orphans, it.id, dir)}
-                    />
-                  ))}
-                </div>
-              )}
-            </section>
-          )
-        })()}
-      </div>
 
       {pending && (
         <BulkReview
@@ -665,15 +680,41 @@ export function ItemsTab({ context, locationId, data, reload, filters, onFilters
         />
       )}
 
-      {editorItem && (
+      {creating === 'category' && (
+        <CategoryDialog
+          context={context}
+          locationId={locationId}
+          count={data.categories.length}
+          onDone={async () => { onCreating(null); await reload() }}
+          onCancel={() => onCreating(null)}
+        />
+      )}
+
+      {(creating === 'item' || current) && (
         <ItemEditor
           context={context}
-          item={editorItem}
+          item={creating === 'item' ? {} : current}
           categories={data.categories}
           stations={data.stations}
           modifierGroups={data.modifierGroups}
-          onClose={() => setEditorItem(null)}
-          onSaved={() => { setEditorItem(null); reload() }}
+          editing={creating === 'item' ? true : editing}
+          onEdit={setEditing}
+          onClose={() => {
+            if (creating === 'item') onCreating(null)
+            setOpenItem(null)
+            setEditing(false)
+          }}
+          onSaved={async () => {
+            if (creating === 'item') onCreating(null)
+            setEditing(false)
+            await reload()
+          }}
+          onDeleted={async () => {
+            if (creating === 'item') onCreating(null)
+            setOpenItem(null)
+            setEditing(false)
+            await reload()
+          }}
           api={{ saveItem, deleteItem, uploadItemImage }}
         />
       )}
@@ -681,191 +722,306 @@ export function ItemsTab({ context, locationId, data, reload, filters, onFilters
   )
 }
 
-// ── Вкладка «Модификаторы» ───────────────────────────────────
-export function ModifiersTab({ context, data, reload }) {
-  const [error, setError] = useState('')
-  const [newGroup, setNewGroup] = useState('')
-
-  async function addGroup() {
-    if (!newGroup.trim()) return
-    try {
-      await createModifierGroup(context, newGroup.trim(), 0, 1, data.modifierGroups.length)
-      setNewGroup(''); reload()
-    } catch (e) { setError(e.message) }
-  }
-
-  /**
-   * Добавление модификатора — строкой прямо в группе, как категории и
-   * станции. Раньше это были два подряд `window.prompt`: они не
-   * поддерживаются в части браузеров (и внутри встроенного кадра), а
-   * там, где поддерживаются, спрашивают цену без валюты и без права
-   * передумать на втором шаге.
-   */
-  async function addModifier(groupId, count, name, priceStr) {
-    if (!name.trim()) return
-    const delta = shekelsToAgorot(priceStr || '0')
-    if (delta === null) { setError('Extra price must be a number, for example 3 or 3.50'); return }
-    try {
-      await createModifier(context, groupId, name.trim(), delta, false, count)
-      setAdding(null)
-      reload()
-    } catch (e) { setError(e.message) }
-  }
-
-  // Открытая строка добавления: { groupId, name, price }
-  const [adding, setAdding] = useState(null)
-
-  const groupIds = useMemo(() => data.modifierGroups.map((g) => g.id), [data.modifierGroups])
-  const { isCollapsed, toggle, collapseAll, expandAll, anyCollapsed } = useCollapsed(groupIds)
-
+/**
+ * Таблица каталога.
+ *
+ * Настоящая `<table>`, а не строки-кнопки: строка с `role="button"`
+ * ломается, как только внутрь попадает чекбокс, стрелки порядка и меню
+ * действий — клавиатура начинает открывать карточку вместо нажатия на
+ * то, на чём стоит фокус. Карточку открывает отдельная кнопка на имени.
+ */
+function ItemsTable({
+  items, catNames, stationNames, selecting, selected, onToggle, onToggleAll, allSelected,
+  openId, onOpen, onAction, menuFor, reorderable, moving, onMove, orderOf,
+}) {
   return (
-    <>
-      <div className="menu-toolbar">
-        <div className="inline-add">
-          <input placeholder="Group name (e.g. Milk, Syrup)" value={newGroup} onChange={(e) => setNewGroup(e.target.value)} />
-          <button className="icon-button" onClick={addGroup} aria-label="Add group"><Plus /></button>
-        </div>
-        {data.modifierGroups.length > 0 && (
-          <button className="text-button collapse-all" onClick={() => anyCollapsed ? expandAll() : collapseAll(data.modifierGroups.map((g) => g.id))}>
-            {anyCollapsed ? 'Expand all' : 'Collapse all'}
-          </button>
-        )}
-      </div>
-
-      {error && <p className="form-error" role="alert">{error}</p>}
-
-      <div className="menu-groups">
-        {data.modifierGroups.length === 0 && (
-          <section className="panel form-panel">
-            <p className="empty-state">
-              No modifier groups yet — add the first one above.
-            </p>
-          </section>
-        )}
-        {data.modifierGroups.map((g) => {
-          const collapsed = isCollapsed(g.id)
-          return (
-            <section className="panel menu-category" key={g.id}>
-              <CollapsibleHead
-                collapsed={collapsed}
-                onToggle={() => toggle(g.id)}
-                title={g.name}
-                subtitle={`Choose ${g.min_select}–${g.max_select} · ${(g.modifiers || []).length}`}
-              />
-              {!collapsed && (
-                <div className="menu-list">
-                  {(g.modifiers || []).map((m) => (
-                    <div className="menu-row" key={m.id}>
-                      <span className="menu-name">{m.name}</span>
-                      <span className="menu-price">{m.price_delta ? `+${money(m.price_delta)}` : '—'}</span>
-                      <button className="icon-button" onClick={async () => {
-                        try { await deleteModifier(m.id); reload() } catch (e) { setError(e.message) }
-                      }} aria-label="Delete"><Trash2 /></button>
-                    </div>
-                  ))}
-                  {adding?.groupId === g.id ? (
-                    <form
-                      className="inline-add modifier-add"
-                      onSubmit={(e) => {
-                        e.preventDefault()
-                        addModifier(g.id, (g.modifiers || []).length, adding.name, adding.price)
-                      }}
-                    >
-                      <input
-                        autoFocus
-                        placeholder="Modifier name"
-                        aria-label={`Modifier name in ${g.name}`}
-                        value={adding.name}
-                        onChange={(e) => setAdding((a) => ({ ...a, name: e.target.value }))}
-                      />
-                      <input
-                        inputMode="decimal"
-                        placeholder="Extra ₪"
-                        aria-label="Extra price in shekels"
-                        value={adding.price}
-                        onChange={(e) => setAdding((a) => ({ ...a, price: e.target.value }))}
-                      />
-                      <IconButton type="submit" label="Add modifier"><Plus /></IconButton>
-                      <IconButton label="Cancel" onClick={() => setAdding(null)}><X /></IconButton>
-                    </form>
-                  ) : (
-                    <button
-                      className="menu-add-row"
-                      onClick={() => setAdding({ groupId: g.id, name: '', price: '0' })}
-                    >
-                      <Plus /> Add modifier
-                    </button>
-                  )}
-                  <button className="menu-delete-row" onClick={async () => {
-                    if (!confirm(`Delete group "${g.name}" and its modifiers?`)) return
-                    try { await deleteModifierGroup(g.id); reload() } catch (e) { setError(e.message) }
-                  }}>
-                    <Trash2 /> Delete group
+    <div className="cat-table-scroll">
+      <table className="cat-table">
+        <thead>
+          <tr>
+            {selecting && (
+              <th scope="col" className="cat-col-check">
+                <input
+                  type="checkbox"
+                  checked={allSelected}
+                  aria-label="Select all shown items"
+                  onChange={onToggleAll}
+                />
+              </th>
+            )}
+            {reorderable && <th scope="col" className="cat-col-order">Order</th>}
+            <th scope="col" className="cat-col-thumb"><span className="visually-hidden">Photo</span></th>
+            <th scope="col">Item</th>
+            <th scope="col">Category</th>
+            <th scope="col" className={SECONDARY}>SKU</th>
+            <th scope="col" className="cat-col-price">Price</th>
+            <th scope="col">Availability</th>
+            <th scope="col" className={SECONDARY}>Station</th>
+            <th scope="col">Status</th>
+            <th scope="col" className="cat-col-actions">Actions</th>
+          </tr>
+        </thead>
+        <tbody>
+          {items.map((item) => {
+            const sizes = sizesLabel(item)
+            const order = reorderable ? orderOf(item) : null
+            return (
+              <tr key={item.id} className={`cat-row${item.id === openId ? ' is-selected' : ''}`}>
+                {selecting && (
+                  <td className="cat-col-check">
+                    <input
+                      type="checkbox"
+                      checked={selected.has(item.id)}
+                      aria-label={`Select ${item.name}`}
+                      onChange={() => onToggle(item.id)}
+                    />
+                  </td>
+                )}
+                {reorderable && (
+                  <td className="cat-col-order">
+                    <OrderButtons
+                      label={item.name}
+                      index={order.index}
+                      total={order.total}
+                      disabled={moving}
+                      onMove={(dir) => onMove(item, dir)}
+                    />
+                  </td>
+                )}
+                <td className="cat-col-thumb"><Thumb item={item} /></td>
+                <td>
+                  <button
+                    type="button"
+                    className="cat-open"
+                    aria-expanded={item.id === openId}
+                    onClick={() => onOpen(item.id)}
+                  >
+                    {item.name}
                   </button>
-                </div>
-              )}
-            </section>
-          )
-        })}
-      </div>
-    </>
+                </td>
+                <td className="cat-cell-muted">{catNames.get(item.category_id) ?? 'Uncategorised'}</td>
+                <td className={`${SECONDARY} cat-cell-sku`}>{item.sku || '—'}</td>
+                <td className="cat-col-price">
+                  {priceLabel(item, money)}
+                  {sizes && <small>{sizes}</small>}
+                </td>
+                <td><Availability item={item} /></td>
+                <td className={`${SECONDARY} cat-cell-muted`}>
+                  {stationNames.get(item.station_id) ?? '—'}
+                </td>
+                <td><ItemStatus item={item} /></td>
+                <td className="cat-col-actions">
+                  <RowMenu
+                    label={`Actions for ${item.name}`}
+                    items={menuFor(item)}
+                    onPick={(key) => onAction(item, key)}
+                  />
+                </td>
+              </tr>
+            )
+          })}
+        </tbody>
+      </table>
+    </div>
   )
 }
 
-// ── Вкладка «Станции» ────────────────────────────────────────
-export function StationsTab({ context, data, reload }) {
-  const [error, setError] = useState('')
-  const [newName, setNewName] = useState('')
-
-  async function add() {
-    if (!newName.trim()) return
-    try { await createStation(context, context.locations?.[0]?.id, newName.trim(), data.stations.length); setNewName(''); reload() }
-    catch (e) { setError(e.message) }
-  }
-
+/**
+ * Каталог на телефоне. Десять колонок, ужатых до 375 px, — это не
+ * таблица, а сетка, которую нельзя прочесть; здесь список отвечает на
+ * то, ради чего в каталог заходят с телефона: что это, сколько стоит,
+ * продаётся ли и чего не хватает.
+ */
+function ItemCards({
+  items, catNames, selecting, selected, onToggle, openId, onOpen, onAction, menuFor,
+}) {
   return (
-    <>
-      <div className="menu-toolbar">
-        <div className="inline-add">
-          <input placeholder="Station name (e.g. Kitchen, Bar)" value={newName} onChange={(e) => setNewName(e.target.value)} />
-          <button className="icon-button" onClick={add} aria-label="Add"><Plus /></button>
-        </div>
-      </div>
-      {error && <p className="form-error" role="alert">{error}</p>}
-      <section className="panel">
-        <div className="menu-list">
-          {data.stations.length === 0 && <p className="empty-state">No stations yet.</p>}
-          {data.stations.map((s) => (
-            <div className="menu-row" key={s.id}>
-              <span className="menu-name">{s.name}</span>
-              <button className="icon-button" onClick={async () => {
-                if (!confirm(`Delete station "${s.name}"?`)) return
-                try { await deleteStation(s.id); reload() } catch (e) { setError(e.message) }
-              }} aria-label="Delete"><Trash2 /></button>
-            </div>
-          ))}
-        </div>
-      </section>
-    </>
+    <ul className="cat-cards">
+      {items.map((item) => {
+        const sizes = sizesLabel(item)
+        return (
+          <li key={item.id} className={item.id === openId ? 'is-selected' : undefined}>
+            {selecting && (
+              <label className="cat-card-check">
+                <input
+                  type="checkbox"
+                  checked={selected.has(item.id)}
+                  onChange={() => onToggle(item.id)}
+                />
+                <span className="visually-hidden">Select {item.name}</span>
+              </label>
+            )}
+            <Thumb item={item} />
+            <button
+              type="button"
+              className="cat-card-open"
+              aria-expanded={item.id === openId}
+              onClick={() => onOpen(item.id)}
+            >
+              <span className="cat-card-name">{item.name}</span>
+              <span className="cat-card-meta">
+                {catNames.get(item.category_id) ?? 'Uncategorised'}
+                {item.sku && ` · ${item.sku}`}
+              </span>
+              <span className="cat-card-price">
+                {priceLabel(item, money)}{sizes && <small> · {sizes}</small>}
+              </span>
+            </button>
+            <span className="cat-card-side">
+              <Availability item={item} />
+              <ItemStatus item={item} />
+              <RowMenu
+                label={`Actions for ${item.name}`}
+                items={menuFor(item)}
+                onPick={(key) => onAction(item, key)}
+              />
+            </span>
+          </li>
+        )
+      })}
+    </ul>
   )
 }
 
-export default function MenuManager({ context, locationId, tab: tabFromUrl, onTabChange }) {
+/**
+ * Категория в режиме «By category»: здесь живёт ручной порядок — тот
+ * самый случай, когда «выше» и «ниже» действительно что-то значат.
+ */
+function CategorySection({
+  title, items, catNames, stationNames, narrow, selecting, selected, onToggle,
+  openId, onOpen, onAction, menuFor, moving, onMove, orderOf, onDelete,
+}) {
+  const [collapsed, setCollapsed] = useState(false)
+  return (
+    <section className="panel cat-panel cat-category">
+      <div className="cat-category-head">
+        <button
+          type="button"
+          className="collapse-toggle"
+          aria-expanded={!collapsed}
+          onClick={() => setCollapsed((v) => !v)}
+        >
+          {collapsed ? <ChevronRight /> : <ChevronDown />}
+          <span>
+            <strong>{title}</strong>
+            <small>{items.length} item{items.length === 1 ? '' : 's'}</small>
+          </span>
+        </button>
+        {onDelete && (
+          <RowMenu
+            label={`Actions for category ${title}`}
+            items={[{ key: 'delete', label: 'Delete category', tone: 'danger' }]}
+            onPick={onDelete}
+          />
+        )}
+      </div>
+      {!collapsed && (items.length === 0 ? (
+        <p className="empty-state">No items.</p>
+      ) : narrow ? (
+        <ItemCards
+          items={items}
+          catNames={catNames}
+          selecting={selecting}
+          selected={selected}
+          onToggle={onToggle}
+          openId={openId}
+          onOpen={onOpen}
+          onAction={onAction}
+          menuFor={menuFor}
+        />
+      ) : (
+        <ItemsTable
+          items={items}
+          catNames={catNames}
+          stationNames={stationNames}
+          selecting={selecting}
+          selected={selected}
+          onToggle={onToggle}
+          onToggleAll={() => {}}
+          allSelected={false}
+          openId={openId}
+          onOpen={onOpen}
+          onAction={onAction}
+          menuFor={menuFor}
+          reorderable
+          moving={moving}
+          onMove={onMove}
+          orderOf={orderOf}
+        />
+      ))}
+    </section>
+  )
+}
+
+export { ModifiersTab, StationsTab }
+
+/** Точка, которой принадлежат новые категории и станции */
+function LocationContext({ locations, locationId, onChange }) {
+  if (!locations || locations.length < 2) return null
+  const title = 'Location for new categories and stations'
+  return (
+    <label className="cat-location" title={title}>
+      <MapPin aria-hidden />
+      <span className="visually-hidden">{title}</span>
+      <select value={locationId ?? ''} onChange={(event) => onChange?.(event.target.value)}>
+        {locations.map((l) => <option key={l.id} value={l.id}>{l.name}</option>)}
+      </select>
+    </label>
+  )
+}
+
+/** Скелет той же геометрии, что таблица: раздел не прыгает при загрузке */
+function CatalogueSkeleton() {
+  return (
+    <section className="panel cat-panel">
+      <div role="status" aria-live="polite" className="visually-hidden">Loading catalogue…</div>
+      <div className="cat-skeleton" aria-hidden>
+        {Array.from({ length: 8 }, (_, i) => (
+          <div key={i} className="cat-skeleton-row">
+            <span style={{ width: '44px', height: '44px', borderRadius: '10px' }} />
+            <span style={{ width: '22%' }} />
+            <span style={{ width: '14%' }} />
+            <span style={{ width: '10%' }} />
+            <span style={{ width: '12%' }} />
+          </div>
+        ))}
+      </div>
+    </section>
+  )
+}
+
+export default function MenuManager({
+  context, locationId, onLocationChange, tab: tabFromUrl, onTabChange,
+  filters: urlFilters = {}, onFiltersChange,
+}) {
   // Вкладка живёт в адресе: перезагрузка и присланная ссылка открывают
   // тот же экран. Неизвестное значение — устаревшая ссылка, не ошибка.
   const tab = TABS.some((t) => t.key === tabFromUrl) ? tabFromUrl : 'items'
-  const setTab = onTabChange
   const [data, setData] = useState(null)
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState('')
-  // Отбор каталога переживает переключение вкладок: см. ItemsTab.
-  const [filters, setFilters] = useState(EMPTY_FILTERS)
-  const patchFilters = useCallback(
-    (patch) => setFilters((prev) => ({ ...prev, ...patch })),
-    []
+  /*
+   * Поиск свой у каждой вкладки: «Search items» и «Search stations» —
+   * разные вопросы, и набранное про эспрессо не должно приезжать в
+   * отбор станций.
+   */
+  const [queries, setQueries] = useState({ items: '', modifiers: '', stations: '' })
+  // Создание начинается из шапки, а диалог рисует вкладка: так шапка не
+  // знает про поля категории, а вкладка — про раскладку шапки.
+  const [creating, setCreating] = useState(null)
+
+  const filters = useMemo(() => readFilters(urlFilters), [urlFilters])
+  const patchFilters = useCallback((patch) => {
+    const next = { ...readFilters(urlFilters), ...patch }
+    onFiltersChange?.(writeFilters(next))
+  }, [urlFilters, onFiltersChange])
+
+  const setQuery = useCallback(
+    (value) => setQueries((prev) => ({ ...prev, [tab]: value })),
+    [tab]
   )
 
-  async function reload() {
+  const reload = useCallback(async () => {
     setLoading(true)
     setError('')
     try {
@@ -878,34 +1034,71 @@ export default function MenuManager({ context, locationId, tab: tabFromUrl, onTa
     } finally {
       setLoading(false)
     }
-  }
+  }, [])
 
-  useEffect(() => { reload() }, [])
+  useEffect(() => { reload() }, [reload])
+
+  const SEARCH = {
+    items: 'Search items, SKU or category',
+    modifiers: 'Search groups or modifiers',
+    stations: 'Search stations or assigned items',
+  }
 
   return (
     <>
-      {/* Menu-only клиенту нельзя говорить про кассу: у него её нет,
-          и каталог для него — то, что видит гость. */}
-      <PageHeader
-        eyebrow={context.organization?.name}
-        title="Catalogue"
-        description={hasCapability(context, 'pos_operate')
-          ? 'Everything your registers and guest pages sell. Changes apply immediately.'
-          : 'Everything your guest pages show. Changes apply immediately.'}
-      />
+      <div className="cat-header">
+        <h1>Catalogue</h1>
+        <LocationContext
+          locations={context.locations}
+          locationId={locationId}
+          onChange={onLocationChange}
+        />
+        <SearchField
+          className="order-search cat-search"
+          label={SEARCH[tab]}
+          placeholder={SEARCH[tab]}
+          value={queries[tab]}
+          onChange={setQuery}
+        />
+        {/* Действия создания меняются вместе с вкладкой: заводить
+            станцию со вкладки товаров незачем, а «Add item» и «Add
+            category» на десктопе видны ОБА и не прячутся в меню. */}
+        <div className="cat-header-actions">
+          {tab === 'items' && (
+            <>
+              <Button onClick={() => setCreating('category')}>
+                <Plus /> Add category
+              </Button>
+              <Button variant="primary" onClick={() => setCreating('item')}>
+                <Plus /> Add item
+              </Button>
+            </>
+          )}
+          {tab === 'modifiers' && (
+            <Button variant="primary" onClick={() => setCreating('group')}>
+              <Plus /> Add modifier group
+            </Button>
+          )}
+          {tab === 'stations' && (
+            <Button variant="primary" onClick={() => setCreating('station')}>
+              <Plus /> Add station
+            </Button>
+          )}
+        </div>
+      </div>
 
       <Tabs
-        className="period-switch menu-tabs"
-        label="Menu section"
+        className="cat-tabs"
+        label="Catalogue section"
         items={TABS}
         value={tab}
-        onChange={setTab}
+        onChange={onTabChange}
       />
 
       {error && <p className="form-error" role="alert">{error}</p>}
 
       {loading || !data ? (
-        <p className="empty-state">Loading…</p>
+        <CatalogueSkeleton />
       ) : (
         <>
           {tab === 'items' && (
@@ -916,10 +1109,34 @@ export default function MenuManager({ context, locationId, tab: tabFromUrl, onTa
               reload={reload}
               filters={filters}
               onFilters={patchFilters}
+              query={queries.items}
+              creating={creating}
+              onCreating={setCreating}
             />
           )}
-          {tab === 'modifiers' && <ModifiersTab context={context} data={data} reload={reload} />}
-          {tab === 'stations' && <StationsTab context={context} data={data} reload={reload} />}
+          {tab === 'modifiers' && (
+            <ModifiersTab
+              context={context}
+              data={data}
+              reload={reload}
+              filters={filters}
+              onFilters={patchFilters}
+              query={queries.modifiers}
+              creating={creating}
+              onCreating={setCreating}
+            />
+          )}
+          {tab === 'stations' && (
+            <StationsTab
+              context={context}
+              locationId={locationId}
+              data={data}
+              reload={reload}
+              query={queries.stations}
+              creating={creating}
+              onCreating={setCreating}
+            />
+          )}
         </>
       )}
     </>

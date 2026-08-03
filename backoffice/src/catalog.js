@@ -63,6 +63,205 @@ export function money(agorot) {
 }
 
 /**
+ * Порядок каталога. Режимов ровно столько, сколько мы умеем ПОСЧИТАТЬ:
+ * выпадающий список с сортировкой, которой нет в данных, — обещание,
+ * которое экран не выполнит.
+ *
+ * `manual` — порядок, заданный владельцем (`sort_order`, `reorder_menu`).
+ * Он имеет смысл ВНУТРИ категории, поэтому стрелки показываются только
+ * там, где категория одна: см. `canReorder`.
+ */
+export const SORT_MODES = [
+  { key: 'manual', label: 'Manual order' },
+  { key: 'name', label: 'Name A–Z' },
+  { key: 'price-asc', label: 'Price: low to high' },
+  { key: 'price-desc', label: 'Price: high to low' },
+]
+
+/** Сортировка списка позиций. Исходный массив не мутируется. */
+export function sortItems(items, mode = 'manual') {
+  const list = [...(items ?? [])]
+  if (mode === 'name') {
+    return list.sort((a, b) => String(a.name ?? '').localeCompare(String(b.name ?? '')))
+  }
+  if (mode === 'price-asc') return list.sort((a, b) => (a.price ?? 0) - (b.price ?? 0))
+  if (mode === 'price-desc') return list.sort((a, b) => (b.price ?? 0) - (a.price ?? 0))
+  return list.sort((a, b) => (a.sort_order ?? 0) - (b.sort_order ?? 0))
+}
+
+/**
+ * Можно ли двигать позиции руками. Порядок существует внутри категории:
+ * в плоском списке из четырёх категорий «выше» не значит ничего, и
+ * стрелка там переставила бы позицию относительно чужих блюд.
+ */
+export function canReorder({ categoryId = 'all', sort = 'manual' } = {}) {
+  return categoryId !== 'all' && sort === 'manual'
+}
+
+/**
+ * Цена позиции. У товара с размерами цена берётся из варианта, поэтому
+ * честный ответ — диапазон, а не базовое число, которое в чеке не
+ * появится ни разу.
+ */
+export function priceRange(item) {
+  const prices = (item?.item_variants ?? []).map((v) => v.price ?? 0)
+  if (prices.length === 0) {
+    const base = item?.price ?? 0
+    return { from: base, to: base, sizes: 0, range: false }
+  }
+  const from = Math.min(...prices)
+  const to = Math.max(...prices)
+  return { from, to, sizes: prices.length, range: from !== to }
+}
+
+/** «₪11–₪16» или «₪10» — тем же форматом денег, что и весь экран */
+export function priceLabel(item, format = money) {
+  const { from, to, range } = priceRange(item)
+  return range ? `${format(from)}–${format(to)}` : format(from)
+}
+
+/** «3 sizes» рядом с ценой; без размеров — ничего */
+export function sizesLabel(item) {
+  const { sizes } = priceRange(item)
+  return sizes > 0 ? `${sizes} size${sizes === 1 ? '' : 's'}` : null
+}
+
+// ── Модификаторы ─────────────────────────────────────────────
+
+/**
+ * Правило выбора человеческим языком.
+ *
+ * `max_select = 0` в схеме означает «без ограничения» (003), поэтому
+ * «unlimited» здесь — не выдумка макета, а реальное состояние. Всё
+ * остальное описывается точными числами: «Choose 1–3» честнее, чем
+ * придуманное слово.
+ */
+export function selectionRule(group) {
+  const min = Number(group?.min_select ?? 0)
+  const max = Number(group?.max_select ?? 0)
+  const unlimited = max === 0
+  if (!unlimited && min > max) return `Invalid rule · min ${min}, max ${max}`
+  if (min === 0) return unlimited ? 'Optional · unlimited' : `Optional · up to ${max}`
+  if (unlimited) return `Required · at least ${min}`
+  if (min === max) return `Required · choose ${min}`
+  return `Required · choose ${min}–${max}`
+}
+
+/** Правило, которое сервер примет: максимум либо «без ограничения», либо ≥ минимума */
+export function ruleError(min, max) {
+  const lo = Number(min)
+  const hi = Number(max)
+  if (!Number.isInteger(lo) || !Number.isInteger(hi) || lo < 0 || hi < 0) {
+    return 'Minimum and maximum must be whole numbers, zero or more.'
+  }
+  if (hi > 0 && lo > hi) return 'Minimum cannot be greater than maximum.'
+  return null
+}
+
+/** Чем группа модификаторов сломана — словами, а не цветом */
+export const GROUP_GAP_LABELS = {
+  empty: 'no modifiers',
+  impossible: 'minimum above maximum',
+  no_choice: 'required, but nothing available',
+  default_off: 'default choice is unavailable',
+}
+
+/**
+ * Проблемы группы. Только то, что действительно мешает продавать:
+ * выдуманного поля «Active» у группы нет, и зелёный бейдж из макета
+ * заменён этим состоянием.
+ */
+export function groupGaps(group) {
+  const gaps = []
+  const mods = group?.modifiers ?? []
+  const min = Number(group?.min_select ?? 0)
+  const max = Number(group?.max_select ?? 0)
+  if (mods.length === 0) gaps.push('empty')
+  if (max > 0 && min > max) gaps.push('impossible')
+  // Обязательная группа без единого доступного выбора останавливает заказ
+  if (min >= 1 && mods.length > 0 && mods.every((m) => m.is_available === false)) {
+    gaps.push('no_choice')
+  }
+  if (mods.some((m) => m.is_default && m.is_available === false)) gaps.push('default_off')
+  return gaps
+}
+
+/**
+ * Сколько позиций пользуется каждой группой. Считается ОДИН раз на
+ * каталог: иначе каждая строка таблицы заново обходит все товары.
+ */
+export function groupUsage(items) {
+  const usage = new Map()
+  for (const item of items ?? []) {
+    for (const link of item.menu_item_modifier_groups ?? []) {
+      usage.set(link.group_id, (usage.get(link.group_id) ?? 0) + 1)
+    }
+  }
+  return usage
+}
+
+/** Отбор групп: поиск идёт и по именам модификаторов, а не только групп */
+export function filterGroups(groups, {
+  query = '', state = 'all', usage = 'all',
+} = {}, usageMap = new Map()) {
+  const needle = query.trim().toLowerCase()
+  return (groups ?? []).filter((group) => {
+    if (state === 'incomplete' && groupGaps(group).length === 0) return false
+    const used = usageMap.get(group.id) ?? 0
+    if (usage === 'used' && used === 0) return false
+    if (usage === 'unused' && used > 0) return false
+    if (!needle) return true
+    const text = [group.name, ...(group.modifiers ?? []).map((m) => m.name)]
+      .filter(Boolean).join(' ').toLowerCase()
+    return text.includes(needle)
+  })
+}
+
+/**
+ * Цена модификатора — всегда ДОПЛАТА, а не цена товара. Ноль называется
+ * словами: «₪0» рядом с названием читается как «бесплатный товар».
+ */
+export function modifierDelta(agorot, format = money) {
+  const value = Number(agorot ?? 0)
+  if (value === 0) return 'No extra charge'
+  return value > 0 ? `+${format(value)}` : `−${format(Math.abs(value))}`
+}
+
+// ── Станции приготовления ────────────────────────────────────
+
+/** Позиции по станциям — один проход по каталогу на весь экран */
+export function itemsByStation(items) {
+  const map = new Map()
+  for (const item of items ?? []) {
+    if (!item.station_id) continue
+    const list = map.get(item.station_id) ?? []
+    list.push(item)
+    map.set(item.station_id, list)
+  }
+  return map
+}
+
+/**
+ * Позиции без станции. Пока в организации нет ни одной станции, вопрос
+ * «почему не назначена» не задан — и предупреждать не о чем.
+ */
+export function unassignedItems(items, stations) {
+  if ((stations ?? []).length === 0) return []
+  return (items ?? []).filter((item) => !item.station_id)
+}
+
+/** Отбор станций: ищем и по назначенным позициям, как обещает подсказка */
+export function filterStations(stations, { query = '' } = {}, byStation = new Map()) {
+  const needle = query.trim().toLowerCase()
+  if (!needle) return stations ?? []
+  return (stations ?? []).filter((station) => {
+    if (String(station.name ?? '').toLowerCase().includes(needle)) return true
+    return (byStation.get(station.id) ?? [])
+      .some((item) => String(item.name ?? '').toLowerCase().includes(needle))
+  })
+}
+
+/**
  * Новая цена при массовой переоценке. Округление — до агоры и тем же
  * правилом, что на сервере (ROUND), иначе предпросмотр покажет одно, а
  * применится другое.

@@ -610,27 +610,8 @@ a { color: inherit; }
 .menu-delete-row svg { width: 15px; height: 15px; }
 .menu-groups { display: grid; gap: 10px; }
 /* ── Каталог: поиск, выбор, порядок (Phase 5) ──────────────── */
-.catalog-filters { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; margin-bottom: 12px; }
-.catalog-count { margin-inline-start: auto; color: var(--c-text-subtle); font-size: 12px; font-weight: 650; white-space: nowrap; }
-.bulk-bar {
-  display: flex; flex-wrap: wrap; align-items: center; gap: 8px;
-  margin-bottom: 14px; padding: 10px 12px;
-  border: 1px solid var(--c-border-panel); border-radius: var(--r-lg); background: var(--c-surface-muted);
-}
-.bulk-bar button, .bulk-bar select { min-height: 40px; }
 .bulk-count { font-size: 13px; font-weight: 700; color: var(--c-text); }
 /* Строка позиции: чекбокс и стрелки порядка не должны толкать название */
-.menu-row-wrap { display: flex; align-items: center; gap: 4px; border-bottom: 1px solid var(--c-surface-active); }
-.menu-row-wrap:last-child { border-bottom: 0; }
-.menu-row-wrap.is-selected { background: #f2f6ff; }
-.menu-row-wrap .menu-row { flex: 1 1 auto; min-width: 0; border-bottom: 0; }
-.menu-select { display: grid; place-items: center; width: 44px; height: 44px; flex: none; cursor: pointer; }
-.menu-select input { width: 18px; height: 18px; }
-.menu-order { display: flex; flex: none; padding-inline-end: 12px; }
-.menu-order .icon-button { width: 34px; height: 34px; }
-.menu-order .icon-button svg { width: 15px; height: 15px; }
-.menu-order .icon-button:disabled { opacity: .35; cursor: default; }
-.menu-gap { color: #9b6a10; }
 /* Предпросмотр массовой правки */
 .bulk-list { display: grid; gap: 2px; max-height: 46vh; overflow-y: auto; }
 .bulk-row {
@@ -654,9 +635,6 @@ a { color: inherit; }
 .menu-name { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-size: 14px; font-weight: 600; }
 .menu-name small { color: var(--c-danger); font-weight: 700; }
 .menu-price { font-size: 14px; font-weight: 700; font-variant-numeric: tabular-nums; white-space: nowrap; }
-.menu-add-row { display: inline-flex; align-items: center; gap: 6px; min-height: 46px; padding: 8px 22px; border: 0; background: var(--c-surface); color: var(--c-text-2); font-size: 13px; font-weight: 700; text-align: left; }
-.menu-add-row:hover { background: var(--c-surface-muted); }
-.menu-add-row svg { width: 15px; height: 15px; }
 
 /* Модальный редактор товара */
 .modal-scrim { position: fixed; inset: 0; z-index: 40; display: grid; place-items: center; padding: 20px; background: rgb(14 16 20 / 44%); }
@@ -853,28 +831,15 @@ a { color: inherit; }
 
   /* Каталог: поля не имеют права расширять страницу. На телефоне поиск
      занимает строку, фильтры делят следующую, счётчик остаётся видимым. */
-  .catalog-filters { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); }
-  .catalog-filters .order-search { grid-column: 1 / -1; width: 100%; max-width: none; }
-  .catalog-filters .order-filter,
-  .catalog-filters .order-filter select { width: 100%; min-width: 0; }
-  .catalog-filters .text-button { justify-self: start; min-height: 36px; }
-  .catalog-count { margin-inline-start: 0; justify-self: end; align-self: center; }
   .menu-toolbar .primary-button.narrow {
     min-height: 40px; margin-top: 0; padding: 0 15px; font-size: 13px;
   }
   .menu-toolbar .collapse-all { flex-basis: 100%; margin-left: 0; justify-content: flex-start; }
-  .bulk-bar { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); }
-  .bulk-bar .bulk-count { grid-column: 1 / -1; }
-  .bulk-bar button, .bulk-bar label, .bulk-bar select { width: 100%; min-width: 0; }
   .order-grid { grid-template-columns: minmax(0, 1fr); }
   .menu-row { padding-inline: 14px; }
-  .menu-order { padding-inline-end: 6px; }
 }
 
 @media (max-width: 420px) {
-  .catalog-filters { grid-template-columns: minmax(0, 1fr); }
-  .catalog-filters .order-search { grid-column: auto; }
-  .catalog-count { justify-self: start; }
 }
 
 /* ── Команда ──────────────────────────────────────────────── */
@@ -1742,9 +1707,6 @@ a { color: inherit; }
  * Категория идёт отдельной колонкой, иначе в плоском списке непонятно,
  * откуда позиция; на телефоне колонка прячется — там важнее имя и цена.
  */
-.catalog-row .menu-row { display: grid; grid-template-columns: minmax(0, 1fr) auto auto; gap: var(--sp-3); align-items: center; }
-.catalog-row-cat { color: var(--c-text-subtle); font-size: 12px; white-space: nowrap; }
-.menu-mode { margin-inline-start: auto; }
 
 /* Парк касс: секции «требует внимания / рабочие / архив» */
 .fleet-section { margin-top: var(--sp-5); }
@@ -1765,7 +1727,6 @@ a { color: inherit; }
 .bulk-result small { color: var(--c-text-subtle); font-size: 12px; }
 
 @media (max-width: 640px) {
-  .catalog-row-cat { display: none; }
 }
 
 /* Ошибка конкретного поля — под ним, а не общим списком внизу формы */
@@ -2641,4 +2602,445 @@ a { color: inherit; }
 @media (prefers-reduced-motion: reduce) {
   .ord-panel[aria-busy="true"] .ord-table-scroll,
   .ord-panel[aria-busy="true"] .ord-cards { transition: none; }
+}
+
+/* ============================================================
+ * Catalogue — рабочая поверхность каталога (редизайн)
+ *
+ * Отдельный префикс `cat-`, а не правка `menu-*`: старые классы делят
+ * с каталогом Team и настройки точки, и менять их ради каталога значило
+ * бы менять чужие экраны.
+ *
+ * Плотность и палитра — те же, что у заказов: `--st-accent` для выбора
+ * и фокуса, зелёный/янтарный/серый для состояний. Это язык платформы, а
+ * не заимствование раздела: каталог и заказы должны выглядеть одним
+ * продуктом.
+ * ============================================================ */
+
+/* Рабочая строка раздела: заголовок, точка, поиск и создание */
+.cat-header {
+  display: flex; flex-wrap: wrap; align-items: center; gap: var(--sp-3);
+  margin-bottom: var(--sp-3);
+}
+.cat-header h1 { margin: 0; font-size: 25px; font-weight: 730; line-height: 1.1; }
+/* Поиск сжимается, но не выталкивает кнопки создания за край экрана */
+.cat-header .cat-search { flex: 1 1 200px; max-width: 340px; min-height: 38px; }
+.cat-header-actions {
+  display: flex; flex-wrap: wrap; align-items: center; gap: var(--sp-2);
+  margin-inline-start: auto;
+}
+.cat-header-actions .primary-button,
+.cat-header-actions .secondary-button { min-height: 38px; }
+
+/* Точка, которой принадлежат новые категории и станции */
+.cat-location {
+  display: inline-flex; align-items: center; gap: 6px;
+  height: 38px; padding: 0 10px;
+  border: 1px solid var(--c-border); border-radius: var(--r-md);
+  background: var(--c-surface); color: var(--c-text-2); font-size: 13px;
+}
+.cat-location svg { width: 15px; height: 15px; color: var(--c-text-subtle); }
+.cat-location select {
+  border: 0; background: none; font: inherit; font-size: 13px;
+  color: inherit; max-width: 160px;
+}
+.cat-location select:focus { outline: none; }
+
+.cat-tabs {
+  display: flex; gap: var(--sp-4); margin-bottom: var(--sp-4);
+  border-bottom: 1px solid var(--c-border-panel);
+  overflow-x: auto; overscroll-behavior-x: contain; scrollbar-width: none;
+}
+.cat-tabs::-webkit-scrollbar { display: none; }
+.cat-tabs button {
+  flex: 0 0 auto; min-height: 40px; padding: 0 2px;
+  border: 0; border-bottom: 2px solid transparent; background: transparent;
+  color: var(--c-text-muted); font: inherit; font-size: 14px; font-weight: 600;
+  white-space: nowrap; cursor: pointer;
+}
+.cat-tabs button:hover { color: var(--c-text); }
+.cat-tabs button.is-active {
+  border-bottom-color: var(--st-accent); color: var(--c-text); font-weight: 730;
+}
+
+/* Отбор: одна компактная строка под вкладками */
+.cat-toolbar {
+  display: flex; flex-wrap: wrap; align-items: center; gap: var(--sp-2);
+  margin-bottom: var(--sp-3);
+}
+.cat-select-filter select {
+  min-height: 36px; padding: 0 28px 0 10px;
+  border: 1px solid var(--c-border); border-radius: var(--r-md);
+  background: var(--c-surface); font: inherit; font-size: 13px; color: var(--c-text);
+}
+.cat-toolbar .secondary-button,
+.cat-toolbar .text-button { min-height: 36px; }
+.cat-toolbar .secondary-button.is-on {
+  background: var(--c-text); border-color: var(--c-text); color: var(--c-on-ink);
+}
+
+/*
+ * «Needs attention» — со счётчиком, который ПОСЧИТАН по каталогу.
+ * Янтарный: это внимание, а не отказ, — позиция без фото продаётся.
+ */
+.cat-chip {
+  display: inline-flex; align-items: center; gap: 6px;
+  min-height: 36px; padding: 0 10px;
+  border: 1px solid var(--c-border); border-radius: var(--r-md);
+  background: var(--c-surface); font: inherit; font-size: 13px;
+  color: var(--c-text-2); cursor: pointer;
+}
+.cat-chip span {
+  min-width: 20px; padding: 1px 6px; border-radius: var(--r-pill);
+  background: var(--c-surface-sunken); font-size: 12px; font-weight: 700;
+}
+.cat-chip.is-on {
+  border-color: #e0b25c; background: #fdf6e7; color: #6b4a05;
+}
+.cat-chip.is-on span { background: #f6e2b4; color: #6b4a05; }
+.cat-count {
+  margin-inline-start: auto; color: var(--c-text-subtle);
+  font-size: 12px; font-weight: 650; white-space: nowrap;
+}
+.cat-mode .period-switch { margin: 0; }
+
+/* Массовая правка: панель появляется только в режиме выбора */
+.cat-bulk {
+  display: flex; flex-wrap: wrap; align-items: center; gap: var(--sp-2);
+  margin-bottom: var(--sp-3); padding: var(--sp-2) var(--sp-3);
+  border: 1px solid var(--st-accent); border-radius: var(--r-md);
+  background: var(--st-accent-soft);
+}
+.cat-bulk-count { font-size: 13px; font-weight: 700; color: #1c3f8f; }
+.cat-bulk .secondary-button { min-height: 36px; background: var(--c-surface); }
+
+/* Итог правки и отмена — рядом с тем, что изменилось */
+.cat-result {
+  display: flex; flex-wrap: wrap; align-items: center; gap: var(--sp-3);
+  margin-bottom: var(--sp-3); padding: var(--sp-2) var(--sp-3);
+  border: 1px solid var(--c-border-panel); border-radius: var(--r-md);
+  background: var(--c-surface); font-size: 13px;
+}
+.cat-result small { color: var(--c-text-subtle); }
+.cat-result .icon-button { margin-inline-start: auto; }
+
+/* Пояснение и предупреждение раздела */
+.cat-note {
+  display: flex; align-items: center; gap: var(--sp-2);
+  margin: 0 0 var(--sp-3); color: var(--c-text-muted); font-size: 13px;
+}
+.cat-note svg { flex: none; width: 16px; height: 16px; }
+.cat-attention {
+  display: flex; flex-wrap: wrap; align-items: center; gap: var(--sp-3);
+  margin-bottom: var(--sp-3); padding: var(--sp-3);
+  border: 1px solid #e8cf9a; border-radius: var(--r-md);
+  background: #fdf6e7; color: #6b4a05; font-size: 13px;
+}
+.cat-attention span { flex: 1 1 240px; }
+
+.cat-panel { padding: 0; overflow: hidden; }
+.cat-panel .empty-state { padding: var(--sp-6) var(--sp-4); }
+
+/* ── Таблица ───────────────────────────────────────────────── */
+.cat-table-scroll { width: 100%; overflow-x: auto; overscroll-behavior-x: contain; }
+.cat-table { width: 100%; border-collapse: collapse; font-size: 14px; }
+.cat-table th,
+.cat-table td {
+  padding: 8px var(--sp-3); text-align: start; vertical-align: middle;
+  border-bottom: 1px solid var(--c-border-hair); white-space: nowrap;
+}
+/* Шапка липнет: на длинном каталоге колонки не должны уезжать из виду */
+.cat-table thead th {
+  position: sticky; top: 0; z-index: 1;
+  background: var(--c-surface);
+  border-bottom: 1px solid var(--c-border-panel);
+  color: var(--c-text-muted); font-size: 12px; font-weight: 650;
+  text-transform: uppercase; letter-spacing: 0.02em;
+}
+.cat-table tbody tr:last-child td { border-bottom: 0; }
+/* Строка с фото — 56–64 px: плотно, но палец попадает */
+.cat-row td { height: 60px; }
+.cat-row:hover { background: var(--c-surface-hover); }
+/* Выбранная строка — сдержанный кобальт слева, а не заливка целиком */
+.cat-row.is-selected { background: var(--st-accent-soft); }
+.cat-row.is-selected td:first-child { box-shadow: inset 3px 0 0 var(--st-accent); }
+
+.cat-col-check { width: 36px; }
+.cat-col-order { width: 84px; }
+.cat-col-thumb { width: 60px; }
+.cat-col-price { text-align: end; font-variant-numeric: tabular-nums; font-weight: 650; }
+.cat-col-price small { display: block; color: var(--c-text-subtle); font-size: 12px; font-weight: 500; }
+.cat-col-actions { width: 56px; text-align: end; }
+.cat-cell-muted { color: var(--c-text-2); }
+.cat-cell-sku { color: var(--c-text-subtle); font-variant-numeric: tabular-nums; }
+.cat-cell-examples { max-width: 280px; overflow: hidden; text-overflow: ellipsis; }
+
+/* Открывает карточку отдельная кнопка, а не вся строка */
+.cat-open {
+  min-height: 36px; padding: 0 2px; max-width: 260px;
+  overflow: hidden; text-overflow: ellipsis;
+  border: 0; background: transparent;
+  color: var(--c-text-strong); font: inherit; font-weight: 650; text-align: start;
+  cursor: pointer;
+}
+.cat-open:hover { text-decoration: underline; }
+
+/*
+ * Коробка фото фиксирована ДО загрузки: иначе строка прыгает, пока
+ * едут картинки, и попасть в нужную невозможно.
+ */
+.cat-thumb {
+  flex: none; display: inline-flex; align-items: center; justify-content: center;
+  width: 44px; height: 44px; overflow: hidden;
+  border: 1px solid var(--c-border-soft); border-radius: var(--r-md);
+  background: var(--c-surface-sunken);
+}
+.cat-thumb img { width: 100%; height: 100%; object-fit: cover; display: block; }
+.cat-thumb.is-empty svg { width: 18px; height: 18px; color: var(--c-text-faint); }
+
+/* Состояния: слово всегда, цвет — усиление */
+.cat-avail {
+  display: inline-flex; align-items: center; padding: 3px 9px;
+  border-radius: var(--r-pill); font-size: 12px; font-weight: 700; white-space: nowrap;
+}
+.cat-avail.is-on { background: #e7f4ec; color: var(--c-success); }
+/* Скрытая позиция — нейтрально-серая: это решение владельца, не ошибка */
+.cat-avail.is-off { background: var(--st-past-bg); color: var(--st-past-fg); }
+.cat-state { display: inline-flex; flex-direction: column; gap: 1px; font-size: 13px; }
+.cat-state small { color: var(--c-text-subtle); font-size: 11px; white-space: normal; }
+.cat-state.is-ok { color: var(--c-text-faint); font-size: 12px; }
+.cat-state.is-attention { color: #6b4a05; font-weight: 650; }
+.cat-tag {
+  display: inline-flex; padding: 2px 8px; border-radius: var(--r-pill);
+  background: var(--c-surface-sunken); color: var(--c-text-2);
+  font-size: 11px; font-weight: 700;
+}
+.cat-station-name { display: inline-flex; align-items: center; gap: var(--sp-2); }
+.cat-station-name svg { width: 16px; height: 16px; color: var(--c-text-faint); }
+
+/* Меню действий строки */
+.row-menu { position: relative; display: inline-flex; }
+.row-menu-pop {
+  position: absolute; inset-inline-end: 0; top: calc(100% + 4px); z-index: 20;
+  min-width: 176px; padding: var(--sp-1);
+  border: 1px solid var(--c-border-panel); border-radius: var(--r-md);
+  background: var(--c-surface); box-shadow: var(--shadow-pop);
+}
+.row-menu-pop button {
+  display: block; width: 100%; min-height: 38px; padding: 0 var(--sp-3);
+  border: 0; border-radius: var(--r-sm); background: transparent;
+  color: var(--c-text); font: inherit; font-size: 13px; text-align: start; cursor: pointer;
+}
+.row-menu-pop button:hover { background: var(--c-surface-hover); }
+.row-menu-pop button.is-danger { color: var(--c-danger); }
+.row-order { display: inline-flex; gap: 2px; }
+.row-order .icon-button { width: 32px; height: 32px; }
+.row-order .icon-button svg { width: 15px; height: 15px; }
+/* Край списка виден: первая «вверх» и последняя «вниз» не просто
+   отключены атрибутом, но и выглядят отключёнными */
+.row-order .icon-button:disabled { opacity: .32; cursor: default; }
+.row-order .icon-button:disabled:hover { background: transparent; }
+
+/* ── Список для телефона ───────────────────────────────────── */
+.cat-cards { margin: 0; padding: 0; list-style: none; }
+.cat-cards li {
+  display: flex; align-items: center; gap: var(--sp-3);
+  padding: var(--sp-3); border-bottom: 1px solid var(--c-border-hair);
+}
+.cat-cards li:last-child { border-bottom: 0; }
+.cat-cards li.is-selected { background: var(--st-accent-soft); box-shadow: inset 3px 0 0 var(--st-accent); }
+.cat-card-open {
+  flex: 1 1 auto; min-width: 0; display: grid; gap: 2px;
+  min-height: 44px; padding: 0; border: 0; background: transparent;
+  font: inherit; text-align: start; cursor: pointer;
+}
+.cat-card-name {
+  font-weight: 650; color: var(--c-text-strong);
+  overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+}
+.cat-card-meta {
+  color: var(--c-text-subtle); font-size: 12px;
+  overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+}
+.cat-card-price { font-size: 13px; font-weight: 650; font-variant-numeric: tabular-nums; }
+.cat-card-price small { color: var(--c-text-subtle); font-weight: 500; }
+/* Правый столбец не отбирает место у названия: длинный список пробелов
+   («no price, no photo, no description») иначе сжимал имя до многоточия */
+.cat-card-side {
+  flex: none; max-width: 42%; display: flex; flex-direction: column;
+  align-items: flex-end; gap: 4px; text-align: end;
+}
+.cat-card-check { display: inline-flex; }
+
+/* ── Режим «By category» ───────────────────────────────────── */
+.cat-groups { display: grid; gap: var(--sp-3); }
+.cat-category-head {
+  display: flex; align-items: center; justify-content: space-between; gap: var(--sp-3);
+  padding: var(--sp-2) var(--sp-3); border-bottom: 1px solid var(--c-border-soft);
+}
+.cat-category-head .collapse-toggle {
+  display: flex; align-items: center; gap: var(--sp-2);
+  min-height: 40px; border: 0; background: none; font: inherit; cursor: pointer;
+}
+.cat-category-head .collapse-toggle svg { width: 16px; height: 16px; color: var(--c-text-subtle); }
+.cat-category-head strong { font-size: 14px; }
+.cat-category-head small { margin-inline-start: var(--sp-2); color: var(--c-text-subtle); font-size: 12px; }
+
+/* ── Панель деталей ────────────────────────────────────────── */
+.cat-detail { display: grid; gap: var(--sp-4); }
+.cat-detail-top { display: flex; gap: var(--sp-3); align-items: flex-start; }
+.cat-detail-photo {
+  flex: none; width: 96px; height: 96px; object-fit: cover;
+  border: 1px solid var(--c-border-soft); border-radius: var(--r-lg);
+  background: var(--c-surface-sunken);
+}
+.cat-detail-photo.is-empty { display: inline-flex; align-items: center; justify-content: center; }
+.cat-detail-photo.is-empty svg { width: 22px; height: 22px; color: var(--c-text-faint); }
+.cat-detail-top p { margin: 0 0 var(--sp-1); }
+.cat-detail-cat { color: var(--c-text-muted); font-size: 13px; }
+.cat-detail-sku { color: var(--c-text-subtle); font-size: 12px; font-variant-numeric: tabular-nums; }
+.cat-detail-gaps {
+  margin: 0; padding: var(--sp-2) var(--sp-3);
+  border: 1px solid #e8cf9a; border-radius: var(--r-md);
+  background: #fdf6e7; color: #6b4a05; font-size: 13px;
+}
+.cat-detail-desc { margin: 0; color: var(--c-text-2); font-size: 14px; line-height: 1.45; }
+.cat-detail-desc.is-empty { color: var(--c-text-faint); }
+.cat-detail-facts { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: var(--sp-3); margin: 0; }
+.cat-detail-facts dt { color: var(--c-text-subtle); font-size: 12px; font-weight: 650; }
+.cat-detail-facts dd { margin: 2px 0 0; font-size: 14px; font-weight: 650; }
+.cat-detail-facts dd small { color: var(--c-text-subtle); font-weight: 500; }
+.cat-detail-block { display: grid; gap: var(--sp-2); }
+.cat-detail-block h4 { margin: 0; font-size: 13px; font-weight: 700; color: var(--c-text-2); }
+.cat-detail-block-head { display: flex; align-items: center; justify-content: space-between; gap: var(--sp-3); }
+.cat-detail-block .empty-state { padding: var(--sp-3) 0; }
+.cat-detail-list { margin: 0; padding: 0; list-style: none; display: grid; }
+.cat-detail-list li {
+  display: flex; align-items: center; justify-content: space-between; gap: var(--sp-3);
+  min-height: 40px; border-bottom: 1px solid var(--c-border-hair); font-size: 14px;
+}
+.cat-detail-list li:last-child { border-bottom: 0; }
+.cat-detail-list small { color: var(--c-text-subtle); font-size: 12px; }
+.cat-drawer-main { flex: 1 1 auto; justify-content: center; min-height: 42px; }
+.cat-drawer-search { width: 100%; max-width: none; }
+
+/* Список модификаторов и назначенных позиций в панели */
+.cat-mod-list { margin: 0; padding: 0; list-style: none; display: grid; }
+.cat-mod-list li {
+  display: flex; align-items: center; gap: var(--sp-2);
+  min-height: 48px; padding: var(--sp-1) 0;
+  border-bottom: 1px solid var(--c-border-hair);
+}
+.cat-mod-list li:last-child { border-bottom: 0; }
+.cat-mod-name {
+  flex: 1 1 auto; min-width: 0; display: grid; gap: 1px;
+  font-size: 14px; font-weight: 600;
+}
+.cat-mod-name small { color: var(--c-text-subtle); font-size: 12px; font-weight: 500; }
+.cat-mod-tags { flex: none; display: inline-flex; align-items: center; gap: 4px; }
+
+/*
+ * Форма правки внутри панели.
+ *
+ * Селектор именно `label`, а не `> label`: поля в `.field-row` вложены
+ * на уровень глубже, и при `> label` подпись вставала В СТРОКУ с полем —
+ * «Preparation station [Bar]» переставало помещаться на телефоне.
+ */
+.cat-form { display: grid; gap: var(--sp-3); }
+.cat-form label:not(.check-field):not(.file-button) { display: grid; gap: 6px; min-width: 0; }
+.cat-form label > span { font-size: 13px; font-weight: 700; color: var(--c-text-2); }
+.cat-form input[type="text"],
+.cat-form input:not([type]),
+.cat-form select {
+  min-height: 40px; padding: 0 12px; min-width: 0;
+  border: 1px solid var(--c-border); border-radius: var(--r-md);
+  background: var(--c-surface); font: inherit; font-size: 15px;
+}
+.cat-form input:focus, .cat-form select:focus { outline: none; border-color: var(--c-ink); }
+.cat-form .check-field {
+  display: inline-flex; flex-direction: row; align-items: center;
+  gap: var(--sp-2); font-size: 14px;
+}
+/* Размеры: имя, цена, «по умолчанию» и удаление в одну строку */
+.cat-form .variant-row {
+  display: grid; grid-template-columns: minmax(0, 1fr) 88px auto auto;
+  gap: var(--sp-2); align-items: center;
+}
+
+/* Диалог формы: компактный, но не тесный */
+.form-dialog { display: grid; gap: var(--sp-3); }
+.form-dialog-body { display: grid; gap: var(--sp-3); }
+.form-dialog .field-row { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: var(--sp-3); }
+
+/* Скелет той же геометрии, что таблица: раздел не прыгает при загрузке */
+.cat-skeleton { display: grid; }
+.cat-skeleton-row {
+  display: flex; align-items: center; gap: var(--sp-3);
+  height: 60px; padding: 0 var(--sp-3);
+  border-bottom: 1px solid var(--c-border-hair);
+}
+.cat-skeleton-row span {
+  height: 12px; border-radius: var(--r-sm);
+  background: var(--c-surface-sunken);
+  background-image: linear-gradient(90deg, var(--c-surface-sunken), var(--c-surface-hover), var(--c-surface-sunken));
+  background-size: 200% 100%;
+  animation: timeline-shimmer 1.4s ease-in-out infinite;
+}
+@media (prefers-reduced-motion: reduce) {
+  .cat-skeleton-row span { animation: none; }
+}
+
+/*
+ * Планшет: второстепенные колонки уходят, важное остаётся. Прячем
+ * артикул и станцию — имя, категория, цена и состояние отвечают на
+ * вопрос «что это и продаётся ли» без них.
+ */
+@media (max-width: 1279px) {
+  .cat-col-secondary { display: none; }
+}
+
+@media (max-width: 900px) {
+  .cat-header h1 { font-size: 22px; }
+  .cat-header .cat-search { flex-basis: 100%; max-width: none; }
+  .cat-header-actions { margin-inline-start: 0; }
+}
+
+/* Цели под палец: планшет у стойки — это рабочая ширина, а не «почти телефон» */
+@media (max-width: 1024px) {
+  .cat-tabs button { min-height: 44px; }
+  .cat-select-filter select,
+  .cat-chip,
+  .cat-toolbar .secondary-button,
+  .cat-toolbar .text-button { min-height: 44px; }
+  .cat-header .cat-search { min-height: 44px; }
+  .cat-header-actions .primary-button,
+  .cat-header-actions .secondary-button { min-height: 44px; }
+  .cat-open, .cat-card-open { min-height: 44px; }
+  .cat-col-actions .icon-button { width: 44px; height: 44px; }
+  .row-order .icon-button { width: 40px; height: 40px; }
+}
+
+@media (max-width: 720px) {
+  .cat-toolbar { gap: var(--sp-2); }
+  .cat-select-filter,
+  .cat-select-filter select { flex: 1 1 140px; width: 100%; min-width: 0; }
+  .cat-count { margin-inline-start: 0; }
+  .cat-bulk .secondary-button,
+  .cat-bulk .cat-select-filter { flex: 1 1 140px; }
+  .cat-detail-facts { grid-template-columns: minmax(0, 1fr); }
+  .form-dialog .field-row,
+  .cat-form .field-row { grid-template-columns: minmax(0, 1fr); }
+  /* Чекбокс и поле «по умолчанию» — цели под палец */
+  .cat-form .check-field { min-height: 44px; }
+  .cat-form .variant-row { grid-template-columns: minmax(0, 1fr) 76px auto auto; }
+  /* Ввод меньше 16px на iOS заставляет браузер приближать страницу */
+  .form-dialog input, .form-dialog select,
+  .cat-form input, .cat-form select { font-size: 16px; }
+}
+
+@media (max-width: 380px) {
+  .cat-header-actions { width: 100%; }
+  .cat-header-actions .primary-button,
+  .cat-header-actions .secondary-button { flex: 1 1 auto; justify-content: center; }
+  .cat-cards li { gap: var(--sp-2); padding: var(--sp-2); }
 }

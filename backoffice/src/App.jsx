@@ -888,7 +888,18 @@ function Dashboard({ session, context, onReloadContext }) {
         {view === 'sales' && <SalesOverview context={context} />}
         {view === 'activity' && <ActivityManager context={context} />}
         {view === 'locations' && <LocationSettings context={context} {...scopedProps} {...tabProps} />}
-        {view === 'menu' && <MenuManager context={context} {...scopedProps} {...tabProps} />}
+        {/* Отбор каталога живёт в адресе — как у заказов: ссылка
+            «покажи неполные позиции» обязана открывать их, а не полный
+            каталог после перезагрузки. */}
+        {view === 'menu' && (
+          <MenuManager
+            context={context}
+            {...scopedProps}
+            {...tabProps}
+            filters={route.filters ?? {}}
+            onFiltersChange={changeFilters}
+          />
+        )}
         {view === 'team' && <TeamManager context={context} {...tabProps} />}
         {view === 'online' && <QrChannels context={context} {...scopedProps} {...tabProps} />}
         {view === 'devices' && <DevicesManager context={context} />}
