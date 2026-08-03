@@ -179,24 +179,32 @@ export default function WaitlistPanel({ locationId, date, query = '' }) {
                   const waited = waitedMin(entry, nowMs)
                   const overdue = isOverdue(entry, nowMs)
                   const place = positionOf.get(entry.id)
+                  /*
+                   * Строка НЕ интерактивна.
+                   *
+                   * Раньше она была `role="button"` с tabIndex, а внутри
+                   * стояли кнопки перестановки — вложенные интерактивные
+                   * элементы. Enter на стрелке всплывал до строки, и вместо
+                   * перестановки открывалась карточка гостя: двигать
+                   * очередь с клавиатуры было нельзя вообще.
+                   * Карточку открывает отдельная кнопка на имени.
+                   */
                   return (
                     <tr
                       key={entry.id}
                       className={`rsv-row${detail?.id === entry.id ? ' is-selected' : ''}`}
-                      aria-selected={detail?.id === entry.id}
-                      tabIndex={0}
-                      role="button"
-                      onClick={() => { setDetail(entry); setSheetError('') }}
-                      onKeyDown={(e) => {
-                        if (e.key !== 'Enter' && e.key !== ' ') return
-                        e.preventDefault()
-                        setDetail(entry)
-                      }}
                     >
                       <td className="rsv-cell-time">{place ?? '—'}</td>
                       <td className="rsv-cell-guest">
-                        <strong>{entry.customer_name}</strong>
-                        {entry.customer_phone && <small>{entry.customer_phone}</small>}
+                        <button
+                          type="button"
+                          className="rsv-open"
+                          aria-pressed={detail?.id === entry.id}
+                          onClick={() => { setDetail(entry); setSheetError('') }}
+                        >
+                          <strong>{entry.customer_name}</strong>
+                          {entry.customer_phone && <small>{entry.customer_phone}</small>}
+                        </button>
                       </td>
                       <td className="rsv-cell-party">{entry.party_size}</td>
                       <td className={`rsv-cell-wait${overdue ? ' is-overdue' : ''}`}>
@@ -224,7 +232,7 @@ export default function WaitlistPanel({ locationId, date, query = '' }) {
                               className="icon-button"
                               aria-label={`Move ${entry.customer_name} up`}
                               disabled={busy != null || place === 1}
-                              onClick={(e) => { e.stopPropagation(); move(entry, 'up') }}
+                              onClick={() => move(entry, 'up')}
                             >
                               <ChevronUp />
                             </button>
@@ -233,7 +241,7 @@ export default function WaitlistPanel({ locationId, date, query = '' }) {
                               className="icon-button"
                               aria-label={`Move ${entry.customer_name} down`}
                               disabled={busy != null || place === openRows.length}
-                              onClick={(e) => { e.stopPropagation(); move(entry, 'down') }}
+                              onClick={() => move(entry, 'down')}
                             >
                               <ChevronDown />
                             </button>

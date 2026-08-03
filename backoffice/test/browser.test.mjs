@@ -99,6 +99,15 @@ const SUPABASE_STUB = `
     total: 7400, order_type: 'pickup', source: 'counter_qr', customer_name: 'Мири', items: [] }]
   const RESERVATIONS = [{ id: 'r1', status: 'new', customer_name: 'Мири Леви', party_size: 2,
     reserved_at: new Date(Date.now() + 3600000).toISOString(), table_id: null, is_test: false }]
+  const TODAY = new Date().toISOString().slice(0, 10)
+  const WAITLIST = [
+    { id: 'w1', customer_name: 'Первый', customer_phone: '', party_size: 2, wanted_date: TODAY,
+      status: 'waiting', position: null, quoted_min: 20, zone_ids: [],
+      created_at: new Date(Date.now() - 30 * 60000).toISOString() },
+    { id: 'w2', customer_name: 'Второй', customer_phone: '', party_size: 4, wanted_date: TODAY,
+      status: 'waiting', position: null, quoted_min: 25, zone_ids: [],
+      created_at: new Date(Date.now() - 10 * 60000).toISOString() },
+  ]
   const LOCATION = { id: 'loc-1', name: 'Пинскер 29', timezone: 'Asia/Jerusalem', currency: 'ILS',
     settings: { online_orders: { enabled: true }, reservations: { enabled: false } } }
   const RPC = {
@@ -115,7 +124,7 @@ const SUPABASE_STUB = `
   export const isSupabaseConfigured = true
   export const supabase = {
     auth: { getSession: async () => ({ data: { session: null } }), onAuthStateChange: () => ({ data: { subscription: { unsubscribe() {} } } }) },
-    rpc: async (name) => {
+    rpc: async (name, args) => {
       // Управляемый отказ одного источника: дашборд обязан пережить его
       if (name === 'sales_report' && window.__BREAK_SALES__) {
         return { data: null, error: { message: 'sales are unavailable' } }
@@ -124,10 +133,17 @@ const SUPABASE_STUB = `
       if (name === 'create_reservation_web') {
         return { data: null, error: { message: 'table_busy' } }
       }
+      // Перестановку очереди запоминаем: тест проверяет, что клавиша
+      // дошла до кнопки, а не открыла карточку
+      if (name === 'reorder_waitlist_web') {
+        window.__REORDERED__ = (window.__REORDERED__ || []).concat([args?.p_ids])
+        return { data: 2, error: null }
+      }
       return { data: RPC[name] ? RPC[name]() : null, error: null }
     },
     from: (table) => {
-      const rows = table === 'online_orders' ? ORDERS
+      const rows = table === 'waitlist_entries' ? WAITLIST
+        : table === 'online_orders' ? ORDERS
         : table === 'reservations' ? RESERVATIONS
         : table === 'shifts' ? (window.__SHIFTS__ || [])
         : table === 'locations' ? [LOCATION]
@@ -418,6 +434,17 @@ before(async () => {
     }
     createRoot(document.getElementById('root')).render(<Page />)
   `)
+
+  await bundle('waitlist', `
+    import { createRoot } from 'react-dom/client'
+    import WaitlistPanel from './WaitlistPanel'
+
+    createRoot(document.getElementById('root')).render(
+      <main className="content">
+        <WaitlistPanel locationId="loc-1" date={new Date().toISOString().slice(0, 10)} />
+      </main>
+    )
+  `, { stubSupabase: true })
 
   await bundle('booking-conflict', `
     import { createRoot } from 'react-dom/client'
@@ -1079,6 +1106,67 @@ describe('слои: панель и диалог поверх неё', { skip },
       () => !!document.querySelector('.confirm-dialog')?.contains(document.activeElement)
     )
     assert.equal(inside, true)
+    await page.close()
+  })
+})
+
+
+describe('очередь ожидания: клавиатура', { skip }, () => {
+  /**
+   * Регресс живой приёмки: строка очереди была `role="button"` с
+   * tabIndex, а внутри стояли кнопки перестановки. Enter на стрелке
+   * всплывал до строки — вместо перемещения открывалась карточка гостя,
+   * и двигать очередь с клавиатуры было нельзя вообще.
+   *
+   * Проверяется поведение, а не разметка: нажатие Enter на стрелке
+   * переставляет очередь и НЕ открывает карточку.
+   */
+  const open = async () => {
+    const page = await browser.newPage()
+    await page.setViewport({ width: 1440, height: 900 })
+    await page.goto(`${appOrigin}/waitlist`, { waitUntil: 'networkidle0' })
+    await page.waitForSelector('.rsv-row')
+    return page
+  }
+
+  it('Enter на стрелке двигает очередь, а не открывает карточку', async () => {
+    const page = await open()
+    await page.evaluate(() => {
+      const button = [...document.querySelectorAll('button')]
+        .find((b) => (b.getAttribute('aria-label') || '').startsWith('Move Второй up'))
+      button.focus()
+    })
+    await page.keyboard.press('Enter')
+    await new Promise((resolve) => setTimeout(resolve, 300))
+
+    const state = await page.evaluate(() => ({
+      reordered: window.__REORDERED__ || [],
+      drawers: document.querySelectorAll('.drawer').length,
+    }))
+    assert.equal(state.drawers, 0, 'карточка гостя не открывается')
+    assert.equal(state.reordered.length, 1, 'перестановка отправлена на сервер')
+    assert.deepEqual(state.reordered[0], ['w2', 'w1'], 'гость поднялся на позицию выше')
+    await page.close()
+  })
+
+  it('карточку открывает кнопка на имени — и с клавиатуры тоже', async () => {
+    const page = await open()
+    await page.evaluate(() => document.querySelector('.rsv-open').focus())
+    await page.keyboard.press('Enter')
+    await new Promise((resolve) => setTimeout(resolve, 300))
+    assert.equal(await page.evaluate(() => document.querySelectorAll('.drawer').length), 1)
+    await page.close()
+  })
+
+  it('строка таблицы не притворяется кнопкой', async () => {
+    // Вложенные интерактивные элементы — то, с чего дефект и начался
+    const page = await open()
+    const rows = await page.evaluate(() => [...document.querySelectorAll('.rsv-row')].map((r) => ({
+      role: r.getAttribute('role'),
+      tabIndex: r.getAttribute('tabindex'),
+    })))
+    assert.deepEqual(rows.map((r) => r.role).filter(Boolean), [])
+    assert.deepEqual(rows.map((r) => r.tabIndex).filter(Boolean), [])
     await page.close()
   })
 })

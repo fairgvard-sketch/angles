@@ -289,25 +289,26 @@ export default function ReservationList({ locationId, date, query = '', filters,
                   </tr>
                   {group.rows.map((r) => {
                     const state = visitState(r)
+                    // Бронь открывает отдельная кнопка, а не вся строка:
+                    // `role="button"` на строке таблицы ломается, как только
+                    // внутрь попадает любой другой интерактивный элемент.
                     return (
                       <tr
                         key={r.id}
                         className={`rsv-row${detail?.id === r.id ? ' is-selected' : ''}`}
-                        aria-selected={detail?.id === r.id}
-                        tabIndex={0}
-                        role="button"
-                        onClick={() => { setDetail(r); setSheetError(''); setSheetConflict(false) }}
-                        onKeyDown={(e) => {
-                          if (e.key !== 'Enter' && e.key !== ' ') return
-                          e.preventDefault()
-                          setDetail(r)
-                        }}
                       >
                         <td className="rsv-cell-time">{hhmm(r.reserved_at, tz)}</td>
                         <td className="rsv-cell-guest">
-                          <strong>{r.customer_name}</strong>
-                          {r.is_test && <span className="guest-fav is-warn"> Test</span>}
-                          {r.customer_phone && <small>{r.customer_phone}</small>}
+                          <button
+                            type="button"
+                            className="rsv-open"
+                            aria-pressed={detail?.id === r.id}
+                            onClick={() => { setDetail(r); setSheetError(''); setSheetConflict(false) }}
+                          >
+                            <strong>{r.customer_name}</strong>
+                            {r.is_test && <span className="guest-fav is-warn"> Test</span>}
+                            {r.customer_phone && <small>{r.customer_phone}</small>}
+                          </button>
                         </td>
                         <td className="rsv-cell-party">{r.party_size}</td>
                         <td className="rsv-col-table">{tablesOf(r)}</td>
