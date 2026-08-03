@@ -121,6 +121,37 @@ export async function fetchTimelineReservations(locationId, fromMs, toMs) {
   return data ?? []
 }
 
+/**
+ * Брони за отрезок времени — для списка.
+ *
+ * Отличается от полотна двумя вещами: берутся ВСЕ состояния, включая
+ * отменённые и завершённые (список отвечает на вопрос «что было и что
+ * будет», а не «что с залом сейчас»), и окно задаётся днями, а не
+ * расписанием точки.
+ *
+ * Лимит честный: 500 визитов — это неделя работы большого зала. Когда
+ * упрёмся, отбор поедет на сервер, а не превратится в тихую потерю
+ * строк — поэтому вызывающий знает, что упёрся.
+ */
+export async function fetchReservationRange(locationId, fromMs, toMs, limit = 500) {
+  const { data, error } = await supabase
+    .from('reservations')
+    .select(
+      'id, status, customer_name, customer_phone, party_size, reserved_at, '
+      + 'duration_min, note, reject_reason, order_id, arrived_at, table_id, '
+      + 'hold_table_ids, zone_id, is_test, source, created_at, '
+      + 'tables_link:reservation_tables ( table_id, is_primary )'
+    )
+    .eq('location_id', locationId)
+    .gte('reserved_at', new Date(fromMs).toISOString())
+    .lt('reserved_at', new Date(toMs).toISOString())
+    .order('reserved_at', { ascending: true })
+    .limit(limit)
+  if (error) throw new Error(error.message)
+  const rows = data ?? []
+  return { rows, capped: rows.length >= limit }
+}
+
 /** Столы и зоны точки для строк полотна */
 export async function fetchTimelineTables(locationId) {
   const [tables, zones] = await Promise.all([

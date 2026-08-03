@@ -1,24 +1,17 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
-import {
-  CalendarDays, ChevronLeft, ChevronRight, DoorOpen, Phone, Plus, RefreshCw,
-  StickyNote, Users,
-} from 'lucide-react'
+import { ChevronLeft, ChevronRight, DoorOpen, Plus } from 'lucide-react'
 import { supabase } from './supabase'
-import {
-  RESERVATION_ACTIONS,
-  fetchReservations, setReservationStatus, visitLabel,
-} from './reservations'
-import { statusClass, statusLabel, visitState } from './reservation-status'
+import { fetchReservations } from './reservations'
 import { shiftDate, todayInZone } from './timeline'
 import { playNewOrderChime } from './orders'
 import TimelineDesk from './TimelineDesk'
+import ReservationList from './ReservationList'
 import WaitlistPanel from './WaitlistPanel'
 import FloorPlanEditor from './FloorPlanEditor'
 import ReserveAnalytics from './ReserveAnalytics'
 import LaunchChecklist from './LaunchChecklist'
 import BookingForm from './BookingForm'
 import Tabs from './ui/Tabs'
-import ConfirmDialog from './ui/ConfirmDialog'
 import { IconButton } from './ui/Button'
 import { fetchLocationSlug, fetchLocation } from './settings'
 import { fetchTimelineTables } from './reservations'
@@ -46,62 +39,12 @@ const VIEWS = [
   { key: 'analytics', label: 'Analytics' },
 ]
 
-function ReservationCard({ reservation, busyAction, onAction }) {
-  const seated = reservation.order_id != null
-  const actions = seated ? [] : (RESERVATION_ACTIONS[reservation.status] ?? [])
-  const state = visitState(reservation)
-  return (
-    <article className={`order-card is-${reservation.status}`}>
-      <header className="order-card-head">
-        <div>
-          <strong>{reservation.customer_name}</strong>
-          <small>
-            <CalendarDays /> {visitLabel(reservation.reserved_at)}
-            {' · '}<Users /> {reservation.party_size}
-            {reservation.customer_phone && <> · <Phone /> {reservation.customer_phone}</>}
-          </small>
-        </div>
-        {/* Состояние тем же словом и цветом, что на полотне: один визит
-            не может называться в списке иначе, чем в таймлайне.
-            Тестовая бронь (126) занимает настоящий стол — её нельзя
-            спутать с гостевой, иначе хостес будет ждать никого. */}
-        <span className={`rsv-status ${statusClass(state)}`}>
-          {reservation.is_test
-            ? 'Test'
-            : seated ? 'Seated (POS)' : statusLabel(state)}
-        </span>
-      </header>
-      {reservation.note && <p className="order-note"><StickyNote /> {reservation.note}</p>}
-      {reservation.reject_reason && <p className="order-note">{reservation.reject_reason}</p>}
-      {actions.length > 0 && (
-        <footer className="order-card-foot">
-          <span />
-          <div className="order-actions">
-            {actions.map((action) => (
-              <button
-                key={action.to}
-                type="button"
-                className={action.tone === 'primary' ? 'primary-button compact' : 'secondary-button'}
-                disabled={busyAction != null}
-                data-danger={action.tone === 'danger' || undefined}
-                onClick={() => onAction(reservation, action.to)}
-              >
-                {busyAction === action.to ? '…' : action.label}
-              </button>
-            ))}
-          </div>
-        </footer>
-      )}
-    </article>
-  )
-}
-
 export default function ReservationsDesk({
   context, locationId, tab, onTabChange, date, onDateChange,
+  filters = {}, onFiltersChange,
 }) {
   const [data, setData] = useState(null)
   const [error, setError] = useState('')
-  const [busy, setBusy] = useState(null) // { id, to }
   // Таймлайн — вид по умолчанию: владелец открывает раздел, чтобы увидеть
   // зал. Вкладка живёт в адресе (Phase 2): ссылку на лист ожидания можно
   // прислать, а Назад возвращает на предыдущую.
@@ -112,8 +55,6 @@ export default function ReservationsDesk({
   const [slug, setSlug] = useState(null)
   // Ручная бронь / walk-in (127): 'booking' | 'walk-in' | null
   const [creating, setCreating] = useState(null)
-  // Спрашиваем причину отказа/отмены: { reservation, to }
-  const [asking, setAsking] = useState(null)
   const [tables, setTables] = useState([])
   const [tz, setTz] = useState('Asia/Jerusalem')
   const knownIds = useRef(new Set())
@@ -187,45 +128,12 @@ export default function ReservationsDesk({
     }
   }, [locationId, refresh])
 
-  /**
-   * Отказ и отмена спрашивают причину — её видит гость.
-   *
-   * Раньше это был `window.prompt`: он не поддерживается в части
-   * браузеров («prompt() is not supported»), и тогда причина молча
-   * терялась. Теперь это диалог кабинета с полем, Escape и фокусом.
+  /*
+   * Список визитов дня остаётся загруженным ради двух вещей: звонка о
+   * новой заявке и подсказок формы ручной брони — она предлагает
+   * альтернативы из тех же визитов, что уже на экране.
    */
-  async function act(reservation, to, reason = null) {
-    if ((to === 'rejected' || to === 'cancelled') && !asking) {
-      setAsking({ reservation, to })
-      return
-    }
-    setBusy({ id: reservation.id, to })
-    try {
-      await setReservationStatus(locationId, reservation.id, to, reason)
-      setAsking(null)
-      await refresh()
-    } catch (e) {
-      setError(e.message === 'pos_mode'
-        ? 'This booking is seated into a POS order — it is handled on the register.'
-        : e.message)
-    } finally {
-      setBusy(null)
-    }
-  }
-
-  // Поиск раздела работает и здесь: поле в шапке обязано что-то менять
-  // на КАЖДОЙ вкладке, иначе это украшение.
-  const matches = useMemo(() => {
-    const needle = query.trim().toLowerCase()
-    if (!needle) return () => true
-    return (r) => `${r.customer_name ?? ''} ${r.customer_phone ?? ''}`
-      .toLowerCase().includes(needle)
-  }, [query])
-
-  const active = (data?.active ?? []).filter(matches)
-  const pending = active.filter((r) => r.status === 'new')
-  const confirmed = active.filter((r) => r.status !== 'new')
-  const history = (data?.history ?? []).filter(matches)
+  const active = data?.active ?? []
 
   return (
     <>
@@ -327,23 +235,6 @@ export default function ReservationsDesk({
         />
       )}
 
-      {asking && (
-        <ConfirmDialog
-          title={asking.to === 'rejected' ? 'Reject this booking?' : 'Cancel this booking?'}
-          description={`${asking.reservation.customer_name || 'Guest'} · ${
-            new Date(asking.reservation.reserved_at).toLocaleString([], {
-              day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit',
-            })} · ${asking.reservation.party_size} guests. The table is freed immediately.`}
-          confirmLabel={asking.to === 'rejected' ? 'Reject booking' : 'Cancel booking'}
-          cancelLabel="Keep the booking"
-          tone="danger"
-          reason={{ label: 'Reason for the guest', placeholder: 'Fully booked, closed for a private event…' }}
-          busy={Boolean(busy)}
-          onCancel={() => setAsking(null)}
-          onConfirm={(text) => act(asking.reservation, asking.to, text)}
-        />
-      )}
-
       {view === 'timeline' && locationId && (
         <TimelineDesk locationId={locationId} date={day} query={query} />
       )}
@@ -353,75 +244,14 @@ export default function ReservationsDesk({
           и есть её смысл, поэтому выбранная точка тут не сужает данные. */}
       {view === 'analytics' && <ReserveAnalytics locations={context.locations || []} />}
 
-      {view === 'list' && (
-      <section className="panel form-panel reservation-list-panel">
-        <div className="panel-heading">
-          <div>
-            <h2>Requests</h2>
-            <p>New booking requests appear instantly with a chime.</p>
-          </div>
-          <button type="button" className="icon-button" aria-label="Refresh" onClick={() => refresh()}>
-            <RefreshCw />
-          </button>
-        </div>
-        {data === null ? (
-          <p className="empty-state">Loading…</p>
-        ) : pending.length === 0 ? (
-          <p className="empty-state">
-            {query.trim() ? `No pending request matches “${query.trim()}”.` : 'No pending requests.'}
-          </p>
-        ) : (
-          <div className="order-grid">
-            {pending.map((reservation) => (
-              <ReservationCard
-                key={reservation.id}
-                reservation={reservation}
-                busyAction={busy?.id === reservation.id ? busy.to : null}
-                onAction={act}
-              />
-            ))}
-          </div>
-        )}
-      </section>
-      )}
-
-      {view === 'list' && (
-      <section className="panel form-panel reservation-list-panel">
-        <div className="panel-heading">
-          <div><h2>Upcoming & today</h2><p>Confirmed visits from today onwards.</p></div>
-        </div>
-        {data === null ? (
-          <p className="empty-state">Loading…</p>
-        ) : confirmed.length === 0 ? (
-          <p className="empty-state">
-            {query.trim() ? `No visit matches “${query.trim()}”.` : 'No confirmed visits yet.'}
-          </p>
-        ) : (
-          <div className="order-grid">
-            {confirmed.map((reservation) => (
-              <ReservationCard
-                key={reservation.id}
-                reservation={reservation}
-                busyAction={busy?.id === reservation.id ? busy.to : null}
-                onAction={act}
-              />
-            ))}
-          </div>
-        )}
-      </section>
-      )}
-
-      {view === 'list' && history.length > 0 && (
-        <section className="panel form-panel reservation-list-panel">
-          <div className="panel-heading">
-            <div><h2>Recent history</h2><p>Completed, no-show, rejected and cancelled bookings.</p></div>
-          </div>
-          <div className="order-grid is-history">
-            {history.map((reservation) => (
-              <ReservationCard key={reservation.id} reservation={reservation} busyAction={null} onAction={() => {}} />
-            ))}
-          </div>
-        </section>
+      {view === 'list' && locationId && (
+        <ReservationList
+          locationId={locationId}
+          date={day}
+          query={query}
+          filters={filters}
+          onFilters={onFiltersChange}
+        />
       )}
     </>
   )

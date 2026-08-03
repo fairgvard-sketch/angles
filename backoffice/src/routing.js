@@ -31,6 +31,30 @@ const DATE_KEY = 'd'
 const DATE_RE = /^\d{4}-\d{2}-\d{2}$/
 
 /**
+ * Фильтры раздела: состояние (st), зал (zn), источник (sr), глубина
+ * (rg), порядок (so).
+ *
+ * Живут в адресе, потому что отобранный список — это и есть ответ,
+ * который присылают в поддержку и открывают завтра снова: «покажи все
+ * неподтверждённые на неделе». Перезагрузка не должна сбрасывать отбор
+ * в «всё подряд».
+ *
+ * Список ключей закрытый: адрес — часть интерфейса, и складывать в него
+ * что попало нельзя.
+ */
+const FILTER_KEYS = ['st', 'zn', 'sr', 'rg', 'so']
+
+/** Значения фильтров из адреса; пустое — «не выбрано» */
+function parseFilters(params) {
+  const out = {}
+  for (const key of FILTER_KEYS) {
+    const value = params.get(key)
+    if (value) out[key] = value
+  }
+  return out
+}
+
+/**
  * Разбор адреса. Неизвестный или недоступный раздел — не ошибка, а
  * устаревшая ссылка: открываем Dashboard и приводим адрес в порядок
  * (`normalized: true` — вызывающему нужно заменить историю).
@@ -48,6 +72,7 @@ export function parseRoute(search, allowedViews = null) {
     locationId: params.get(LOCATION_KEY) || null,
     tab: params.get(TAB_KEY) || null,
     date: date && DATE_RE.test(date) ? date : null,
+    filters: parseFilters(params),
     normalized: Boolean(raw) && !known,
   }
 }
@@ -56,7 +81,9 @@ export function parseRoute(search, allowedViews = null) {
  * Адрес раздела. Dashboard остаётся без параметров: базовый адрес
  * кабинета не должен обрастать хвостом при первом же открытии.
  */
-export function routeToSearch({ view, locationId = null, tab = null, date = null } = {}) {
+export function routeToSearch({
+  view, locationId = null, tab = null, date = null, filters = null,
+} = {}) {
   const params = new URLSearchParams()
   if (view && view !== DEFAULT_VIEW) params.set(VIEW_KEY, view)
   if (locationId) params.set(LOCATION_KEY, locationId)
@@ -64,6 +91,12 @@ export function routeToSearch({ view, locationId = null, tab = null, date = null
   // Сегодняшний день в адрес не пишем: базовая ссылка на раздел не
   // должна протухать к завтрашнему утру.
   if (date && DATE_RE.test(date)) params.set(DATE_KEY, date)
+  // Значение по умолчанию тоже не пишем: адрес отражает выбор человека,
+  // а не полный слепок состояния экрана.
+  for (const key of FILTER_KEYS) {
+    const value = filters?.[key]
+    if (value) params.set(key, String(value))
+  }
   const query = params.toString()
   return query ? `?${query}` : ''
 }
@@ -79,4 +112,5 @@ export function sameRoute(a, b) {
     && a?.locationId === b?.locationId
     && a?.tab === b?.tab
     && (a?.date ?? null) === (b?.date ?? null)
+    && FILTER_KEYS.every((key) => (a?.filters?.[key] ?? null) === (b?.filters?.[key] ?? null))
 }

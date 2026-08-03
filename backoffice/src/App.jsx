@@ -698,6 +698,7 @@ function Dashboard({ session, context, onReloadContext }) {
       locationId: parsed.locationId || readStoredLocation(),
       tab: parsed.tab,
       date: parsed.date,
+      filters: parsed.filters,
     }
   })
 
@@ -730,13 +731,15 @@ function Dashboard({ session, context, onReloadContext }) {
   // Адрес всегда отражает то, что на экране; кривой приводим в порядок
   // заменой записи, чтобы Назад не возвращал в него же.
   useEffect(() => {
-    const current = { view, locationId, tab: route.tab, date: route.date }
+    const current = {
+      view, locationId, tab: route.tab, date: route.date, filters: route.filters,
+    }
     routeRef.current = current
     const url = routeToUrl(current, window.location.pathname)
     if (url !== window.location.pathname + window.location.search) {
       window.history.replaceState({ ...current }, '', url)
     }
-  }, [view, locationId, route.tab, route.date])
+  }, [view, locationId, route.tab, route.date, route.filters])
 
   // Назад/Вперёд браузера меняют раздел, а не выкидывают из кабинета
   const poppedRef = useRef(false)
@@ -744,7 +747,8 @@ function Dashboard({ session, context, onReloadContext }) {
     function onPopState() {
       const parsed = parseRoute(window.location.search)
       const next = {
-        view: parsed.view, locationId: parsed.locationId, tab: parsed.tab, date: parsed.date,
+        view: parsed.view, locationId: parsed.locationId, tab: parsed.tab,
+        date: parsed.date, filters: parsed.filters,
       }
       routeRef.current = next
       poppedRef.current = true
@@ -779,8 +783,9 @@ function Dashboard({ session, context, onReloadContext }) {
       // Вкладка принадлежит разделу: уходя из него, её нельзя тащить.
       // Явно переданная вкладка — переход «в конкретное место раздела».
       tab: nextTab ?? (nextView === prev.view ? prev.tab : null),
-      // День — тоже свойство раздела, а не кабинета целиком.
+      // День и отбор — тоже свойства раздела, а не кабинета целиком.
       date: nextView === prev.view ? prev.date : null,
+      filters: nextView === prev.view ? prev.filters : null,
     })
   }, [applyRoute])
 
@@ -801,6 +806,12 @@ function Dashboard({ session, context, onReloadContext }) {
     applyRoute({ ...routeRef.current, date: nextDate || null }, 'replace')
   }, [applyRoute])
 
+  // Отбор — уточнение того же экрана: он живёт в адресе, но не набивает
+  // историю браузера шагом на каждый выбранный фильтр.
+  const changeFilters = useCallback((nextFilters) => {
+    applyRoute({ ...routeRef.current, filters: nextFilters || null }, 'replace')
+  }, [applyRoute])
+
   useEffect(() => { if (locationId) storeLocation(locationId) }, [locationId])
 
   async function signOut() {
@@ -812,7 +823,12 @@ function Dashboard({ session, context, onReloadContext }) {
   const scopedProps = { locationId, onLocationChange: changeLocation }
   const tabProps = { tab: route.tab, onTabChange: changeTab }
   // День живёт в адресе только у раздела броней — остальным он не нужен
-  const dateProps = { date: route.date, onDateChange: changeDate }
+  const dateProps = {
+    date: route.date,
+    onDateChange: changeDate,
+    filters: route.filters ?? {},
+    onFiltersChange: changeFilters,
+  }
 
   return (
     <AppShell

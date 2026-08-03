@@ -1567,6 +1567,80 @@ a { color: inherit; }
   border-bottom-color: var(--rsv-accent); color: var(--c-text); font-weight: 730;
 }
 
+/*
+ * Список броней — рабочая таблица.
+ *
+ * Была сетка крупных карточек: одна бронь занимала четверть экрана, и
+ * десяток визитов уже не помещался. Таблица отвечает на вопрос «что у
+ * нас в субботу вечером» одним взглядом, а не прокруткой.
+ */
+.rsv-list-toolbar {
+  display: flex; flex-wrap: wrap; align-items: center; gap: var(--sp-2);
+  margin-bottom: var(--sp-3);
+}
+.rsv-select select {
+  min-height: 40px; padding: 0 30px 0 10px;
+  border: 1px solid var(--c-border-panel); border-radius: var(--r-md);
+  background: var(--c-surface); color: var(--c-text); font: inherit; font-size: 13px; font-weight: 650;
+}
+.rsv-table-scroll {
+  max-width: 100%; max-height: min(70vh, 760px); overflow: auto; overscroll-behavior: contain;
+  border: 1px solid var(--c-border-panel); border-radius: 10px; background: var(--c-surface);
+}
+.rsv-table { width: 100%; border-collapse: collapse; font-size: 14px; }
+/* Шапка держится при прокрутке: без неё на третьем десятке строк
+   непонятно, что за колонка перед глазами */
+.rsv-table thead th {
+  position: sticky; top: 0; z-index: 2; text-align: start;
+  padding: var(--sp-2) var(--sp-3); background: var(--c-surface);
+  border-bottom: 1px solid var(--c-border-panel);
+  color: var(--c-text-subtle); font-size: 11px; font-weight: 750;
+  letter-spacing: .04em; text-transform: uppercase; white-space: nowrap;
+}
+.rsv-sort {
+  padding: 0; border: 0; background: none; font: inherit; color: inherit;
+  letter-spacing: inherit; text-transform: inherit; cursor: pointer;
+}
+.rsv-sort:hover { color: var(--c-text); }
+/* Разделитель дня: «Today», «Tomorrow» — сутки читаются без вычислений */
+.rsv-day-row th {
+  position: sticky; top: 33px; z-index: 1; text-align: start;
+  padding: var(--sp-2) var(--sp-3); background: var(--c-surface-muted);
+  border-block: 1px solid var(--c-border-hair);
+  font-size: 12px; font-weight: 750; color: var(--c-text-muted);
+}
+.rsv-day-row span { font-weight: 500; color: var(--c-text-faint); }
+.rsv-row { cursor: pointer; border-bottom: 1px solid var(--c-border-hair); }
+.rsv-row:hover { background: var(--c-surface-hover); }
+.rsv-row:focus-visible { outline: 2px solid var(--rsv-accent); outline-offset: -2px; }
+/* Выбранная строка — тем же кобальтом, что и выбранный блок на полотне */
+.rsv-row.is-selected { background: #eef3fe; box-shadow: inset 3px 0 0 var(--rsv-accent); }
+.rsv-table td { padding: var(--sp-2) var(--sp-3); color: var(--c-text-2); vertical-align: middle; }
+.rsv-cell-time { font-variant-numeric: tabular-nums; font-weight: 700; color: var(--c-text); white-space: nowrap; }
+.rsv-cell-guest strong { display: block; color: var(--c-text); font-size: 14px; font-weight: 650; }
+.rsv-cell-guest small { color: var(--c-text-subtle); font-size: 12px; font-variant-numeric: tabular-nums; }
+.rsv-cell-party { font-variant-numeric: tabular-nums; }
+.rsv-note {
+  display: block; max-width: 240px; overflow: hidden;
+  text-overflow: ellipsis; white-space: nowrap; color: var(--c-text-muted);
+}
+.rsv-pager {
+  display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between;
+  gap: var(--sp-2); margin-top: var(--sp-3); color: var(--c-text-muted); font-size: 13px;
+}
+.rsv-pager-buttons { display: flex; align-items: center; gap: var(--sp-2); }
+.rsv-pager-page { font-variant-numeric: tabular-nums; }
+.rsv-list-skeleton { padding: var(--sp-2); }
+.rsv-skeleton-row { display: flex; gap: var(--sp-3); padding: var(--sp-3) var(--sp-2); }
+.rsv-skeleton-row span {
+  height: 12px; border-radius: var(--r-sm);
+  background: linear-gradient(90deg, var(--c-surface-sunken), var(--c-surface-hover), var(--c-surface-sunken));
+  background-size: 200% 100%; animation: timeline-shimmer 1.4s ease-in-out infinite;
+}
+@media (prefers-reduced-motion: reduce) {
+  .rsv-skeleton-row span { animation: none; }
+}
+
 /* Чеклист запуска: свёрнут — одна строка, а не первый экран телефона */
 .launch-toggle {
   display: flex; align-items: center; gap: 10px; min-height: 44px;
@@ -1773,6 +1847,26 @@ a { color: inherit; }
   .timeline-panel > .panel-heading { margin-inline: -12px; padding-inline: 16px; }
   .timeline-controls { grid-template-columns: minmax(0, 1fr); align-items: stretch; gap: 10px; }
   .timeline-zone-filter { min-width: 0; }
+  /*
+   * Список на телефоне: колонки не сжимаются до нечитаемости, а
+   * отпадают по важности. «Источник» и «заметка» есть в панели визита —
+   * восемь колонок на 390 px превратились бы в кашу из переносов.
+   */
+  .rsv-col-source, .rsv-col-note { display: none; }
+  /* Ещё уже — уходит и стол с телефоном: на 390 px важнее, чтобы имя
+     гостя стояло одной строкой, а не ломалось пополам. Всё убранное
+     целиком есть в панели визита, до которой один тап. */
+  @media (max-width: 560px) {
+    .rsv-col-table { display: none; }
+    .rsv-cell-guest small { display: none; }
+  }
+  .rsv-list-toolbar .rsv-select { flex: 1 1 44%; }
+  .rsv-list-toolbar select { width: 100%; min-height: 44px; }
+  .rsv-table { font-size: 13px; }
+  .rsv-table td, .rsv-table thead th { padding: 10px var(--sp-2); }
+  .rsv-row { min-height: 44px; }
+  .rsv-pager { justify-content: center; }
+  .rsv-pager-buttons button { min-height: 44px; }
   .timeline-guide { align-items: flex-start; flex-direction: column; gap: 7px; }
   .timeline-pan { width: 100%; justify-content: space-between; }
   .timeline-canvas { --timeline-label-width: 96px; }
