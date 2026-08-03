@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import {
-  ChevronLeft, ChevronRight, MoreHorizontal, RefreshCw, Store, X,
+  ChevronLeft, ChevronRight, MoreHorizontal, RefreshCw, SlidersHorizontal,
+  Store, X,
 } from 'lucide-react'
 import { supabase } from './supabase'
 import {
@@ -39,6 +40,32 @@ import { SearchField } from './ui/Layout'
 
 /** Колонки, которые прячутся на планшете: строка обязана оставаться читаемой */
 const SECONDARY = 'ord-col-secondary'
+
+/** Ширина, ниже которой таблица перестаёт быть таблицей */
+const NARROW = '(max-width: 640px)'
+
+/**
+ * Узкий экран. Раскладку решает разметка, а не только CSS: девять
+ * колонок, ужатых до телефона, — это не список заказов, а таблица,
+ * которую невозможно прочесть. На телефоне рисуется другой компонент,
+ * поэтому ширину надо знать в JS.
+ */
+function useNarrow() {
+  const [narrow, setNarrow] = useState(
+    () => (typeof window !== 'undefined' && window.matchMedia
+      ? window.matchMedia(NARROW).matches
+      : false)
+  )
+  useEffect(() => {
+    if (!window.matchMedia) return undefined
+    const mq = window.matchMedia(NARROW)
+    const onChange = () => setNarrow(mq.matches)
+    onChange()
+    mq.addEventListener('change', onChange)
+    return () => mq.removeEventListener('change', onChange)
+  }, [])
+  return narrow
+}
 
 /**
  * Действия строки. Отдельное меню, а не ряд кнопок в ячейке: у заказа их
@@ -206,19 +233,96 @@ function OrdersTable({
   )
 }
 
-/** Скелет той же геометрии, что таблица: раздел не прыгает при загрузке */
-function TableSkeleton() {
+/**
+ * Список заказов для телефона.
+ *
+ * Каждая строка отвечает на то, ради чего в раздел заходят с телефона:
+ * какой это заказ, когда пришёл, чей он, на сколько и в каком он
+ * состоянии. Остальное — в панели: она на телефоне открывается листом
+ * снизу и показывает заказ целиком.
+ */
+function OrdersList({
+  rows, groups, scope, currency, tz, dayStartMs, nowMs, selectedId, onSelect,
+  canManage, busy, onAction, empty,
+}) {
+  const byPickup = scope === 'scheduled'
+  const blocks = groups ?? [{ key: 'all', label: null, rows }]
+  const total = blocks.reduce((n, block) => n + block.rows.length, 0)
+
+  if (total === 0) return <p className="empty-state">{empty}</p>
+
   return (
-    <div className="ord-table-scroll ord-skeleton">
+    <div className="ord-cards">
+      {blocks.map((block) => (
+        <section key={block.key}>
+          {block.label && (
+            <h3 className="ord-cards-day">
+              {block.label} <span>· {block.rows.length}</span>
+            </h3>
+          )}
+          <ul>
+            {block.rows.map((row) => {
+              const at = byPickup ? row.pickup_at : row.created_at
+              const active = ACTIVE_STATUSES.includes(row.status)
+              const actions = canManage && !row.order_id
+                ? (NEXT_ACTIONS[row.status] ?? [])
+                : []
+              return (
+                <li key={row.id} className={row.id === selectedId ? 'is-selected' : undefined}>
+                  <button
+                    type="button"
+                    className="ord-card-open"
+                    aria-expanded={row.id === selectedId}
+                    onClick={() => onSelect(row.id)}
+                  >
+                    <span className="ord-card-head">
+                      <strong>{orderNumber(row)}</strong>
+                      <span className="ord-card-time">
+                        {orderTimeLabel(at, dayStartMs, tz)}
+                        {active && scope === 'active' && (
+                          <small> · {elapsedLabel(row.created_at, nowMs)}</small>
+                        )}
+                      </span>
+                    </span>
+                    <span className="ord-card-body">
+                      <span className="ord-card-context">{rowContext(row)}</span>
+                      <span className="ord-card-sum">
+                        {itemsLabel(row.item_count)} · {formatMoney(row.total, currency)}
+                      </span>
+                    </span>
+                  </button>
+                  <span className="ord-card-side">
+                    <span className={`ord-status is-${STATUS_TONE[row.status] ?? 'done'}`}>
+                      {STATUS_LABELS[row.status] ?? row.status}
+                    </span>
+                    <RowMenu
+                      label={`Actions for order ${orderNumber(row)}`}
+                      items={actions}
+                      disabled={busy?.id === row.id}
+                      onPick={(to) => onAction(row, to)}
+                    />
+                  </span>
+                </li>
+              )
+            })}
+          </ul>
+        </section>
+      ))}
+    </div>
+  )
+}
+
+/** Скелет той же геометрии, что готовый экран: раздел не прыгает при загрузке */
+function DeskSkeleton({ narrow }) {
+  const widths = narrow
+    ? [['22%', '34%'], ['46%', '28%']]
+    : [['7%', '9%', '18%', '11%', '10%', '8%']]
+  return (
+    <div className={`ord-skeleton${narrow ? ' is-cards' : ' ord-table-scroll'}`}>
       <div role="status" aria-live="polite" className="visually-hidden">Loading orders…</div>
       {Array.from({ length: 8 }, (_, i) => (
         <div key={i} className="ord-skeleton-row" aria-hidden>
-          <span style={{ width: '7%' }} />
-          <span style={{ width: '9%' }} />
-          <span style={{ width: '18%' }} />
-          <span style={{ width: '11%' }} />
-          <span style={{ width: '10%' }} />
-          <span style={{ width: '8%' }} />
+          {widths.flat().map((w, j) => <span key={j} style={{ width: w }} />)}
         </div>
       ))}
     </div>
@@ -260,11 +364,18 @@ export default function OrdersInbox({
   // Долг прошлых дней свёрнут по умолчанию: это чужая вчерашняя работа,
   // а не то, ради чего раздел открыли.
   const [debtOpen, setDebtOpen] = useState(false)
+  // Идёт ли запрос. Отдельно от данных: смена фильтра не должна стирать
+  // то, что уже на экране.
+  const [loading, setLoading] = useState(true)
   // Страница истории — состояние экрана, а не ссылки: присылают отбор и
   // период, а не «третью страницу».
   const [page, setPage] = useState(1)
   const knownIds = useRef(new Set())
   const requestRef = useRef(0)
+  const narrow = useNarrow()
+  // Отбор на телефоне занимал две строки над списком — там, где нужен
+  // сам список. Прячем за одну кнопку, на десктопе он всегда открыт.
+  const [showFilters, setShowFilters] = useState(false)
 
   // Возраст заказа — живая величина: без тика «5 min ago» застывает
   useEffect(() => {
@@ -321,6 +432,7 @@ export default function OrdersInbox({
     if (!locationId) return
     const ticket = requestRef.current + 1
     requestRef.current = ticket
+    setLoading(true)
     const params = {
       scope: view,
       status: status === 'all' ? null : status,
@@ -358,6 +470,8 @@ export default function OrdersInbox({
     } catch (e) {
       if (requestRef.current !== ticket) return
       setError(deskError(e.message))
+    } finally {
+      if (requestRef.current === ticket) setLoading(false)
     }
   }, [locationId, view, status, channel, type, search, debtWanted,
     period.from, period.to, page])
@@ -388,13 +502,20 @@ export default function OrdersInbox({
     }
   }, [locationId, refresh])
 
-  // Смена разреза, отбора или точки — это другой вопрос к серверу
+  /*
+   * Пустой экран показывается только когда показывать НЕЧЕГО: при смене
+   * точки. Смена вкладки, фильтра или страницы оставляет прежние строки
+   * на месте до прихода новых — иначе раздел мигает скелетом на каждую
+   * букву в поиске, а список прыгает под курсором.
+   */
   useEffect(() => {
     setDesk(null)
     setOlder(null)
+    setSelectedId(null)
     knownIds.current = new Set()
-    refresh()
-  }, [refresh])
+  }, [locationId])
+
+  useEffect(() => { refresh() }, [refresh])
 
   async function act(row, to) {
     /*
@@ -472,6 +593,11 @@ export default function OrdersInbox({
       ? 'Handled on the register'
       : 'Handled on the register — no open shift right now')
 
+  // Девять колонок, ужатых до телефона, — это не список заказов; на
+  // узком экране раздел рисует другой компонент, а не ту же таблицу
+  // мельче.
+  const Rows = narrow ? OrdersList : OrdersTable
+
   const tableProps = {
     currency, tz, dayStartMs: dayStart, nowMs, selectedId,
     onSelect: setSelectedId, canManage, busy, onAction: act,
@@ -513,7 +639,19 @@ export default function OrdersInbox({
         onChange={setView}
       />
 
-      <div className="ord-toolbar">
+      <button
+        type="button"
+        className="ord-filters-toggle"
+        aria-expanded={showFilters}
+        aria-controls="ord-filters"
+        onClick={() => setShowFilters((v) => !v)}
+      >
+        <SlidersHorizontal aria-hidden />
+        Filters
+        {filtersOn && <span className="order-count">on</span>}
+      </button>
+
+      <div id="ord-filters" className={`ord-toolbar${showFilters ? ' is-open' : ''}`}>
         {/* Период спрашиваем только там, где он что-то меняет: у работы
             дня границы задаёт смена, а не выбор в шапке. */}
         {view === 'all' && (
@@ -576,11 +714,11 @@ export default function OrdersInbox({
       )}
 
       {desk === null ? (
-        <TableSkeleton />
+        <DeskSkeleton narrow={narrow} />
       ) : (
         <>
-          <section className="panel form-panel ord-panel">
-            <OrdersTable
+          <section className="panel form-panel ord-panel" aria-busy={loading || undefined}>
+            <Rows
               rows={rows}
               scope={view}
               empty={filtersOn
@@ -655,7 +793,7 @@ export default function OrdersInbox({
                   {older === null ? (
                     <p className="empty-state">Loading…</p>
                   ) : (
-                    <OrdersTable
+                    <Rows
                       groups={debtGroups}
                       scope="older"
                       empty="No order from previous days matches these filters."

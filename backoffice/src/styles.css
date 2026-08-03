@@ -2532,3 +2532,113 @@ a { color: inherit; }
   .ord-pager { justify-content: center; }
   .ord-pager-buttons button { min-height: 44px; }
 }
+
+/*
+ * Телефон: список вместо таблицы (Phase 7).
+ *
+ * Девять колонок, ужатых до 390 px, читать невозможно, а горизонтальный
+ * ход внутри таблицы прячет сумму — то самое, ради чего в раздел и
+ * заходят с телефона. Строка списка отвечает на пять вопросов сразу:
+ * какой заказ, когда, чей, на сколько и в каком состоянии.
+ */
+.ord-cards ul { list-style: none; margin: 0; padding: 0; }
+.ord-cards li {
+  display: flex; align-items: center; gap: var(--sp-2);
+  padding: var(--sp-2) var(--sp-3);
+  border-bottom: 1px solid var(--c-border-hair);
+}
+.ord-cards li:last-child { border-bottom: 0; }
+.ord-cards li.is-selected { background: var(--st-accent-soft); }
+.ord-cards-day {
+  margin: 0; padding: 8px var(--sp-3);
+  background: var(--c-surface-muted);
+  color: var(--c-text-muted); font-size: 12px; font-weight: 650;
+  text-transform: uppercase; letter-spacing: 0.02em;
+}
+.ord-cards-day span { font-weight: 550; text-transform: none; }
+.ord-card-open {
+  flex: 1 1 auto; min-width: 0; min-height: 56px;
+  /* minmax(0,1fr), а не 1fr: элемент грида по умолчанию не меньше своего
+     содержимого, и длинное имя гостя выдавливало состояние за край. */
+  display: grid; grid-template-columns: minmax(0, 1fr); gap: 2px; padding: 6px 0;
+  border: 0; background: transparent; font: inherit; text-align: start;
+  cursor: pointer;
+}
+.ord-card-head { display: flex; align-items: baseline; gap: var(--sp-2); min-width: 0; }
+.ord-card-head strong {
+  font-size: 15px; font-weight: 700; color: var(--c-text-strong);
+  font-variant-numeric: tabular-nums;
+}
+.ord-card-time { color: var(--c-text-muted); font-size: 13px; font-variant-numeric: tabular-nums; }
+.ord-card-time small { color: var(--c-text-subtle); font-size: 12px; }
+.ord-card-body { display: flex; align-items: baseline; gap: var(--sp-2); min-width: 0; }
+.ord-card-context {
+  flex: 1 1 auto; min-width: 0; overflow: hidden; text-overflow: ellipsis;
+  white-space: nowrap; font-size: 14px; color: var(--c-text);
+}
+.ord-card-sum {
+  flex: none; margin-inline-start: auto;
+  color: var(--c-text-2); font-size: 13px; font-variant-numeric: tabular-nums;
+}
+/* Место под меню резервируется всегда: у заказа, принятого на кассе,
+   действий нет, и без резерва его состояние уезжало в чужую колонку —
+   список переставал читаться столбиком. */
+.ord-card-side {
+  flex: none; display: grid; grid-template-columns: auto 44px;
+  align-items: center; justify-items: end; gap: var(--sp-1);
+}
+.ord-card-side .icon-button { width: 44px; height: 44px; }
+
+/* Скелет карточек — та же геометрия, что у готового списка */
+.ord-skeleton.is-cards .ord-skeleton-row {
+  display: grid; grid-template-columns: 1fr auto; gap: 6px;
+  height: auto; padding: var(--sp-3);
+}
+
+/* Отбор на телефоне живёт за одной кнопкой */
+.ord-filters-toggle { display: none; }
+@media (max-width: 640px) {
+  .ord-filters-toggle {
+    display: inline-flex; align-items: center; gap: 6px;
+    min-height: 44px; margin-bottom: var(--sp-2); padding: 0 12px;
+    border: 1px solid var(--c-border); border-radius: var(--r-md);
+    background: var(--c-surface); font: inherit; font-size: 14px;
+    color: var(--c-text); cursor: pointer;
+  }
+  .ord-filters-toggle svg { width: 16px; height: 16px; }
+  /* Прячем сам отбор, а не строку целиком: подпись «кем обслуживается»
+     — факт о разделе, а не фильтр, и она нужна и в свёрнутом виде. */
+  .ord-toolbar .ord-select,
+  .ord-toolbar > .text-button { display: none; }
+  .ord-toolbar.is-open { flex-wrap: wrap; }
+  .ord-toolbar.is-open .ord-select { display: block; flex: 1 1 140px; }
+  .ord-toolbar.is-open > .text-button { display: inline-flex; }
+  .ord-owner { margin-inline-start: 0; }
+}
+
+/*
+ * Планшет и телефон: цели под палец (Phase 7).
+ *
+ * Промах в час пик стоит дороже пары лишних пикселей строки, поэтому
+ * 44 px действуют до 1024 включительно — это и есть рабочая ширина
+ * планшета у стойки, а не только телефон в кармане.
+ */
+@media (max-width: 1024px) {
+  .ord-tabs button { min-height: 44px; }
+  .ord-select select { min-height: 44px; }
+  .ord-header .order-search { min-height: 44px; }
+  .ord-header .order-search input { min-height: 42px; }
+  .ord-header-live .icon-button,
+  .ord-cell-menu .icon-button { width: 44px; height: 44px; }
+  .ord-open { min-height: 44px; }
+  .ord-toolbar .text-button,
+  .ord-debt-toggle { min-height: 44px; }
+}
+/* Идёт запрос: список приглушается, но остаётся на месте — экран не
+   мигает скелетом на каждую букву в поиске */
+.ord-panel[aria-busy="true"] .ord-table-scroll,
+.ord-panel[aria-busy="true"] .ord-cards { opacity: 0.55; transition: opacity .12s ease-out; }
+@media (prefers-reduced-motion: reduce) {
+  .ord-panel[aria-busy="true"] .ord-table-scroll,
+  .ord-panel[aria-busy="true"] .ord-cards { transition: none; }
+}
