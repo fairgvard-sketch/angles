@@ -2518,3 +2518,17 @@ a { color: inherit; }
   background: var(--c-ink); color: var(--c-on-ink); font-size: 14px;
   box-shadow: var(--shadow-pop);
 }
+/* Пагинация истории: сколько показано из скольких */
+.ord-pager {
+  display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between;
+  gap: var(--sp-2); padding: var(--sp-3) var(--sp-4);
+  border-top: 1px solid var(--c-border-hair);
+  color: var(--c-text-muted); font-size: 13px;
+}
+.ord-pager-buttons { display: flex; align-items: center; gap: var(--sp-2); }
+.ord-pager-page { font-variant-numeric: tabular-nums; }
+.ord-pager svg { width: 15px; height: 15px; }
+@media (max-width: 720px) {
+  .ord-pager { justify-content: center; }
+  .ord-pager-buttons button { min-height: 44px; }
+}

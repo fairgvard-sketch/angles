@@ -2,7 +2,8 @@ import test from 'node:test'
 import assert from 'node:assert/strict'
 import {
   REALTIME_STALE_MS, STATUS_LABELS, STATUS_TONE,
-  activityActor, activityLabel,
+  DEFAULT_RANGE, HISTORY_RANGES,
+  activityActor, activityLabel, historyWindow, pageBounds,
   bucketOrders, dayStartMs, elapsedLabel, formatMoney, groupByDay, itemsLabel,
   orderItemLines, orderNumber, orderRef, orderTabs, orderTimeLabel,
   realtimeState, rowContext,
@@ -214,4 +215,25 @@ test('давние дни подписаны датой, а не «2026-07-28»'
   // at(-3, …) — это 28 июля: в августе день 0 приходится на 31 июля
   const groups = groupByDay([{ id: 'x', created_at: at(-3, 12) }], TZ, NOW)
   assert.equal(groups[0].label, '28 Jul')
+})
+
+test('окно истории считается от конца дня точки, а не браузера', () => {
+  const dayEnd = new Date(DAY_START + 86_400_000).toISOString()
+  const week = historyWindow('week', dayEnd)
+  assert.equal(week.to, dayEnd)
+  assert.equal(new Date(week.to) - new Date(week.from), 7 * 86_400_000)
+  // Неизвестный ключ — не повод показать пустоту: берём период по умолчанию
+  assert.equal(historyWindow('nonsense', dayEnd).range.key, DEFAULT_RANGE)
+  // Пока сервер не ответил, границ нет — запрос уйдёт с окном по умолчанию
+  assert.deepEqual(historyWindow('week', null), {
+    from: null, to: null, range: HISTORY_RANGES[1],
+  })
+})
+
+test('страница выборки не врёт про размер', () => {
+  assert.deepEqual(pageBounds(214, 1), { page: 1, pages: 5, total: 214, from: 1, to: 50 })
+  assert.deepEqual(pageBounds(214, 5), { page: 5, pages: 5, total: 214, from: 201, to: 214 })
+  // Страница за пределами — возвращаемся к последней, а не в пустоту
+  assert.equal(pageBounds(214, 99).page, 5)
+  assert.deepEqual(pageBounds(0, 1), { page: 1, pages: 1, total: 0, from: 0, to: 0 })
 })

@@ -1,19 +1,20 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import {
-  ChevronRight, MoreHorizontal, RefreshCw, Store, X,
+  ChevronLeft, ChevronRight, MoreHorizontal, RefreshCw, Store, X,
 } from 'lucide-react'
 import { supabase } from './supabase'
 import {
   fetchOrdersDesk, setOnlineOrderStatus, playNewOrderChime,
 } from './orders'
 import {
-  ACTIVE_STATUSES, DONE_STATUSES, NEXT_ACTIONS, ORDER_CHANNEL_LABELS,
-  ORDER_TYPE_LABELS, STATUS_LABELS, STATUS_TONE,
-  elapsedLabel, formatMoney, groupByDay, itemsLabel, orderNumber,
-  orderTabs, orderTimeLabel, realtimeState, rowContext,
+  ACTIVE_STATUSES, DEFAULT_RANGE, DONE_STATUSES, HISTORY_RANGES, NEXT_ACTIONS,
+  ORDER_CHANNEL_LABELS, ORDER_TYPE_LABELS, PAGE_SIZE, STATUS_LABELS, STATUS_TONE,
+  elapsedLabel, formatMoney, groupByDay, historyWindow, itemsLabel, orderNumber,
+  orderTabs, orderTimeLabel, pageBounds, realtimeState, rowContext,
 } from './orders-inbox'
 import OrderSheet from './OrderSheet'
 import ConfirmDialog from './ui/ConfirmDialog'
+import { Button } from './ui/Button'
 import Tabs from './ui/Tabs'
 import { IconButton } from './ui/Button'
 import { SearchField } from './ui/Layout'
@@ -259,6 +260,9 @@ export default function OrdersInbox({
   // Долг прошлых дней свёрнут по умолчанию: это чужая вчерашняя работа,
   // а не то, ради чего раздел открыли.
   const [debtOpen, setDebtOpen] = useState(false)
+  // Страница истории — состояние экрана, а не ссылки: присылают отбор и
+  // период, а не «третью страницу».
+  const [page, setPage] = useState(1)
   const knownIds = useRef(new Set())
   const requestRef = useRef(0)
 
@@ -302,6 +306,17 @@ export default function OrdersInbox({
   const view = tabs.some((t) => t.key === tab) ? tab : 'active'
   const setView = (key) => onTabChange?.(key === 'active' ? null : key)
 
+  /*
+   * Глубина истории живёт в адресе: «покажи прошлую неделю» — это ответ,
+   * который присылают в поддержку. Работе дня период задаёт смена,
+   * поэтому селектор есть только на вкладке истории.
+   */
+  const rangeKey = filters.rg ?? DEFAULT_RANGE
+  const period = useMemo(
+    () => historyWindow(rangeKey, desk?.day_end),
+    [rangeKey, desk?.day_end]
+  )
+
   const refresh = useCallback(async (withSound = false) => {
     if (!locationId) return
     const ticket = requestRef.current + 1
@@ -312,7 +327,11 @@ export default function OrdersInbox({
       channel: channel === 'all' ? null : channel,
       type: type === 'all' ? null : type,
       query: search || null,
-      limit: 200,
+      // История листается страницами: полсотни строк — это ответ, а не
+      // «первые двести из тысячи». Работа дня и долг ограничены сами.
+      ...(view === 'all'
+        ? { from: period.from, to: period.to, limit: PAGE_SIZE, offset: (page - 1) * PAGE_SIZE }
+        : { limit: 200 }),
     }
     try {
       /*
@@ -340,7 +359,11 @@ export default function OrdersInbox({
       if (requestRef.current !== ticket) return
       setError(deskError(e.message))
     }
-  }, [locationId, view, status, channel, type, search, debtWanted])
+  }, [locationId, view, status, channel, type, search, debtWanted,
+    period.from, period.to, page])
+
+  // Сузили отбор — третьей страницы может уже не быть; возвращаемся к первой
+  useEffect(() => { setPage(1) }, [view, status, channel, type, search, rangeKey])
 
   // Realtime + страховочный поллинг
   useEffect(() => {
@@ -412,6 +435,7 @@ export default function OrdersInbox({
   // Пока долг не загружен, счётчик берётся из ответа сервера: свёрнутый
   // блок обязан честно называть, сколько там лежит.
   const debtCount = filtersOn ? debtRows.length : (Number(counts.older) || 0)
+  const bounds = pageBounds(desk?.total, page)
   const debtGroups = useMemo(
     () => groupByDay(debtRows, desk?.timezone || 'Asia/Jerusalem', nowMs),
     [debtRows, desk?.timezone, nowMs]
@@ -490,6 +514,18 @@ export default function OrdersInbox({
       />
 
       <div className="ord-toolbar">
+        {/* Период спрашиваем только там, где он что-то меняет: у работы
+            дня границы задаёт смена, а не выбор в шапке. */}
+        {view === 'all' && (
+          <label className="ord-select">
+            <span className="visually-hidden">Period</span>
+            <select value={rangeKey} onChange={(e) => setFilter('rg', e.target.value)}>
+              {HISTORY_RANGES.map((r) => (
+                <option key={r.key} value={r.key}>{r.label}</option>
+              ))}
+            </select>
+          </label>
+        )}
         <label className="ord-select">
           <span className="visually-hidden">Source</span>
           <select value={channel} onChange={(e) => setFilter('ch', e.target.value)}>
@@ -554,11 +590,33 @@ export default function OrdersInbox({
                     : 'No open orders right now.'}
               {...tableProps}
             />
-            {view === 'all' && desk.total > rows.length && (
-              <p className="timeline-hidden-note">
-                Showing the first {rows.length} of {desk.total} orders — narrow the
-                search or the filters to see the rest.
-              </p>
+            {view === 'all' && rows.length > 0 && (
+              <div className="ord-pager">
+                <span>
+                  {bounds.from}–{bounds.to} of {bounds.total} orders
+                </span>
+                {bounds.pages > 1 && (
+                  <div className="ord-pager-buttons">
+                    <Button
+                      size="compact"
+                      disabled={bounds.page <= 1}
+                      onClick={() => setPage(bounds.page - 1)}
+                    >
+                      <ChevronLeft /> Previous
+                    </Button>
+                    <span className="ord-pager-page">
+                      Page {bounds.page} of {bounds.pages}
+                    </span>
+                    <Button
+                      size="compact"
+                      disabled={bounds.page >= bounds.pages}
+                      onClick={() => setPage(bounds.page + 1)}
+                    >
+                      Next <ChevronRight />
+                    </Button>
+                  </div>
+                )}
+              </div>
             )}
           </section>
 

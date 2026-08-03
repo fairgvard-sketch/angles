@@ -202,6 +202,53 @@ function humanDay(key, tz) {
   }
 }
 
+/**
+ * Глубина вкладки «All orders». Сервер по умолчанию отдаёт последние 30
+ * дней; здесь владелец говорит, какой период его интересует, и это
+ * единственное место, где раздел спрашивает про дату — у работы дня
+ * период задаёт сама смена.
+ */
+export const HISTORY_RANGES = [
+  { key: 'today', label: 'Today', days: 1 },
+  { key: 'week', label: 'Last 7 days', days: 7 },
+  { key: 'month', label: 'Last 30 days', days: 30 },
+]
+
+export const DEFAULT_RANGE = 'month'
+
+/**
+ * Границы окна истории от конца текущего дня точки назад. День берётся
+ * с сервера (`day_end`), поэтому «сегодня» здесь то же самое, что у
+ * разрезов, а не то, что показывают часы браузера.
+ */
+export function historyWindow(rangeKey, dayEndIso) {
+  const range = HISTORY_RANGES.find((r) => r.key === rangeKey)
+    ?? HISTORY_RANGES.find((r) => r.key === DEFAULT_RANGE)
+  const end = dayEndIso ? new Date(dayEndIso) : null
+  if (!end || Number.isNaN(end.getTime())) return { from: null, to: null, range }
+  return {
+    from: new Date(end.getTime() - range.days * 86_400_000).toISOString(),
+    to: end.toISOString(),
+    range,
+  }
+}
+
+/** Страница выборки: «51–100 из 214» без вранья про полный размер */
+export const PAGE_SIZE = 50
+
+export function pageBounds(total, page, size = PAGE_SIZE) {
+  const count = Math.max(Number(total) || 0, 0)
+  const pages = Math.max(Math.ceil(count / size), 1)
+  const current = Math.min(Math.max(page, 1), pages)
+  return {
+    page: current,
+    pages,
+    total: count,
+    from: count === 0 ? 0 : (current - 1) * size + 1,
+    to: Math.min(current * size, count),
+  }
+}
+
 /** «3 items» — штуки, а не строки меню (сервер считает qty, 141) */
 export function itemsLabel(count) {
   const n = Number(count) || 0
