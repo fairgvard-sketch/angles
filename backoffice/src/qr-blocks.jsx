@@ -183,26 +183,62 @@ export function NumberSelect({ value, fallback, options, onChange }) {
 }
 
 /**
- * Раскрывающаяся группа настроек.
+ * Раскрывающаяся группа настроек — строка списка.
  *
  * Свёрнутая строка показывает текущее значение (`value`), поэтому проверить
  * настройку можно не открывая её. Открытое состояние держит вызывающий
  * компонент — так группы переживают перерисовку после сохранения и можно
  * открыть нужную по умолчанию.
+ *
+ * Значение стоит под заголовком, а не в правом краю: на узкой колонке
+ * рабочей области правая колонка схлопывалась до многоточия, и владелец
+ * видел «Sun–Thu 08:00…» вместо расписания. Подпись-подсказка остаётся
+ * третьей строкой — она объясняет, ЧТО настраивается, а значение
+ * отвечает, КАК сейчас.
+ *
+ * Нажимается вся строка целиком: `Edit` — подпись, усиливающая действие,
+ * а не единственная цель, поэтому она скрыта от скринридера (кнопка уже
+ * названа заголовком).
  */
 export function SettingGroup({ icon: Icon, title, hint, value, open, onToggle, children }) {
   return (
     <section className={`setting-group${open ? ' is-open' : ''}`}>
       <button type="button" className="setting-group-head" aria-expanded={open} onClick={onToggle}>
-        <span className="setting-group-icon"><Icon /></span>
-        <span>
+        <span className="setting-group-icon" aria-hidden><Icon /></span>
+        <span className="setting-group-text">
           <strong>{title}</strong>
-          <small>{hint}</small>
+          {value && <span className="setting-group-value">{value}</span>}
+          {hint && <small>{hint}</small>}
         </span>
-        <span className="setting-group-value">{value}</span>
+        <span className="setting-group-edit" aria-hidden>{open ? 'Close' : 'Edit'}</span>
         <span className="setting-group-chevron" aria-hidden><ChevronRight /></span>
       </button>
       {open && <div className="setting-group-body">{children}</div>}
+    </section>
+  )
+}
+
+/**
+ * Строка того же списка, но ведущая в соседний раздел кабинета.
+ *
+ * Не кнопка на всю строку: внутри лежит настоящая кнопка перехода, а
+ * интерактивный элемент внутри интерактивного — это и сломанная
+ * клавиатура, и невнятное объявление скринридером.
+ */
+export function SettingLink({ icon: Icon, title, hint, value, actionLabel, onAction }) {
+  return (
+    <section className="setting-group is-static">
+      <div className="setting-group-head">
+        <span className="setting-group-icon" aria-hidden><Icon /></span>
+        <span className="setting-group-text">
+          <strong>{title}</strong>
+          {value && <span className="setting-group-value">{value}</span>}
+          {hint && <small>{hint}</small>}
+        </span>
+        <button type="button" className="text-button setting-group-action" onClick={onAction}>
+          {actionLabel}
+        </button>
+      </div>
     </section>
   )
 }

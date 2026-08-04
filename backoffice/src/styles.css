@@ -882,7 +882,9 @@ a { color: inherit; }
 .toggle-row.is-disabled input { cursor: default; }
 
 /* Сетка полей раздела; на узком экране схлопывается в одну колонку */
-.qr-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 16px; margin-top: 16px; }
+/* Пара полей в строке, пока строке хватает ширины: колонка настроек уже
+   не во весь экран, и жёсткие две колонки давали поля по 180px. */
+.qr-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); gap: 16px; margin-top: 16px; }
 .qr-field { display: grid; gap: 7px; min-width: 0; }
 .qr-field > span { font-size: 13px; font-weight: 700; color: var(--c-text-2); }
 .qr-field input, .qr-field select { height: 44px; padding: 0 14px; border: 1px solid var(--c-border); border-radius: var(--r-md); font-size: 15px; background: var(--c-surface); min-width: 0; }
@@ -941,8 +943,10 @@ a { color: inherit; }
 .background-preset-check svg { width: 15px; height: 15px; stroke-width: 3; }
 
 /* Ссылка + QR рядом: код фиксированный, текст занимает остаток */
-.qr-block { display: flex; align-items: flex-start; justify-content: space-between; gap: 24px; }
-.qr-block-text { flex: 1 1 auto; min-width: 0; }
+/* Ссылка и QR рядом, пока ссылке хватает места: в узкой рабочей области
+   код переезжает под текст сам, без отдельной точки перелома. */
+.qr-block { display: flex; flex-wrap: wrap; align-items: flex-start; justify-content: space-between; gap: 24px; }
+.qr-block-text { flex: 1 1 260px; min-width: 0; }
 .qr-block-text h3 { margin: 0; font-size: 15px; }
 .qr-block-text p { margin: 5px 0 0; color: var(--c-text-subtle); font-size: 12px; }
 .qr-link-row { display: flex; gap: 8px; margin-top: 14px; }
@@ -953,17 +957,23 @@ a { color: inherit; }
 .qr-canvas { flex: 0 0 auto; width: 176px; height: 176px; border: 1px solid var(--c-border-soft); border-radius: 10px; background: var(--c-surface); }
 .qr-table-link { margin-top: 18px; padding-top: 18px; border-top: 1px solid var(--c-border-hair); }
 
-/* Превью — результат настроек, а не ещё одна группа: отделяем зазором,
-   иначе оно читается как продолжение списка. */
-.guest-preview-panel { margin-top: 26px; overflow: hidden; }
-.guest-preview-copy { min-height: 88px; display: grid; grid-template-columns: 42px minmax(0, 1fr) auto; align-items: center; gap: 14px; padding: 20px 22px; border-bottom: 1px solid var(--c-border-soft); }
-.guest-preview-copy h2 { margin: 0; color: var(--c-ink); font-size: 17px; }
-.guest-preview-copy p { margin: 5px 0 0; color: var(--c-text-subtle); font-size: 12px; }
-.guest-preview-icon { width: 42px; height: 42px; display: grid; place-items: center; border-radius: 10px; background: var(--c-border-hair); color: #2f3540; }
-.guest-preview-icon svg { width: 21px; height: 21px; }
-.guest-preview-actions { display: flex; flex-wrap: wrap; justify-content: flex-end; gap: 8px; }
-.guest-preview-actions .secondary-button { min-height: 44px; text-decoration: none; }
-.guest-phone-frame { position: relative; width: min(390px, calc(100% - 32px)); height: 680px; margin: 24px auto; overflow: hidden; border: 9px solid var(--c-ink); border-radius: 30px; background: var(--c-surface-active); box-shadow: 0 18px 42px rgb(20 24 31 / 16%); }
+/* Превью — вторая колонка рабочей области: слева настройка, справа её
+   результат. Панель узкая, поэтому шапка идёт в две строки, а не в три
+   колонки, как раньше на всю ширину экрана. */
+.guest-preview-panel { overflow: hidden; }
+.guest-preview-copy { display: grid; gap: 12px; padding: 16px 16px 14px; border-bottom: 1px solid var(--c-border-soft); }
+.guest-preview-copy h2 { margin: 0; color: var(--c-ink); font-size: 15px; }
+.guest-preview-copy p { margin: 4px 0 0; color: var(--c-text-subtle); font-size: 12px; }
+.guest-preview-actions { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; }
+.guest-preview-actions .secondary-button { min-height: 40px; text-decoration: none; }
+.guest-preview-actions .text-button { min-height: 40px; }
+.guest-preview-actions .secondary-button.is-icon { width: 40px; padding: 0; }
+/* «Open full page» — главное действие панели, прижимаем к концу строки */
+.guest-preview-actions a.secondary-button { margin-inline-start: auto; }
+/* Высота кадра считается от окна: липкая колонка выше экрана не
+   прокручивается вместе с настройками — владелец упирался бы в обрезанный
+   телефон и не мог его довернуть. */
+.guest-phone-frame { position: relative; width: min(320px, calc(100% - 24px)); height: clamp(360px, calc(100svh - 300px), 620px); margin: 16px auto; overflow: hidden; border: 8px solid var(--c-ink); border-radius: 28px; background: var(--c-surface-active); box-shadow: 0 12px 32px rgb(20 24 31 / 14%); }
 .guest-phone-frame iframe { display: block; width: 100%; height: 100%; border: 0; background: var(--c-surface); }
 .guest-phone-frame iframe[hidden] { display: none; }
 /* Состояния превью лежат поверх кадра: пока страница не подтвердила
@@ -982,8 +992,8 @@ a { color: inherit; }
 .guest-phone-frame.is-ready .guest-preview-state { display: none; }
 .guest-preview-note {
   display: flex; align-items: flex-start; gap: 8px;
-  margin: 0 22px 22px; padding: 12px 14px; border-radius: var(--r-lg);
-  background: #fdf7ea; border: 1px solid #f0e0bd; color: #5a4514; font-size: 13px; line-height: 1.5;
+  margin: 0 16px 16px; padding: 12px 14px; border-radius: var(--r-lg);
+  background: #fdf7ea; border: 1px solid #f0e0bd; color: #5a4514; font-size: 12.5px; line-height: 1.5;
 }
 .guest-preview-note svg { width: 18px; height: 18px; flex: none; color: #b4720e; }
 
@@ -995,10 +1005,10 @@ a { color: inherit; }
   .qr-block { flex-direction: column; align-items: center; }
   .qr-block-text { width: 100%; }
   .qr-actions { display: grid; grid-template-columns: minmax(0, 1fr); }
-  .guest-preview-copy { grid-template-columns: 42px minmax(0, 1fr); }
-  .guest-preview-actions { grid-column: 1 / -1; justify-content: stretch; }
-  .guest-preview-actions .secondary-button { flex: 1 1 0; }
-  .guest-phone-frame { height: 620px; border-width: 7px; border-radius: 25px; }
+  .guest-preview-actions { display: grid; grid-template-columns: minmax(0, 1fr); }
+  .guest-preview-actions .secondary-button,
+  .guest-preview-actions .text-button { min-height: 44px; }
+  .guest-phone-frame { width: min(340px, calc(100% - 24px)); height: 600px; border-width: 7px; border-radius: 25px; }
 }
 
 /* Website embed: HTML-сниппеты для сайта ресторана (QrChannels).
@@ -1016,16 +1026,67 @@ a { color: inherit; }
   color: var(--c-text-2);
 }
 
-/* ── QR-меню: герой канала ────────────────────────────────────
-   Первый экран отвечает на два вопроса владельца: принимает ли канал
-   заказы прямо сейчас и где взять ссылку/QR. Всё остальное убрано
-   в раскрывающиеся группы ниже, поэтому герой — единственный блок,
-   который виден без прокрутки. */
-.channel-hero { padding: 26px; display: grid; grid-template-columns: minmax(0, 1fr) auto; gap: 32px; align-items: start; }
-.channel-hero-main { min-width: 0; display: grid; gap: 16px; }
-.channel-hero-status { display: flex; align-items: center; justify-content: space-between; gap: 16px; }
-.channel-hero-status h2 { margin: 0; font-size: 20px; }
-.channel-hero-status p { margin: 5px 0 0; color: var(--c-text-subtle); font-size: 13px; }
+/* ── QR-меню: вкладки каналов ─────────────────────────────────
+   Каналов ровно два, и они не должны переноситься на вторую строку
+   даже на телефоне: при нехватке ширины полоса прокручивается. */
+.channel-tabs {
+  display: flex; flex-wrap: nowrap; gap: var(--sp-2); margin-bottom: var(--sp-3);
+  overflow-x: auto; overscroll-behavior-x: contain; scrollbar-width: none;
+}
+.channel-tabs::-webkit-scrollbar { display: none; }
+.channel-tabs button {
+  flex: 0 0 auto; display: inline-flex; align-items: center; gap: 7px;
+  min-height: 40px; padding: 0 18px;
+  border: 1px solid var(--c-border-panel); border-radius: var(--r-md);
+  background: var(--c-surface); color: var(--c-text-muted);
+  font: inherit; font-size: 13px; font-weight: 700; white-space: nowrap; cursor: pointer;
+}
+.channel-tabs button:hover { border-color: var(--c-border); color: var(--c-text); }
+.channel-tabs button.is-active { border-color: var(--c-ink); background: var(--c-ink); color: var(--c-on-ink); }
+
+/* Место под «Saved» зарезервировано: отклик не должен сдвигать
+   рабочую область на строку вниз при каждом сохранении. */
+.qr-feedback { min-height: 22px; margin-bottom: var(--sp-2); }
+.qr-feedback > * { margin: 0; }
+
+/* ── QR-меню: рабочая область ─────────────────────────────────
+   Слева настройки канала, справа живое превью гостевой страницы.
+   Разделитель висит на левой колонке, а не на липкой правой: иначе
+   линия обрывалась бы там, где заканчивается прилипший блок. */
+.qr-workspace {
+  display: grid; grid-template-columns: minmax(0, 1fr) clamp(340px, 30%, 440px);
+  gap: var(--sp-5); align-items: start;
+}
+.qr-workspace-main { min-width: 0; padding-inline-end: var(--sp-5); border-inline-end: 1px solid var(--c-border-panel); }
+.qr-workspace-side { min-width: 0; position: sticky; top: 84px; }
+
+@media (max-width: 1080px) {
+  .qr-workspace { grid-template-columns: minmax(0, 1fr); gap: var(--sp-4); }
+  .qr-workspace-main { padding-inline-end: 0; border-inline-end: 0; }
+  /* Узкий экран: превью встаёт под настройки и перестаёт быть липким —
+     прилипший телефон отъедал бы пол-экрана у самих настроек. */
+  .qr-workspace-side { position: static; }
+}
+
+/* ── QR-меню: шапка канала ────────────────────────────────────
+   Одна компактная панель отвечает на два вопроса: принимает ли канал
+   гостей прямо сейчас и где взять ссылку и QR. */
+.channel-bar { padding: var(--sp-4); display: grid; grid-template-columns: minmax(0, 1fr) auto; gap: var(--sp-4); align-items: center; }
+.channel-bar-main { min-width: 0; display: grid; gap: var(--sp-3); }
+.channel-bar-state { display: flex; flex-wrap: wrap; align-items: center; gap: var(--sp-3); }
+.channel-bar-state h2 { margin: 0; font-size: 16px; }
+.channel-bar-auto { margin-inline-start: auto; color: var(--c-text-subtle); font-size: 12px; }
+.channel-bar-link { min-width: 0; display: flex; flex-wrap: wrap; align-items: center; gap: var(--sp-2); }
+.channel-bar-url {
+  flex: 1 1 240px; min-width: 0; height: 40px; padding: 0 12px;
+  border: 1px solid var(--c-border); border-radius: var(--r-md);
+  background: var(--c-surface-muted); color: var(--c-text-2);
+  font-size: 13px; text-overflow: ellipsis;
+}
+.channel-bar-actions { flex: 0 0 auto; margin-top: 0; }
+.channel-bar-actions .secondary-button { min-height: 40px; }
+.channel-bar-qr { flex: 0 0 auto; display: grid; justify-items: center; }
+.channel-bar-qr canvas { width: 104px; height: 104px; border: 1px solid var(--c-border-soft); border-radius: var(--r-md); background: var(--c-surface); }
 
 /* Тумблер-переключатель канала: состояние читается цветом и подписью,
    а не только положением — владелец видит «работает» с расстояния. */
@@ -1038,35 +1099,44 @@ a { color: inherit; }
 .channel-switch.is-on i::after { transform: translateX(14px); }
 .channel-switch:disabled { cursor: default; opacity: .6; }
 
-/* Ссылка гостя: адрес и действия в одном блоке с QR — то, за чем
-   владелец сюда и пришёл. */
-.channel-link-label { display: block; margin-bottom: 7px; font-size: 13px; font-weight: 700; color: var(--c-text-2); }
-.channel-hero-qr { flex: 0 0 auto; display: grid; gap: 10px; justify-items: center; }
-.channel-hero-qr canvas { width: 148px; height: 148px; border: 1px solid var(--c-border-soft); border-radius: 10px; background: var(--c-surface); }
-.channel-hero-qr .text-button { justify-self: center; }
-
 /* Канал выключен: гостевая страница закрыта, и печатать QR сейчас
    бессмысленно — предупреждаем прямо у ссылки. */
 .channel-off-note { display: flex; align-items: center; gap: 9px; padding: 11px 14px; border: 1px solid #f0dfae; border-radius: var(--r-md); background: #fdf8ea; color: #7a6220; font-size: 12.5px; font-weight: 650; }
 .channel-off-note svg { width: 16px; height: 16px; flex: 0 0 auto; }
 
-/* ── QR-меню: раскрывающиеся группы настроек ──────────────────
-   Каждая группа — одна задача владельца. Свёрнутая строка показывает
-   текущее значение (summary), чтобы не открывать её ради проверки. */
-.setting-group { margin-top: 10px; border: 1px solid var(--c-border-panel); border-radius: var(--r-md); background: var(--c-surface); overflow: hidden; }
-.setting-group-head { width: 100%; min-height: 72px; display: grid; grid-template-columns: 38px minmax(0, 1fr) auto 18px; align-items: center; gap: 14px; padding: 14px 20px; border: 0; background: var(--c-surface); color: var(--c-ink); text-align: start; font: inherit; cursor: pointer; }
+/* ── QR-меню: строки настроек ─────────────────────────────────
+   Каждая строка — одна задача владельца. Свёрнутая показывает текущее
+   значение (summary), чтобы не открывать её ради проверки.
+
+   Список, а не стопка карточек: восемь отдельных рамок с зазорами
+   читались как восемь несвязанных объектов. Волосяные разделители
+   внутри одной белой поверхности дают ту же группировку тише. */
+.setting-section-title { margin: var(--sp-5) 0 var(--sp-2); font-size: 13px; font-weight: 750; color: var(--c-text-muted); letter-spacing: .01em; }
+.setting-rows { border: 1px solid var(--c-border-panel); border-radius: var(--r-md); background: var(--c-surface); overflow: hidden; }
+.setting-group + .setting-group { border-top: 1px solid var(--c-border-hair); }
+.setting-group-head { width: 100%; min-height: 72px; display: grid; grid-template-columns: 40px minmax(0, 1fr) auto auto; align-items: center; gap: var(--sp-3); padding: var(--sp-3) var(--sp-4); border: 0; background: transparent; color: var(--c-ink); text-align: start; font: inherit; cursor: pointer; }
 .setting-group-head:hover { background: var(--c-surface-muted); }
+.setting-group.is-static .setting-group-head { grid-template-columns: 40px minmax(0, 1fr) auto; cursor: default; }
+.setting-group.is-static .setting-group-head:hover { background: transparent; }
+.setting-group-text { min-width: 0; }
 .setting-group-head strong { display: block; font-size: 15px; font-weight: 700; }
-.setting-group-head small { display: block; margin-top: 4px; color: var(--c-text-subtle); font-size: 12px; }
-.setting-group-icon { width: 38px; height: 38px; display: grid; place-items: center; border-radius: var(--r-md); background: var(--c-surface-sunken); color: #4d525a; }
-.setting-group-icon svg { width: 19px; height: 19px; }
-.setting-group-value { color: var(--c-text-muted); font-size: 12px; font-weight: 700; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; max-width: 220px; }
+.setting-group-head small { display: block; margin-top: 2px; color: var(--c-text-subtle); font-size: 12px; }
+/* Иконка контурная, без плашки: 40px площадь остаётся, а список
+   перестаёт выглядеть строчкой одинаковых серых квадратов. */
+.setting-group-icon { width: 40px; height: 40px; display: grid; place-items: center; color: var(--c-text-muted); }
+.setting-group-icon svg { width: 20px; height: 20px; stroke-width: 1.6; }
+/* Значение — вторая строка, а не правая колонка: в узкой рабочей
+   области расписание схлопывалось в многоточие. */
+.setting-group-value { display: block; margin-top: 3px; color: var(--c-text-2); font-size: 13px; font-weight: 650; overflow-wrap: anywhere; }
+.setting-group-edit { color: var(--st-accent); font-size: 13px; font-weight: 700; }
+.setting-group-action { min-height: 40px; }
 .setting-group-chevron { color: var(--c-text-faint); transition: transform .16s ease; }
 .setting-group-chevron svg { width: 18px; height: 18px; display: block; }
 .setting-group.is-open .setting-group-chevron { transform: rotate(90deg); }
+.setting-group.is-open .setting-group-head { background: var(--c-surface-muted); }
 /* Содержимое группы — форма, а не таблица: ограничиваем строку чтения,
    иначе тумблер и его подпись расходятся по краям широкого экрана. */
-.setting-group-body { padding: 4px 20px 20px; border-top: 1px solid var(--c-border-hair); }
+.setting-group-body { padding: var(--sp-1) var(--sp-4) var(--sp-5); border-top: 1px solid var(--c-border-hair); }
 .setting-group-body > *,
 .setting-group-body > .toggle-row,
 .setting-group-body .hours-editor { max-width: 620px; }
@@ -1074,12 +1144,29 @@ a { color: inherit; }
 .setting-group-body .panel { border: 0; }
 .setting-group-body .panel + .panel { margin-top: 4px; border-top: 1px solid var(--c-border-hair); border-radius: 0; }
 
+/* Строка занимает всю ширину списка, а список обрезает содержимое:
+   обводка снаружи оказалась бы срезанной у краёв. */
+.setting-group-head:focus-visible { outline-offset: -2px; }
+
+@media (prefers-reduced-motion: reduce) {
+  .setting-group-chevron,
+  .channel-switch i,
+  .channel-switch i::after { transition: none; }
+}
+
 @media (max-width: 640px) {
-  .channel-hero { grid-template-columns: minmax(0, 1fr); }
-  .channel-hero-qr { justify-self: center; }
-  .channel-hero-status { flex-direction: column; align-items: stretch; }
-  .setting-group-head { grid-template-columns: 38px minmax(0, 1fr) 18px; }
-  .setting-group-value { grid-column: 2 / 3; max-width: none; }
+  .channel-bar { grid-template-columns: minmax(0, 1fr); }
+  .channel-bar-qr { justify-self: center; }
+  .channel-bar-auto { margin-inline-start: 0; flex-basis: 100%; }
+  .channel-bar-actions { display: grid; grid-template-columns: minmax(0, 1fr); width: 100%; }
+  .channel-bar-actions .secondary-button { min-height: 44px; }
+  .channel-tabs button { min-height: 44px; }
+  /* Палец вместо мыши: строка настройки становится крупнее, а подпись
+     Edit уходит — цель всё равно вся строка. */
+  .setting-group-head { grid-template-columns: 40px minmax(0, 1fr) 18px; min-height: 76px; }
+  .setting-group.is-static .setting-group-head { grid-template-columns: 40px minmax(0, 1fr); }
+  .setting-group.is-static .setting-group-action { grid-column: 1 / -1; justify-self: start; min-height: 44px; }
+  .setting-group-edit { display: none; }
 }
 
 /* ── Часы работы (Kassa 112) ──────────────────────────────────

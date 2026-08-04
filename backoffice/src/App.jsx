@@ -901,7 +901,11 @@ function Dashboard({ session, context, onReloadContext }) {
           />
         )}
         {view === 'team' && <TeamManager context={context} {...tabProps} />}
-        {view === 'online' && <QrChannels context={context} {...scopedProps} {...tabProps} />}
+        {/* onNavigate — короткий путь «меню собирается в Каталоге»:
+            раздел QR не редактирует товары, он только уводит туда. */}
+        {view === 'online' && (
+          <QrChannels context={context} {...scopedProps} {...tabProps} onNavigate={navigate} />
+        )}
         {view === 'devices' && <DevicesManager context={context} />}
         {view === 'guests' && <GuestsManager context={context} {...tabProps} />}
         {view === 'settings' && <AccountSettingsPage email={session.user.email} onSignOut={signOut} />}

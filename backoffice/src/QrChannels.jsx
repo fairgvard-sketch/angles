@@ -1,7 +1,7 @@
 import { useEffect, useRef, useState } from 'react'
 import {
   AlertTriangle, Check, Clock, Copy, Download, ExternalLink, Image, LayoutGrid,
-  QrCode, RefreshCw, ShoppingBag, Smartphone, Table, Code2,
+  QrCode, RefreshCw, ShoppingBag, Table, Code2, ListTree,
   CalendarClock, Contact, Ban,
 } from 'lucide-react'
 import { fetchLocation, fetchLocationSlug, fetchTables, saveLocationSlug } from './settings'
@@ -22,10 +22,12 @@ import {
   validateSchedule, todayInZone,
 } from './reserve-schedule'
 import {
-  Field, LinkBlock, NumberSelect, QrCanvas, SettingGroup, SnippetBlock, Toggle,
-  downloadQr, useCopy,
+  Field, LinkBlock, NumberSelect, QrCanvas, SettingGroup, SettingLink, SnippetBlock,
+  Toggle, downloadQr, useCopy,
 } from './qr-blocks'
+import { hasCapability } from './navigation'
 import { PageHeader } from './ui/Layout'
+import Tabs from './ui/Tabs'
 
 /**
  * QR-каналы гостя: онлайн-заказы и бронирование столов.
@@ -52,28 +54,30 @@ const TABS = [
 ]
 
 /**
- * Герой канала: состояние, гостевая ссылка и QR в одном блоке.
+ * Рабочая шапка канала: состояние, гостевая ссылка, действия и QR.
  *
- * Собран из отдельных элементов, а не из LinkBlock: здесь ссылка — главный
- * объект экрана, ей нужен свой заголовок-подпись и место под предупреждение
- * о выключенном канале, а QR стоит справа в меньшем размере.
+ * Первый экран отвечает на два вопроса владельца — принимает ли канал
+ * гостей прямо сейчас и где взять ссылку. Раньше это был герой в пол-экрана
+ * с QR 148px; теперь та же информация занимает одну компактную панель, а
+ * место отдано настройкам и живому превью.
+ *
+ * Тумблер остаётся тумблером: цветная подпись «открыто» сама по себе не
+ * даёт способа закрыть канал, а закрывать его приходится в тот момент,
+ * когда на кухне встало.
  *
  * `qrUrl` отличается от `url` там, где напечатанный код нужно уметь
  * отличить от ссылки в профиле (Kassa 124): гость видит одну и ту же
  * страницу, но в отчёте это разные каналы. По умолчанию совпадают.
  */
-function ChannelHero({ title, hint, enabled, onToggle, url, qrUrl, qrName, offNote }) {
+function ChannelBar({ title, enabled, onToggle, onLabel, offLabel, url, qrUrl, qrName, offNote }) {
   const [copyState, copy] = useCopy(url)
   const codeUrl = qrUrl || url
 
   return (
-    <section className="panel channel-hero">
-      <div className="channel-hero-main">
-        <div className="channel-hero-status">
-          <div>
-            <h2>{title}</h2>
-            <p>{hint}</p>
-          </div>
+    <section className="panel channel-bar">
+      <div className="channel-bar-main">
+        <div className="channel-bar-state">
+          <h2>{title}</h2>
           <button
             type="button"
             className={`channel-switch${enabled ? ' is-on' : ''}`}
@@ -81,25 +85,24 @@ function ChannelHero({ title, hint, enabled, onToggle, url, qrUrl, qrName, offNo
             onClick={() => onToggle(!enabled)}
           >
             <i aria-hidden />
-            {enabled ? 'Live' : 'Paused'}
+            {enabled ? onLabel : offLabel}
           </button>
+          {/* Автосохранение — обещание, которое экран обязан назвать
+              вслух: кнопки «Опубликовать» здесь нет и не будет. */}
+          <span className="channel-bar-auto">Changes save automatically</span>
         </div>
 
-        {!enabled && (
-          <p className="channel-off-note" role="status">
-            <AlertTriangle aria-hidden />
-            {offNote}
-          </p>
-        )}
-
-        <div>
-          <span className="channel-link-label">Guest link</span>
-          <div className="qr-link-row">
-            {/* Такие же блоки есть у каждого канала: доступное имя
-                называет канал, иначе подряд читается «Copy link». */}
-            <input value={url} readOnly aria-label={`${title} — guest link`} onFocus={(e) => e.target.select()} />
-          </div>
-          <div className="qr-actions">
+        <div className="channel-bar-link">
+          {/* Такие же блоки есть у каждого канала: доступное имя
+              называет канал, иначе подряд читается «Copy link». */}
+          <input
+            className="channel-bar-url"
+            value={url}
+            readOnly
+            aria-label={`${title} — guest link`}
+            onFocus={(e) => e.target.select()}
+          />
+          <div className="qr-actions channel-bar-actions">
             <button type="button" className="secondary-button" aria-label={`Copy link — ${title}`} onClick={copy}>
               {copyState === 'copied' ? <><Check /> Copied</> : <><Copy /> Copy link</>}
             </button>
@@ -121,14 +124,24 @@ function ChannelHero({ title, hint, enabled, onToggle, url, qrUrl, qrName, offNo
               <ExternalLink /> Open page
             </a>
           </div>
-          {copyState === 'failed' && (
-            <p className="qr-copy-error" role="alert">Copy was blocked. Select the link above and copy it manually.</p>
-          )}
         </div>
+
+        {!enabled && (
+          <p className="channel-off-note" role="status">
+            <AlertTriangle aria-hidden />
+            {offNote}
+          </p>
+        )}
+        {copyState === 'failed' && (
+          <p className="qr-copy-error" role="alert">Copy was blocked. Select the link above and copy it manually.</p>
+        )}
       </div>
 
-      <div className="channel-hero-qr">
-        <QrCanvas url={codeUrl} size={148} label={title} />
+      {/* QR остаётся на виду в компактном размере: его сканируют прямо с
+          экрана, чтобы проверить страницу телефоном. Печатный размер даёт
+          «Download QR». */}
+      <div className="channel-bar-qr">
+        <QrCanvas url={codeUrl} size={104} label={title} />
       </div>
     </section>
   )
@@ -422,7 +435,7 @@ function HeroVideoField({ context, url, onChange }) {
 }
 
 /**
- * Превью гостевой страницы.
+ * Превью гостевой страницы — общее для меню и брони.
  *
  * Кросс-доменный кадр невозможно опросить: заблокированный он выглядит
  * снаружи так же, как ещё не загруженный, поэтому страница сама шлёт
@@ -435,10 +448,23 @@ function HeroVideoField({ context, url, onChange }) {
  *                  И подсказку, а не прячем работающее превью;
  *   blocked      — событий не было вовсе: вместо белого прямоугольника
  *                  объяснение и ссылка «открыть страницу гостя».
+ *
+ * Оба канала обслуживает одно публичное приложение (PublicApp кассы), и
+ * сигнал `ready` оно шлёт на уровне приложения — и для `/order/*`, и для
+ * `/reserve/*`. Поэтому контракт готовности параметром не сделан:
+ * отдельный origin/тип сообщения означал бы, что где-то живёт вторая
+ * публичная страница, а её нет.
  */
 const PREVIEW_TIMEOUT_MS = 8000
 
-export function GuestPreview({ url }) {
+export function GuestPreview({
+  url,
+  title = 'Guest menu preview',
+  description = 'This is the same mobile page guests open from the counter QR.',
+  iframeTitle = 'Guest ordering menu preview',
+  openLabel = 'Open full page',
+  blockedLinkLabel = 'Open the guest page',
+}) {
   const [previewKey, setPreviewKey] = useState(0)
   // `idle` — кадр ещё не поднимали намеренно. Без этого состояния таймаут
   // объявлял бы «превью не загрузилось» про кадр, который мы сами и не
@@ -580,10 +606,9 @@ export function GuestPreview({ url }) {
   return (
     <section className="panel guest-preview-panel">
       <div className="guest-preview-copy">
-        <span className="guest-preview-icon" aria-hidden><Smartphone /></span>
         <div>
-          <h2>Guest menu preview</h2>
-          <p>This is the same mobile page guests open from the counter QR.</p>
+          <h2>{title}</h2>
+          <p>{description}</p>
         </div>
         <div className="guest-preview-actions">
           {/* Кадр вне обхода табом, иначе владелец «проваливается» в чужую
@@ -598,16 +623,20 @@ export function GuestPreview({ url }) {
           >
             Enter preview
           </button>
+          {/* Иконка без видимой подписи, но не безымянная: текст остаётся
+              в разметке для скринридера — колонка узкая, а обновление
+              нажимают чаще всего. */}
           <button
             type="button"
-            className="secondary-button"
+            className="secondary-button is-icon"
             ref={refreshRef}
             onClick={refresh}
           >
-            <RefreshCw /> Refresh preview
+            <RefreshCw aria-hidden />
+            <span className="visually-hidden">Refresh preview</span>
           </button>
           <a className="secondary-button" href={url} target="_blank" rel="noreferrer">
-            <ExternalLink /> Open full page
+            <ExternalLink /> {openLabel}
           </a>
         </div>
       </div>
@@ -624,7 +653,7 @@ export function GuestPreview({ url }) {
               itself keeps working — open it in a new tab to check it.
             </p>
             <a className="secondary-button" href={url} target="_blank" rel="noreferrer">
-              <ExternalLink /> Open the guest page
+              <ExternalLink /> {blockedLinkLabel}
             </a>
           </div>
         )}
@@ -633,7 +662,7 @@ export function GuestPreview({ url }) {
             key={previewKey}
             ref={iframeRef}
             src={url}
-            title="Guest ordering menu preview"
+            title={iframeTitle}
             loading="lazy"
             tabIndex={entered ? 0 : -1}
             hidden={blocked}
@@ -669,14 +698,21 @@ function backgroundLabel(value) {
   return preset ? preset.label : 'Custom image'
 }
 
-function OnlineTab({ context, locationId, settings, tables, patch, slug, onSlugSaved, openGroup, onOpenGroup }) {
+/**
+ * Вкладки экспортируются ради тестов: раздел рисуется только после
+ * загрузки настроек, и без прямого рендера ни одна строка настройки
+ * проверке не поддаётся — а именно в них живёт всё, что нельзя потерять.
+ */
+export function OnlineTab({
+  context, locationId, settings, tables, patch, slug, onSlugSaved,
+  url, openGroup, onOpenGroup, onManageCatalogue,
+}) {
   const enabled = onlineEnabled(settings)
   const types = orderTypes(settings)
   const online = settings.online_orders || {}
   const [selectedTableId, setSelectedTableId] = useState(tables[0]?.id || '')
   const selectedTable = tables.find((table) => table.id === selectedTableId) || tables[0] || null
 
-  const url = orderUrl(locationId, slug)
   const group = (key) => ({
     open: openGroup === key,
     onToggle: () => onOpenGroup(openGroup === key ? null : key),
@@ -684,181 +720,200 @@ function OnlineTab({ context, locationId, settings, tables, patch, slug, onSlugS
 
   return (
     <>
-      <ChannelHero
+      <ChannelBar
         title="QR menu"
-        hint="Guests scan the code, browse the menu and order from their phone."
         enabled={enabled}
         onToggle={(v) => patch({ enabled: v })}
+        onLabel="Ordering is live"
+        offLabel="Ordering is paused"
         url={url}
         qrName="counter"
         offNote="Ordering is paused — guests who scan the code see the menu but cannot order."
       />
 
-      <SettingGroup
-        {...group('address')}
-        icon={QrCode}
-        title="Link & address"
-        hint="The short address printed on flyers and shown in the browser."
-        value={slug ? `/${slug}` : 'Location id'}
-      >
-        <SlugBlock locationId={locationId} slug={slug} onSaved={onSlugSaved} />
-      </SettingGroup>
+      <h2 className="setting-section-title">Guest experience</h2>
+      <div className="setting-rows">
+        <SettingGroup
+          {...group('address')}
+          icon={QrCode}
+          title="Link & address"
+          hint="The short address printed on flyers and shown in the browser."
+          value={slug ? `/${slug}` : 'Location id'}
+        >
+          <SlugBlock locationId={locationId} slug={slug} onSaved={onSlugSaved} />
+        </SettingGroup>
 
-      <SettingGroup
-        {...group('ordering')}
-        icon={ShoppingBag}
-        title="How guests order"
-        hint="Which fulfilment options the guest can pick."
-        value={types.map((t) => ORDER_TYPE_LABELS[t]).join(' · ') || 'None'}
-      >
-        {enabled ? (
-          ORDER_TYPES.map((type) => (
-            <Toggle
-              key={type}
-              label={ORDER_TYPE_LABELS[type]}
-              checked={types.includes(type)}
-              // Последний включённый тип не выключаем — гостю нужен способ заказа
-              disabled={types.length === 1 && types.includes(type)}
-              onChange={() => patch({ order_types: toggleOrderType(types, type) })}
-            />
-          ))
-        ) : (
-          <p className="form-hint" style={{ marginTop: 12 }}>
-            Turn ordering on above to choose fulfilment options.
-          </p>
-        )}
-      </SettingGroup>
-
-      <SettingGroup
-        {...group('hours')}
-        icon={Clock}
-        title="Opening hours"
-        hint="When the guest page accepts orders — now and for later."
-        value={hoursSummary(online.hours)}
-      >
-        {enabled ? (
-          <OpeningHours
-            hours={online.hours ?? null}
-            onChange={(next) => patch({ hours: next })}
-          />
-        ) : (
-          <p className="form-hint" style={{ marginTop: 12 }}>
-            Turn ordering on above to set opening hours.
-          </p>
-        )}
-      </SettingGroup>
-
-      <SettingGroup
-        {...group('look')}
-        icon={Image}
-        title="Look of the guest page"
-        hint="Name, background, hero video and social links."
-        value={backgroundLabel(online.background_url)}
-      >
-        <div className="qr-grid">
-          <Field label="Display name">
-            <input
-              defaultValue={online.display_name || ''}
-              placeholder="Shown as the page title"
-              onBlur={(e) => patch({ display_name: e.target.value.trim() || null })}
-            />
-          </Field>
-          <Field label="Google review link">
-            <input
-              defaultValue={online.google_review || ''}
-              placeholder="https://…"
-              onBlur={(e) => patch({ google_review: e.target.value.trim() || null })}
-            />
-          </Field>
-          <Field label="Instagram">
-            <input
-              defaultValue={online.instagram || ''}
-              placeholder="https://instagram.com/…"
-              onBlur={(e) => patch({ instagram: e.target.value.trim() || null })}
-            />
-          </Field>
-          <Field label="Facebook">
-            <input
-              defaultValue={online.facebook || ''}
-              placeholder="https://facebook.com/…"
-              onBlur={(e) => patch({ facebook: e.target.value.trim() || null })}
-            />
-          </Field>
-        </div>
-        <HeroVideoField
-          context={context}
-          url={online.hero_video_url || null}
-          onChange={(videoUrl) => patch({ hero_video_url: videoUrl })}
-        />
-        <BackgroundPresets
-          value={online.background_url}
-          onChange={(backgroundUrl) => patch({ background_url: backgroundUrl })}
-        />
-        <p className="form-hint">
-          The header image comes from this location’s settings — Locations →
-          Online orders.
-        </p>
-      </SettingGroup>
-
-      <SettingGroup
-        {...group('tables')}
-        icon={Table}
-        title="Table QR codes"
-        hint="A separate code per table — the table is filled in automatically."
-        value={tables.length > 0 ? `${tables.length} tables` : 'No tables'}
-      >
-        {selectedTable ? (
-          <>
-            <p className="form-hint" style={{ marginTop: 12 }}>
-              Guests who scan a table code skip contact and fulfilment questions.
-            </p>
-            <Field label="Table">
-              <select
-                value={selectedTable.id}
-                onChange={(event) => setSelectedTableId(event.target.value)}
-              >
-                {tables.map((table) => (
-                  <option key={table.id} value={table.id}>
-                    Table {table.label}{table.zone ? ` · ${table.zone}` : ''}
-                  </option>
-                ))}
-              </select>
-            </Field>
-            <div className="qr-table-link">
-              <LinkBlock
-                url={tableOrderUrl(locationId, selectedTable.public_token, slug)}
-                title={`Table ${selectedTable.label}`}
-                hint="Print this specific code for the selected table. The public URL contains an opaque token, not the internal table ID."
+        <SettingGroup
+          {...group('ordering')}
+          icon={ShoppingBag}
+          title="How guests order"
+          hint="Which fulfilment options the guest can pick."
+          value={types.map((t) => ORDER_TYPE_LABELS[t]).join(' · ') || 'None'}
+        >
+          {enabled ? (
+            ORDER_TYPES.map((type) => (
+              <Toggle
+                key={type}
+                label={ORDER_TYPE_LABELS[type]}
+                checked={types.includes(type)}
+                // Последний включённый тип не выключаем — гостю нужен способ заказа
+                disabled={types.length === 1 && types.includes(type)}
+                onChange={() => patch({ order_types: toggleOrderType(types, type) })}
               />
-            </div>
-          </>
-        ) : (
-          <p className="empty-state compact">
-            No active tables yet. Add them in Reservations → Tables &amp; zones.
+            ))
+          ) : (
+            <p className="form-hint" style={{ marginTop: 12 }}>
+              Turn ordering on above to choose fulfilment options.
+            </p>
+          )}
+        </SettingGroup>
+
+        <SettingGroup
+          {...group('hours')}
+          icon={Clock}
+          title="Opening hours"
+          hint="When the guest page accepts orders — now and for later."
+          value={hoursSummary(online.hours)}
+        >
+          {enabled ? (
+            <OpeningHours
+              hours={online.hours ?? null}
+              onChange={(next) => patch({ hours: next })}
+            />
+          ) : (
+            <p className="form-hint" style={{ marginTop: 12 }}>
+              Turn ordering on above to set opening hours.
+            </p>
+          )}
+        </SettingGroup>
+
+        <SettingGroup
+          {...group('look')}
+          icon={Image}
+          title="Look of the guest page"
+          hint="Name, background, hero video and social links."
+          value={backgroundLabel(online.background_url)}
+        >
+          <div className="qr-grid">
+            <Field label="Display name">
+              <input
+                defaultValue={online.display_name || ''}
+                placeholder="Shown as the page title"
+                onBlur={(e) => patch({ display_name: e.target.value.trim() || null })}
+              />
+            </Field>
+            <Field label="Google review link">
+              <input
+                defaultValue={online.google_review || ''}
+                placeholder="https://…"
+                onBlur={(e) => patch({ google_review: e.target.value.trim() || null })}
+              />
+            </Field>
+            <Field label="Instagram">
+              <input
+                defaultValue={online.instagram || ''}
+                placeholder="https://instagram.com/…"
+                onBlur={(e) => patch({ instagram: e.target.value.trim() || null })}
+              />
+            </Field>
+            <Field label="Facebook">
+              <input
+                defaultValue={online.facebook || ''}
+                placeholder="https://facebook.com/…"
+                onBlur={(e) => patch({ facebook: e.target.value.trim() || null })}
+              />
+            </Field>
+          </div>
+          <HeroVideoField
+            context={context}
+            url={online.hero_video_url || null}
+            onChange={(videoUrl) => patch({ hero_video_url: videoUrl })}
+          />
+          <BackgroundPresets
+            value={online.background_url}
+            onChange={(backgroundUrl) => patch({ background_url: backgroundUrl })}
+          />
+          <p className="form-hint">
+            The header image comes from this location’s settings — Locations →
+            Online orders.
           </p>
+        </SettingGroup>
+
+        {/* Каталог редактируется в своём разделе — здесь только короткий
+            путь туда. Второй редактор меню в этом экране означал бы две
+            правды об одном и том же товаре. */}
+        {onManageCatalogue && (
+          <SettingLink
+            icon={ListTree}
+            title="Menu content"
+            hint="Items, categories and photos live in Catalogue and appear here automatically."
+            value="Synced from Catalogue"
+            actionLabel="Manage catalogue"
+            onAction={onManageCatalogue}
+          />
         )}
-      </SettingGroup>
+      </div>
 
-      <SettingGroup
-        {...group('embed')}
-        icon={Code2}
-        title="Put the menu on your website"
-        hint="A button or the live menu embedded in your own page."
-        value="HTML snippets"
-      >
-        <SnippetBlock
-          title="Menu button"
-          hint="A plain link styled as a button. Works in any site builder — paste it into an HTML block."
-          code={embedButtonSnippet(locationId, slug)}
-        />
-        <SnippetBlock
-          title="Embedded menu (iframe)"
-          hint="The menu inside your page. Responsive up to 480px wide; menu edits appear automatically."
-          code={embedIframeSnippet(locationId, slug)}
-        />
-      </SettingGroup>
+      <h2 className="setting-section-title">Ways guests open the menu</h2>
+      <div className="setting-rows">
+        <SettingGroup
+          {...group('tables')}
+          icon={Table}
+          title="Table QR codes"
+          hint="A separate code per table — the table is filled in automatically."
+          value={tables.length > 0 ? `${tables.length} tables` : 'No tables'}
+        >
+          {selectedTable ? (
+            <>
+              <p className="form-hint" style={{ marginTop: 12 }}>
+                Guests who scan a table code skip contact and fulfilment questions.
+              </p>
+              <Field label="Table">
+                <select
+                  value={selectedTable.id}
+                  onChange={(event) => setSelectedTableId(event.target.value)}
+                >
+                  {tables.map((table) => (
+                    <option key={table.id} value={table.id}>
+                      Table {table.label}{table.zone ? ` · ${table.zone}` : ''}
+                    </option>
+                  ))}
+                </select>
+              </Field>
+              <div className="qr-table-link">
+                <LinkBlock
+                  url={tableOrderUrl(locationId, selectedTable.public_token, slug)}
+                  title={`Table ${selectedTable.label}`}
+                  hint="Print this specific code for the selected table. The public URL contains an opaque token, not the internal table ID."
+                />
+              </div>
+            </>
+          ) : (
+            <p className="empty-state compact">
+              No active tables yet. Add them in Reservations → Tables &amp; zones.
+            </p>
+          )}
+        </SettingGroup>
 
-      <GuestPreview url={url} />
+        <SettingGroup
+          {...group('embed')}
+          icon={Code2}
+          title="Put the menu on your website"
+          hint="A button or the live menu embedded in your own page."
+          value="HTML snippets"
+        >
+          <SnippetBlock
+            title="Menu button"
+            hint="A plain link styled as a button. Works in any site builder — paste it into an HTML block."
+            code={embedButtonSnippet(locationId, slug)}
+          />
+          <SnippetBlock
+            title="Embedded menu (iframe)"
+            hint="The menu inside your page. Responsive up to 480px wide; menu edits appear automatically."
+            code={embedIframeSnippet(locationId, slug)}
+          />
+        </SettingGroup>
+      </div>
     </>
   )
 }
@@ -1139,7 +1194,7 @@ function AddressField({ override, businessAddress, onChange }) {
   )
 }
 
-function ReserveTab({ locationId, settings, patch, slug, tz, businessAddress, openGroup, onOpenGroup }) {
+export function ReserveTab({ locationId, settings, patch, slug, tz, businessAddress, url, openGroup, onOpenGroup }) {
   const enabled = reservationsEnabled(settings)
   const rsv = settings.reservations || {}
   const instant = rsv.instant === true
@@ -1155,237 +1210,241 @@ function ReserveTab({ locationId, settings, patch, slug, tz, businessAddress, op
 
   return (
     <>
-      <ChannelHero
+      <ChannelBar
         title="Table reservations"
-        hint="Guests book a table from the link; you confirm at the host desk."
         enabled={enabled}
         onToggle={(v) => patch({ enabled: v })}
-        url={reserveUrl(locationId, slug)}
+        onLabel="Reservations are open"
+        offLabel="Reservations are paused"
+        url={url}
         qrUrl={reserveUrl(locationId, slug, 'qr')}
         qrName="reserve"
         offNote="Bookings are paused — the guest page tells visitors reservations are closed."
       />
 
-      <SettingGroup
-        {...group('hours')}
-        icon={CalendarClock}
-        title="Booking hours"
-        hint="The one schedule guests see and book by."
-        value={scheduleSummary(schedule)}
-      >
-        {enabled ? (
-          <ReservationSchedule
-            schedule={schedule}
-            tz={tz}
-            onChange={(next) => patch({ schedule: next })}
-          />
-        ) : (
-          <p className="form-hint" style={{ marginTop: 12 }}>
-            Turn reservations on above to set booking hours.
-          </p>
-        )}
-      </SettingGroup>
+      <h2 className="setting-section-title">Booking setup</h2>
+      <div className="setting-rows">
+        <SettingGroup
+          {...group('hours')}
+          icon={CalendarClock}
+          title="Booking hours"
+          hint="The one schedule guests see and book by."
+          value={scheduleSummary(schedule)}
+        >
+          {enabled ? (
+            <ReservationSchedule
+              schedule={schedule}
+              tz={tz}
+              onChange={(next) => patch({ schedule: next })}
+            />
+          ) : (
+            <p className="form-hint" style={{ marginTop: 12 }}>
+              Turn reservations on above to set booking hours.
+            </p>
+          )}
+        </SettingGroup>
 
-      <SettingGroup
-        {...group('window')}
-        icon={Clock}
-        title="Slots & booking window"
-        hint="Slot length, party limit and how far ahead guests can book."
-        value={`${rsv.slot_min ?? 15} min · up to ${rsv.max_party ?? 20}`}
-      >
-        {enabled ? (
-          <div className="qr-grid">
-            <Field label="Slot, minutes">
-              <NumberSelect
-                value={rsv.slot_min} fallback={15} options={[15, 30, 60]}
-                onChange={(v) => patch({ slot_min: v })}
-              />
-            </Field>
-            <Field label="Max party size">
-              <NumberSelect
-                value={rsv.max_party} fallback={20} options={[2, 4, 6, 8, 10, 12, 15, 20, 30, 50]}
-                onChange={(v) => patch({ max_party: v })}
-              />
-            </Field>
-            <Field label="Book at least, minutes ahead">
-              <NumberSelect
-                value={schedule.lead_min} fallback={30} options={[0, 15, 30, 60, 120, 180, 1440]}
-                onChange={(v) => patch({ schedule: { ...schedule, lead_min: v } })}
-              />
-            </Field>
-            <Field label="Book at most, days ahead">
-              <NumberSelect
-                value={schedule.horizon_days} fallback={30} options={[7, 14, 30, 60, 90, 180, 365]}
-                onChange={(v) => patch({ schedule: { ...schedule, horizon_days: v } })}
-              />
-            </Field>
-          </div>
-        ) : (
-          <p className="form-hint" style={{ marginTop: 12 }}>
-            Turn reservations on above to set the booking window.
-          </p>
-        )}
-      </SettingGroup>
-
-      <SettingGroup
-        {...group('cutoff')}
-        icon={Ban}
-        title="Cancellation & changes"
-        hint="Until when a guest may cancel or move the booking themselves."
-        value={cutoffLabel(rsv.cancel_cutoff_min)}
-      >
-        {enabled ? (
-          <>
+        <SettingGroup
+          {...group('window')}
+          icon={Clock}
+          title="Slots & booking window"
+          hint="Slot length, party limit and how far ahead guests can book."
+          value={`${rsv.slot_min ?? 15} min slots · up to ${rsv.max_party ?? 20} guests · ${schedule.horizon_days ?? 30} days ahead`}
+        >
+          {enabled ? (
             <div className="qr-grid">
-              <Field label="Guests can cancel">
-                <CutoffSelect
-                  value={rsv.cancel_cutoff_min}
-                  onChange={(v) => patch({ cancel_cutoff_min: v })}
+              <Field label="Slot, minutes">
+                <NumberSelect
+                  value={rsv.slot_min} fallback={15} options={[15, 30, 60]}
+                  onChange={(v) => patch({ slot_min: v })}
                 />
               </Field>
-              <Field label="Guests can move the booking">
-                <CutoffSelect
-                  value={rsv.reschedule_cutoff_min}
-                  onChange={(v) => patch({ reschedule_cutoff_min: v })}
+              <Field label="Max party size">
+                <NumberSelect
+                  value={rsv.max_party} fallback={20} options={[2, 4, 6, 8, 10, 12, 15, 20, 30, 50]}
+                  onChange={(v) => patch({ max_party: v })}
+                />
+              </Field>
+              <Field label="Book at least, minutes ahead">
+                <NumberSelect
+                  value={schedule.lead_min} fallback={30} options={[0, 15, 30, 60, 120, 180, 1440]}
+                  onChange={(v) => patch({ schedule: { ...schedule, lead_min: v } })}
+                />
+              </Field>
+              <Field label="Book at most, days ahead">
+                <NumberSelect
+                  value={schedule.horizon_days} fallback={30} options={[7, 14, 30, 60, 90, 180, 365]}
+                  onChange={(v) => patch({ schedule: { ...schedule, horizon_days: v } })}
                 />
               </Field>
             </div>
-            <p className="form-hint">
-              After the cut-off the buttons disappear from the guest page and the
-              server refuses the change — the rule is not a hint. A booking the
-              register has not confirmed yet can always be withdrawn by the guest:
-              holding someone on an undecided request and refusing to release it
-              would not be fair.
+          ) : (
+            <p className="form-hint" style={{ marginTop: 12 }}>
+              Turn reservations on above to set the booking window.
             </p>
-            <Toggle
-              label="Keep a waitlist"
-              hint="When the day is full, guests can leave a wish instead of leaving empty-handed. Only turn this on if someone will actually call them back."
-              checked={rsv.waitlist === true}
-              onChange={(v) => patch({ waitlist: v })}
-            />
-            <Field label="Cancellation policy shown to the guest">
-              <textarea
-                rows={3}
-                defaultValue={rsv.policy || ''}
-                placeholder="Please let us know at least 2 hours ahead if your plans change."
-                onBlur={(e) => patch({ policy: e.target.value.trim() || null })}
+          )}
+        </SettingGroup>
+
+        <SettingGroup
+          {...group('cutoff')}
+          icon={Ban}
+          title="Cancellation & changes"
+          hint="Until when a guest may cancel or move the booking themselves."
+          value={`${cutoffLabel(rsv.cancel_cutoff_min)} · ${rsv.waitlist === true ? 'waitlist on' : 'no waitlist'}`}
+        >
+          {enabled ? (
+            <>
+              <div className="qr-grid">
+                <Field label="Guests can cancel">
+                  <CutoffSelect
+                    value={rsv.cancel_cutoff_min}
+                    onChange={(v) => patch({ cancel_cutoff_min: v })}
+                  />
+                </Field>
+                <Field label="Guests can move the booking">
+                  <CutoffSelect
+                    value={rsv.reschedule_cutoff_min}
+                    onChange={(v) => patch({ reschedule_cutoff_min: v })}
+                  />
+                </Field>
+              </div>
+              <p className="form-hint">
+                After the cut-off the buttons disappear from the guest page and the
+                server refuses the change — the rule is not a hint. A booking the
+                register has not confirmed yet can always be withdrawn by the guest:
+                holding someone on an undecided request and refusing to release it
+                would not be fair.
+              </p>
+              <Toggle
+                label="Keep a waitlist"
+                hint="When the day is full, guests can leave a wish instead of leaving empty-handed. Only turn this on if someone will actually call them back."
+                checked={rsv.waitlist === true}
+                onChange={(v) => patch({ waitlist: v })}
+              />
+              <Field label="Cancellation policy shown to the guest">
+                <textarea
+                  rows={3}
+                  defaultValue={rsv.policy || ''}
+                  placeholder="Please let us know at least 2 hours ahead if your plans change."
+                  onBlur={(e) => patch({ policy: e.target.value.trim() || null })}
+                />
+              </Field>
+            </>
+          ) : (
+            <p className="form-hint" style={{ marginTop: 12 }}>
+              Turn reservations on above to set cancellation rules.
+            </p>
+          )}
+        </SettingGroup>
+
+        <SettingGroup
+          {...group('confirm')}
+          icon={LayoutGrid}
+          title="Confirmation"
+          hint="Confirm automatically or decide each booking yourself."
+          value={instant ? 'Instant' : 'Manual'}
+        >
+          {enabled ? (
+            <>
+              <Toggle
+                label="Confirm instantly"
+                hint="A free table is picked and the guest is confirmed straight away."
+                checked={instant}
+                onChange={(v) => patch({ instant: v })}
+              />
+              {instant && (
+                <>
+                  <Toggle
+                    label="Combine tables"
+                    hint="Seat a large party across adjacent tables."
+                    checked={rsv.combine === true}
+                    onChange={(v) => patch({ combine: v })}
+                  />
+                  <div className="qr-grid">
+                    <Field label="Visit length, minutes">
+                      <NumberSelect
+                        value={rsv.duration_min} fallback={90} options={[30, 45, 60, 90, 120, 150, 180]}
+                        onChange={(v) => patch({ duration_min: v })}
+                      />
+                    </Field>
+                    <Field label="Buffer between guests, minutes">
+                      <NumberSelect
+                        value={rsv.buffer_min} fallback={0} options={[0, 5, 10, 15, 30]}
+                        onChange={(v) => patch({ buffer_min: v })}
+                      />
+                    </Field>
+                  </div>
+                </>
+              )}
+            </>
+          ) : (
+            <p className="form-hint" style={{ marginTop: 12 }}>
+              Turn reservations on above to choose how bookings are confirmed.
+            </p>
+          )}
+        </SettingGroup>
+
+        {/* Депозит убран из интерфейса (Kassa 117). Поля deposit_* и серверная
+            логика сохранены — точка, у которой флаг уже проставлен, ведёт себя
+            как прежде, — но показывать переключатель нельзя: оплаты за ним нет
+            и не планируется, а владелец воспринимал его как работающую
+            предоплату. Вернуть — только вместе с реальным приёмом платежа. */}
+        <SettingGroup
+          {...group('page')}
+          icon={Contact}
+          title="Look of the booking page"
+          hint="Name, address and social links."
+          value={`${rsv.display_name || 'Location name'} · ${rsv.address ? 'address override' : 'business address'}`}
+        >
+          <div className="qr-grid">
+            <Field label="Display name">
+              <input
+                defaultValue={rsv.display_name || ''}
+                onBlur={(e) => patch({ display_name: e.target.value.trim() || null })}
               />
             </Field>
-          </>
-        ) : (
-          <p className="form-hint" style={{ marginTop: 12 }}>
-            Turn reservations on above to set cancellation rules.
+            {/* Свободный текст часов убран (Kassa 117): он вёлся ОТДЕЛЬНО от
+                часов приёма и расходился с ними — страница писала «шабат
+                закрыто» и предлагала субботние слоты. Гостю теперь показывается
+                расписание из группы «Booking hours». */}
+            {/* Адрес у точки один. Плейсхолдера мало: он не виден гостю и
+                не спасает от мусора, уже лежащего в переопределении —
+                у живой точки там оказалась подпись поля «כתובת העסק», и
+                гость видел её вместо улицы. Поэтому показываем ФАКТ:
+                что именно откроется у гостя, и чем это задано. */}
+            <AddressField
+              override={rsv.address || ''}
+              businessAddress={businessAddress}
+              onChange={(value) => patch({ address: value })}
+            />
+            <Field label="Google review link">
+              <input
+                defaultValue={rsv.google_review || ''}
+                placeholder="https://…"
+                onBlur={(e) => patch({ google_review: e.target.value.trim() || null })}
+              />
+            </Field>
+            <Field label="Instagram">
+              <input
+                defaultValue={rsv.instagram || ''}
+                placeholder="https://instagram.com/…"
+                onBlur={(e) => patch({ instagram: e.target.value.trim() || null })}
+              />
+            </Field>
+            <Field label="Facebook">
+              <input
+                defaultValue={rsv.facebook || ''}
+                placeholder="https://facebook.com/…"
+                onBlur={(e) => patch({ facebook: e.target.value.trim() || null })}
+              />
+            </Field>
+          </div>
+          <p className="form-hint">
+            Header image and the map pin come from this location’s settings —
+            Locations → Reservations.
           </p>
-        )}
-      </SettingGroup>
-
-      <SettingGroup
-        {...group('confirm')}
-        icon={LayoutGrid}
-        title="Confirmation"
-        hint="Confirm automatically or decide each booking yourself."
-        value={instant ? 'Instant' : 'Manual'}
-      >
-        {enabled ? (
-          <>
-            <Toggle
-              label="Confirm instantly"
-              hint="A free table is picked and the guest is confirmed straight away."
-              checked={instant}
-              onChange={(v) => patch({ instant: v })}
-            />
-            {instant && (
-              <>
-                <Toggle
-                  label="Combine tables"
-                  hint="Seat a large party across adjacent tables."
-                  checked={rsv.combine === true}
-                  onChange={(v) => patch({ combine: v })}
-                />
-                <div className="qr-grid">
-                  <Field label="Visit length, minutes">
-                    <NumberSelect
-                      value={rsv.duration_min} fallback={90} options={[30, 45, 60, 90, 120, 150, 180]}
-                      onChange={(v) => patch({ duration_min: v })}
-                    />
-                  </Field>
-                  <Field label="Buffer between guests, minutes">
-                    <NumberSelect
-                      value={rsv.buffer_min} fallback={0} options={[0, 5, 10, 15, 30]}
-                      onChange={(v) => patch({ buffer_min: v })}
-                    />
-                  </Field>
-                </div>
-              </>
-            )}
-          </>
-        ) : (
-          <p className="form-hint" style={{ marginTop: 12 }}>
-            Turn reservations on above to choose how bookings are confirmed.
-          </p>
-        )}
-      </SettingGroup>
-
-      {/* Депозит убран из интерфейса (Kassa 117). Поля deposit_* и серверная
-          логика сохранены — точка, у которой флаг уже проставлен, ведёт себя
-          как прежде, — но показывать переключатель нельзя: оплаты за ним нет
-          и не планируется, а владелец воспринимал его как работающую
-          предоплату. Вернуть — только вместе с реальным приёмом платежа. */}
-      <SettingGroup
-        {...group('page')}
-        icon={Contact}
-        title="Look of the booking page"
-        hint="Name, opening hours, address and social links."
-        value={rsv.display_name || 'Location name'}
-      >
-        <div className="qr-grid">
-          <Field label="Display name">
-            <input
-              defaultValue={rsv.display_name || ''}
-              onBlur={(e) => patch({ display_name: e.target.value.trim() || null })}
-            />
-          </Field>
-          {/* Свободный текст часов убран (Kassa 117): он вёлся ОТДЕЛЬНО от
-              часов приёма и расходился с ними — страница писала «шабат
-              закрыто» и предлагала субботние слоты. Гостю теперь показывается
-              расписание из группы «Booking hours». */}
-          {/* Адрес у точки один. Плейсхолдера мало: он не виден гостю и
-              не спасает от мусора, уже лежащего в переопределении —
-              у живой точки там оказалась подпись поля «כתובת העסק», и
-              гость видел её вместо улицы. Поэтому показываем ФАКТ:
-              что именно откроется у гостя, и чем это задано. */}
-          <AddressField
-            override={rsv.address || ''}
-            businessAddress={businessAddress}
-            onChange={(value) => patch({ address: value })}
-          />
-          <Field label="Google review link">
-            <input
-              defaultValue={rsv.google_review || ''}
-              placeholder="https://…"
-              onBlur={(e) => patch({ google_review: e.target.value.trim() || null })}
-            />
-          </Field>
-          <Field label="Instagram">
-            <input
-              defaultValue={rsv.instagram || ''}
-              placeholder="https://instagram.com/…"
-              onBlur={(e) => patch({ instagram: e.target.value.trim() || null })}
-            />
-          </Field>
-          <Field label="Facebook">
-            <input
-              defaultValue={rsv.facebook || ''}
-              placeholder="https://facebook.com/…"
-              onBlur={(e) => patch({ facebook: e.target.value.trim() || null })}
-            />
-          </Field>
-        </div>
-        <p className="form-hint">
-          Header image and the map pin come from this location’s settings —
-          Locations → Reservations.
-        </p>
-      </SettingGroup>
+        </SettingGroup>
+      </div>
     </>
   )
 }
@@ -1403,7 +1462,7 @@ function pickKeys(source, delta) {
   return result
 }
 
-export default function QrChannels({ context, locationId, tab: tabFromUrl, onTabChange }) {
+export default function QrChannels({ context, locationId, tab: tabFromUrl, onTabChange, onNavigate }) {
   const locations = context?.locations || []
   const activeId = locationId || locations[0]?.id || null
   const tab = TABS.some((t) => t.key === tabFromUrl) ? tabFromUrl : 'online'
@@ -1481,6 +1540,14 @@ export default function QrChannels({ context, locationId, tab: tabFromUrl, onTab
     )
   }
 
+  // Адрес гостевой страницы считается один раз на экран: его показывает
+  // шапка канала И грузит превью, и разойтись они не имеют права.
+  const guestUrl = tab === 'online' ? orderUrl(activeId, slug) : reserveUrl(activeId, slug)
+  // Каталог редактируется в своём разделе. Ярлык показываем только
+  // тому, у кого этот раздел вообще есть: ссылка в никуда хуже её
+  // отсутствия.
+  const canManageCatalogue = typeof onNavigate === 'function' && hasCapability(context, 'catalog_manage')
+
   return (
     <>
       <PageHeader
@@ -1489,55 +1556,82 @@ export default function QrChannels({ context, locationId, tab: tabFromUrl, onTab
         description="The pages your guests open by scanning a code — ordering and table booking."
       />
 
-      <div className="menu-tabs location-tabs" role="tablist" aria-label="Channel">
-        {TABS.map((item) => (
-          <button
-            key={item.key}
-            type="button"
-            role="tab"
-            aria-selected={tab === item.key}
-            className={tab === item.key ? 'is-active' : ''}
-            // Группы принадлежат каналу: при смене вкладки закрываем
-            // открытую, иначе на соседней вкладке раскрылась бы чужая.
-            onClick={() => { setTab(item.key); setOpenGroup(null) }}
-          >
-            {item.label}
-          </button>
-        ))}
-      </div>
+      {/* Ровно два канала — ровно две вкладки. Клавиатура и RTL живут в
+          общем примитиве Tabs, а не переписываются здесь заново. */}
+      <Tabs
+        className="channel-tabs"
+        label="Channel"
+        items={TABS}
+        value={tab}
+        // Группы принадлежат каналу: при смене вкладки закрываем
+        // открытую, иначе на соседней вкладке раскрылась бы чужая.
+        onChange={(key) => { setTab(key); setOpenGroup(null) }}
+      />
 
-      {error && <p className="form-error" role="alert">{error}</p>}
-      {saved && !error && <p className="save-ok inline"><Check /> Saved</p>}
+      {/* Место под отклик зарезервировано: «Saved» не должен сдвигать
+          весь экран на строку вниз каждый раз, когда он появляется. */}
+      <div className="qr-feedback">
+        {error && <p className="form-error" role="alert">{error}</p>}
+        {saved && !error && <p className="save-ok inline"><Check /> Saved</p>}
+      </div>
 
       {settings === null ? (
         <p className="empty-state">Loading…</p>
-      ) : tab === 'online' ? (
-        // key по точке: поля витрины неуправляемые (defaultValue), без
-        // пересоздания они сохранили бы значения предыдущей точки.
-        <OnlineTab
-          key={activeId}
-          context={context}
-          locationId={activeId}
-          settings={settings}
-          tables={tables}
-          patch={makePatcher('online_orders', saveOnlineOrders)}
-          slug={slug}
-          onSlugSaved={setSlug}
-          openGroup={openGroup}
-          onOpenGroup={setOpenGroup}
-        />
       ) : (
-        <ReserveTab
-          key={activeId}
-          locationId={activeId}
-          settings={settings}
-          patch={makePatcher('reservations', saveReservations)}
-          slug={slug}
-          businessAddress={businessAddress}
-          tz={locations.find((l) => l.id === activeId)?.timezone || 'Asia/Jerusalem'}
-          openGroup={openGroup}
-          onOpenGroup={setOpenGroup}
-        />
+        <div className="qr-workspace">
+          <div className="qr-workspace-main">
+            {tab === 'online' ? (
+              // key по точке: поля витрины неуправляемые (defaultValue), без
+              // пересоздания они сохранили бы значения предыдущей точки.
+              <OnlineTab
+                key={activeId}
+                context={context}
+                locationId={activeId}
+                settings={settings}
+                tables={tables}
+                patch={makePatcher('online_orders', saveOnlineOrders)}
+                slug={slug}
+                onSlugSaved={setSlug}
+                url={guestUrl}
+                openGroup={openGroup}
+                onOpenGroup={setOpenGroup}
+                onManageCatalogue={canManageCatalogue ? () => onNavigate('menu') : null}
+              />
+            ) : (
+              <ReserveTab
+                key={activeId}
+                locationId={activeId}
+                settings={settings}
+                patch={makePatcher('reservations', saveReservations)}
+                slug={slug}
+                businessAddress={businessAddress}
+                tz={locations.find((l) => l.id === activeId)?.timezone || 'Asia/Jerusalem'}
+                url={guestUrl}
+                openGroup={openGroup}
+                onOpenGroup={setOpenGroup}
+              />
+            )}
+          </div>
+
+          {/* Превью — второй канал правды на экране: настройка слева,
+              её результат справа. Ключ по каналу и точке: это разные
+              страницы, и переиспользовать кадр между ними нельзя. */}
+          <aside className="qr-workspace-side">
+            {tab === 'online' ? (
+              <GuestPreview key={`online:${activeId}`} url={guestUrl} />
+            ) : (
+              <GuestPreview
+                key={`reserve:${activeId}`}
+                url={guestUrl}
+                title="Booking page preview"
+                description="The page guests open from the booking link."
+                iframeTitle="Guest booking page preview"
+                openLabel="Open booking page"
+                blockedLinkLabel="Open the booking page"
+              />
+            )}
+          </aside>
+        </div>
       )}
     </>
   )
