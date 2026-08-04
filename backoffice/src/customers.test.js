@@ -4,7 +4,8 @@ import {
   SEGMENTS, segmentParams, segmentSummary, parseTagsInput, TAG_LIMIT,
   guestsToCsv, csvFileName, duplicateReason, mergePreview, mergeSources,
   customerErrorText, normalizePhoneInput, formatPhone, formatMoney,
-  mergeConfirmText,
+  mergeConfirmText, loyaltyLabel, guestRowLabel, loadedCountLabel, tagTone,
+  visitsLabel, ROW_LIMIT, TAG_TONES,
 } from './customers.js'
 
 // ── Сегменты считает сервер ──────────────────────────────────
@@ -180,6 +181,122 @@ test('деньги приходят агоротами и показываютс
 test('десятизначный номер разбивается на группы, остальные — как есть', () => {
   assert.equal(formatPhone('0501234567'), '050-123-4567')
   assert.equal(formatPhone('972501234567'), '972501234567')
+})
+
+test('крупные суммы разделены разрядами — иначе «₪1284.50» читается как ₪128450', () => {
+  assert.equal(formatMoney(128450), '₪1,284.50')
+})
+
+// ── Лояльность: две программы, один список ───────────────────
+
+describe('loyaltyLabel', () => {
+  const stampGuest = { points: 0, stamps: 3 }
+  const pointGuest = { points: 4800, stamps: 0 }
+
+  it('штампы считает штуками, баллы — деньгами', () => {
+    assert.equal(loyaltyLabel(stampGuest, 'stamps'), '3 stamps')
+    assert.equal(loyaltyLabel(pointGuest, 'points'), 'Points ₪48.00')
+  })
+
+  it('единица не становится «1 stamps»', () => {
+    assert.equal(loyaltyLabel({ stamps: 1 }, 'stamps'), '1 stamp')
+  })
+
+  /*
+   * Режим приходит только с карточкой гостя (115), а список рисуется
+   * раньше. Зашить баллы «как на макете» нельзя: точка со штампами
+   * увидела бы ₪0.00 на всей базе.
+   */
+  it('до ответа сервера показывает то, что ненулевое', () => {
+    assert.equal(loyaltyLabel(stampGuest, null), '3 stamps')
+    assert.equal(loyaltyLabel(pointGuest, null), 'Points ₪48.00')
+    assert.equal(loyaltyLabel({ points: 0, stamps: 0 }, null), 'Points ₪0.00')
+  })
+
+  it('пустой гость не роняет строку', () => {
+    assert.equal(loyaltyLabel(undefined, 'stamps'), '0 stamps')
+  })
+})
+
+// ── Доступное имя строки ─────────────────────────────────────
+
+describe('guestRowLabel', () => {
+  const guest = {
+    name: 'Дана Леви', phone: '0501234567', visits: 23, total_spent: 128450,
+    points: 4800, stamps: 0, last_visit_at: new Date().toISOString(), tags: ['VIP'],
+  }
+
+  /*
+   * Строка списка — одна кнопка, и `aria-label` заменяет читалке ВСЁ её
+   * содержимое. Если имя не назовёт числа, для читалки список будет
+   * состоять из двухсот одинаковых «Open».
+   */
+  it('называет то же, что видит глаз', () => {
+    const label = guestRowLabel(guest, 'points')
+    assert.match(label, /^Open Дана Леви/)
+    assert.match(label, /050-123-4567/)
+    assert.match(label, /Points ₪48\.00/)
+    assert.match(label, /23 visits/)
+    assert.match(label, /₪1,284\.50 spent/)
+    assert.match(label, /last visit today/)
+    assert.match(label, /tagged VIP/)
+  })
+
+  it('профиль без имени называется номером и не повторяет его дважды', () => {
+    const label = guestRowLabel({ phone: '0539876543', visits: 1 }, 'points')
+    assert.match(label, /^Open 053-987-6543/)
+    assert.equal(label.match(/053-987-6543/g).length, 1)
+    assert.match(label, /1 visit ·/, 'единственный визит не «1 visits»')
+  })
+
+  it('в режиме штампов имя строки говорит о штампах', () => {
+    assert.match(guestRowLabel({ ...guest, stamps: 4 }, 'stamps'), /4 stamps/)
+  })
+})
+
+test('визиты называются словом там, где нет шапки колонки', () => {
+  assert.equal(visitsLabel(0), '0 visits')
+  assert.equal(visitsLabel(1), '1 visit')
+})
+
+// ── Счётчик среза ────────────────────────────────────────────
+
+describe('loadedCountLabel', () => {
+  it('считает загруженные строки', () => {
+    assert.equal(loadedCountLabel(0), 'No customers')
+    assert.equal(loadedCountLabel(1), '1 customer')
+    assert.equal(loadedCountLabel(128), '128 customers')
+  })
+
+  /*
+   * На пределе выборки счётчик не вправе выглядеть размером базы:
+   * RPC отдаёт 200 строк, листать нечем, и «200 customers» у точки с
+   * тысячей клиентов было бы ложью.
+   */
+  it('на пределе выборки говорит «первые»', () => {
+    assert.equal(loadedCountLabel(ROW_LIMIT), `First ${ROW_LIMIT} customers`)
+    assert.equal(loadedCountLabel(ROW_LIMIT - 1), `${ROW_LIMIT - 1} customers`)
+  })
+
+  it('предел счётчика тот же, что уходит на сервер', () => {
+    assert.equal(segmentParams().p_limit, ROW_LIMIT)
+  })
+})
+
+// ── Оттенок метки ────────────────────────────────────────────
+
+describe('tagTone', () => {
+  it('одна и та же метка всегда одного оттенка', () => {
+    assert.equal(tagTone('VIP'), tagTone('VIP'))
+    assert.equal(tagTone('חלב שקדים'), tagTone('חלב שקדים'))
+  })
+
+  it('оттенок всегда из палитры, даже у пустой метки', () => {
+    for (const tag of ['VIP', 'Allergy', 'Oat milk', 'regular', '', undefined]) {
+      const tone = tagTone(tag)
+      assert.ok(Number.isInteger(tone) && tone >= 0 && tone < TAG_TONES, `tone=${tone}`)
+    }
+  })
 })
 
 describe('mergeConfirmText', () => {

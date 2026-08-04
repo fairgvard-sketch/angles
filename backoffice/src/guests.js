@@ -3,7 +3,8 @@ import { segmentParams } from './customers'
 // Чистые правила клиентской базы — в отдельном модуле под тесты
 export {
   formatMoney, formatPhone, normalizePhoneInput, lastVisitLabel, formatDateTime,
-  SEGMENTS, SORTS, segmentParams, segmentSummary, parseTagsInput, TAG_LIMIT,
+  visitsLabel, loyaltyLabel, guestRowLabel, loadedCountLabel, tagTone,
+  SEGMENTS, SORTS, ROW_LIMIT, segmentParams, segmentSummary, parseTagsInput, TAG_LIMIT,
   guestsToCsv, csvFileName, duplicateReason, mergeConfirmText, mergePreview, mergeSources,
   customerErrorText,
 } from './customers'

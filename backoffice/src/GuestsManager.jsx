@@ -1,20 +1,22 @@
 import { useCallback, useEffect, useMemo, useState } from 'react'
 import {
-  Users, RefreshCw, X, Search, Pencil, Download, GitMerge, ShieldOff, AlertTriangle,
+  Users, RefreshCw, Pencil, Download, GitMerge, ShieldOff, AlertTriangle,
+  ChevronDown, ChevronUp, Check,
 } from 'lucide-react'
 import {
   fetchGuests, fetchGuestCard, fetchGuestTags, fetchDuplicates,
   saveGuestProfile, mergeGuests, anonymizeGuest,
   formatMoney, formatPhone, normalizePhoneInput, lastVisitLabel, formatDateTime,
+  visitsLabel, loyaltyLabel, guestRowLabel, loadedCountLabel, tagTone,
   SEGMENTS, SORTS, segmentSummary, parseTagsInput, TAG_LIMIT,
   guestsToCsv, csvFileName, duplicateReason, mergeConfirmText, mergePreview, mergeSources,
   customerErrorText,
 } from './guests'
-import { PageHeader } from './ui/Layout'
+import { EmptyPanel, ErrorText, PageHeader, SearchField } from './ui/Layout'
 import Drawer from './ui/Drawer'
 import Tabs from './ui/Tabs'
 import ConfirmDialog from './ui/ConfirmDialog'
-import { Button } from './ui/Button'
+import { Button, IconButton } from './ui/Button'
 
 /**
  * «Customers» — база клиентов организации (114/115/121, правки 131).
@@ -26,42 +28,69 @@ import { Button } from './ui/Button'
  *
  * Балансы по-прежнему меняет только касса (apply_loyalty/pay_order):
  * начислять баллы из кабинета — это не правка профиля, а операция.
+ *
+ * Редизайн по `docs/claude-customers-approved-redesign-plan.md`. Прежний
+ * список отвечал на вопросы вразнобой: имя, баланс, визиты, сумма и
+ * «когда был» стояли в потоке без колонок, поэтому две строки нельзя
+ * было сравнить глазом — а именно за этим в базу и заходят («кто ходит
+ * чаще», «кто оставляет больше»). Теперь это таблица с устойчивыми
+ * колонками, а профиль открывается сбоку, не убирая список из вида.
+ *
+ * Серверное здесь всё, кроме оформления: поиск (300 мс), сегменты, метки
+ * и порядок считает `get_backoffice_guests`, метки и дубли — свои RPC.
+ * Ни клиентского отбора, ни клиентской «страницы» не добавлено: RPC
+ * отдаёт срез в 200 строк, и счётчик над списком говорит об этом прямо.
  */
+
+/** Метка: один и тот же оттенок в строке, в фильтре и в профиле */
+function TagChip({ tag }) {
+  return <span className={`cus-tag is-tone-${tagTone(tag)}`}>{tag}</span>
+}
 
 function TagChips({ tags }) {
   if (!tags?.length) return null
   return (
-    <span className="guest-row-tags">
-      {tags.map((tag) => <span className="guest-tag" key={tag}>{tag}</span>)}
+    <span className="cus-row-tags">
+      {tags.map((tag) => <TagChip tag={tag} key={tag} />)}
     </span>
   )
 }
 
-function GuestRow({ guest, mode, onOpen }) {
+/**
+ * Строка клиента.
+ *
+ * Вся строка — одна кнопка, и это осознанно иначе, чем в заказах и
+ * каталоге: там в строке живут меню действий и стрелки порядка, и кнопка
+ * поверх ячеек ломала бы их. Здесь у строки ровно одно назначение —
+ * открыть профиль, поэтому целью служит вся строка, а не имя в первой
+ * ячейке. Отсюда и разметка: не `<table>`, а сетка, у которой шапка
+ * повторяет колонки строки.
+ *
+ * Числа до читалки не доходят: `aria-label` заменяет содержимое кнопки
+ * целиком, поэтому имя строки собирает `guestRowLabel`.
+ */
+function CustomerRow({ guest, mode, selected, onOpen }) {
   return (
     <button
-      className="data-row guest-row"
+      type="button"
+      className={`cus-row${selected ? ' is-selected' : ''}`}
+      aria-label={guestRowLabel(guest, mode)}
+      aria-expanded={selected}
       onClick={() => onOpen(guest)}
-      aria-label={`Open ${guest.name || formatPhone(guest.phone)}`}
     >
-      <div className="guest-main">
+      <span className="cus-cell-name">
         <strong>{guest.name || formatPhone(guest.phone)}</strong>
-        <small>{formatPhone(guest.phone)}</small>
+        {guest.name && guest.phone && <small>{formatPhone(guest.phone)}</small>}
         <TagChips tags={guest.tags} />
-      </div>
-      <div className="guest-meta">
-        <span className="guest-balance">
-          {mode === 'stamps'
-            ? `${guest.stamps} stamps`
-            : mode === 'points'
-              ? formatMoney(guest.points)
-              // Режим ещё не известен — показываем то, что ненулевое
-              : guest.stamps > 0 ? `${guest.stamps} stamps` : formatMoney(guest.points)}
-        </span>
-        <span className="guest-visits">{guest.visits} visit{guest.visits === 1 ? '' : 's'}</span>
-        <span className="guest-spent">{formatMoney(guest.total_spent)}</span>
-        <span className="guest-seen">{lastVisitLabel(guest.last_visit_at)}</span>
-      </div>
+      </span>
+      <span className="cus-cell-loyalty">{loyaltyLabel(guest, mode)}</span>
+      <span className="cus-cell-num" data-label="Visits">{guest.visits ?? 0}</span>
+      <span className="cus-cell-num" data-label="Total spent">
+        {formatMoney(guest.total_spent)}
+      </span>
+      <span className="cus-cell-seen" data-label="Last visit">
+        {lastVisitLabel(guest.last_visit_at)}
+      </span>
     </button>
   )
 }
@@ -104,7 +133,10 @@ function ProfileEditor({ guest, card, onSaved, onCancel }) {
   }
 
   return (
-    <form className="guest-editor" onSubmit={submit}>
+    <form className="cus-form" onSubmit={submit}>
+      {/* Первый фокус ставит сама панель: она объявляет читалке имя
+          клиента целиком, а не первое попавшееся поле. Поэтому autoFocus
+          здесь не стоит — он всё равно был бы перебит. */}
       <div className="field-row">
         <label>
           <span>Name</span>
@@ -112,7 +144,6 @@ function ProfileEditor({ guest, card, onSaved, onCancel }) {
             type="text"
             value={name}
             maxLength={60}
-            autoFocus
             onChange={(e) => setName(e.target.value)}
           />
         </label>
@@ -136,7 +167,7 @@ function ProfileEditor({ guest, card, onSaved, onCancel }) {
           onChange={(e) => setTagText(e.target.value)}
         />
       </label>
-      <p className="form-hint guest-editor-hint">
+      <p className="form-hint cus-form-hint">
         Separate tags with commas — up to {TAG_LIMIT}. Tags and notes stay
         internal: guests never see them.
       </p>
@@ -151,11 +182,11 @@ function ProfileEditor({ guest, card, onSaved, onCancel }) {
         />
       </label>
       {error && <p className="form-error" role="alert">{error}</p>}
-      <div className="guest-editor-actions">
-        <button type="button" className="secondary-button" onClick={onCancel}>Cancel</button>
-        <button type="submit" className="primary-button compact" disabled={saving}>
-          {saving ? 'Saving…' : 'Save'}
-        </button>
+      <div className="cus-form-actions">
+        <Button onClick={onCancel}>Cancel</Button>
+        <Button variant="primary" size="compact" type="submit" busy={saving} busyLabel="Saving…">
+          Save
+        </Button>
       </div>
     </form>
   )
@@ -185,13 +216,13 @@ function ErasePanel({ guest, onDone, onCancel }) {
   }
 
   return (
-    <form className="guest-erase" onSubmit={submit}>
-      <p className="guest-erase-lead">
+    <form className="cus-form cus-erase" onSubmit={submit}>
+      <p className="cus-erase-lead">
         <AlertTriangle aria-hidden />
         Erase the name, phone, note and tags of this customer, and the contact
         details on their past bookings.
       </p>
-      <p className="guest-erase-keep">
+      <p className="cus-erase-keep">
         Orders and receipts stay: they are accounting records and must be kept.
         Loyalty balance stays with the empty profile and can no longer be
         claimed — the phone will not match anyone.
@@ -202,13 +233,12 @@ function ErasePanel({ guest, onDone, onCancel }) {
           type="text"
           inputMode="tel"
           value={confirm}
-          autoFocus
           onChange={(e) => setConfirm(e.target.value)}
         />
       </label>
       {error && <p className="form-error" role="alert">{error}</p>}
-      <div className="guest-editor-actions">
-        <button type="button" className="secondary-button" onClick={onCancel}>Cancel</button>
+      <div className="cus-form-actions">
+        <Button onClick={onCancel}>Cancel</Button>
         <button type="submit" className="danger-button" disabled={busy}>
           {busy ? 'Erasing…' : 'Erase personal data'}
         </button>
@@ -217,11 +247,194 @@ function ErasePanel({ guest, onDone, onCancel }) {
   )
 }
 
+/** Тихий раздел профиля: подпись и содержимое, а не карточка в карточке */
+function CardSection({ label, children }) {
+  return (
+    <section className="cus-section">
+      <h4>{label}</h4>
+      {children}
+    </section>
+  )
+}
+
+/** История заказов гостя: строка раскрывается в состав */
+function OrderHistory({ orders }) {
+  const [openId, setOpenId] = useState(null)
+
+  if (orders.length === 0) return <p className="empty-state">No orders yet</p>
+
+  return (
+    <div className="cus-orders">
+      {orders.map((o) => {
+        const open = openId === o.id
+        return (
+          <div className={`cus-order${open ? ' is-open' : ''}`} key={o.id}>
+            <button
+              type="button"
+              className="cus-order-head"
+              aria-expanded={open}
+              onClick={() => setOpenId(open ? null : o.id)}
+            >
+              <strong>#{o.daily_number}</strong>
+              <span className="cus-order-date">{formatDateTime(o.created_at)}</span>
+              <span className="cus-order-total">{formatMoney(o.total)}</span>
+              {open ? <ChevronUp aria-hidden /> : <ChevronDown aria-hidden />}
+            </button>
+            {open && (
+              <div className="cus-order-items">
+                {o.items.length === 0 ? (
+                  <p className="empty-state">No items</p>
+                ) : o.items.map((it, i) => (
+                  <div className="cus-order-item" key={i}>
+                    <span className="qty">{it.qty}×</span>
+                    <span className="name">
+                      {it.name}{it.variant_name ? ` · ${it.variant_name}` : ''}
+                    </span>
+                    <span className="sum">{formatMoney(it.line_total)}</span>
+                  </div>
+                ))}
+                {o.loyalty_discount > 0 && (
+                  <div className="cus-order-item is-discount">
+                    <span className="name">Loyalty reward</span>
+                    <span className="sum">−{formatMoney(o.loyalty_discount)}</span>
+                  </div>
+                )}
+              </div>
+            )}
+          </div>
+        )
+      })}
+    </div>
+  )
+}
+
+/**
+ * Что видно в профиле: четыре числа, поведение в бронях, внутренние
+ * метки, заметка, любимые позиции и история. Отдельный компонент, а не
+ * ветка тернарника в панели: чтение — самая крупная часть карточки, и
+ * рядом с формами правки его невозможно было читать.
+ */
+function ProfileView({ guest, card, mode, error, onErase }) {
+  const [tab, setTab] = useState('orders')
+  const orders = card?.orders ?? []
+  const favorites = card?.favorites ?? []
+  const events = card?.events ?? []
+  // Kassa 121: ресторанное поведение и внутренние метки. У точки без кассы
+  // заказы пусты, а этот блок полон — профиль осмыслен и без POS.
+  const rsv = card?.reservations
+  const tags = card?.tags ?? []
+
+  return (
+    <>
+      <div className="cus-stats">
+        <div>
+          <span>{mode === 'stamps' ? 'Stamps' : 'Points'}</span>
+          <strong>{mode === 'stamps' ? guest.stamps ?? 0 : formatMoney(guest.points)}</strong>
+        </div>
+        <div><span>Visits</span><strong>{guest.visits ?? 0}</strong></div>
+        <div><span>Total spent</span><strong>{formatMoney(guest.total_spent)}</strong></div>
+        <div><span>Last visit</span><strong>{lastVisitLabel(guest.last_visit_at)}</strong></div>
+      </div>
+
+      {rsv && rsv.total > 0 && (
+        <CardSection label="Bookings">
+          <div className="cus-chips">
+            <span className="cus-chip">{rsv.visits} visits</span>
+            {rsv.upcoming > 0 && <span className="cus-chip">{rsv.upcoming} upcoming</span>}
+            {rsv.no_shows > 0 && (
+              <span className="cus-chip is-warn">{rsv.no_shows} no-show</span>
+            )}
+            {rsv.cancelled > 0 && <span className="cus-chip">{rsv.cancelled} cancelled</span>}
+            {rsv.zone && <span className="cus-chip">{rsv.zone}</span>}
+            {rsv.avg_party && <span className="cus-chip">~{rsv.avg_party} guests</span>}
+          </div>
+        </CardSection>
+      )}
+
+      {tags.length > 0 && (
+        <CardSection label="Tags">
+          <div className="cus-chips">
+            {tags.map((tag) => <TagChip tag={tag} key={tag} />)}
+          </div>
+        </CardSection>
+      )}
+
+      {card?.notes && (
+        <CardSection label="Internal note">
+          <p className="cus-note">{card.notes}</p>
+          {/* Обещание, данное в правке профиля, повторено там, где заметку
+              читают: метки и заметки гостю не показываются нигде. */}
+          <p className="cus-note-hint">Visible to staff only — never to the guest.</p>
+        </CardSection>
+      )}
+
+      {favorites.length > 0 && (
+        <CardSection label="Usually orders">
+          <div className="cus-chips">
+            {favorites.map((f) => (
+              <span className="cus-chip" key={f.name}>{f.name} · {f.qty}</span>
+            ))}
+          </div>
+        </CardSection>
+      )}
+
+      <Tabs
+        className="cus-tabs"
+        label="Guest history"
+        items={[
+          { key: 'orders', label: 'Orders' },
+          { key: 'events', label: 'Loyalty log' },
+        ]}
+        value={tab}
+        onChange={setTab}
+      />
+
+      {error && <ErrorText>{error}</ErrorText>}
+
+      {!card && !error ? (
+        <p className="empty-state">Loading…</p>
+      ) : tab === 'orders' ? (
+        <OrderHistory orders={orders} />
+      ) : events.length === 0 ? (
+        <p className="empty-state">Nothing earned yet</p>
+      ) : (
+        <div className="cus-events">
+          {events.map((e, i) => {
+            const delta = mode === 'stamps' ? e.stamps_delta : e.points_delta
+            return (
+              <div className="cus-event" key={i}>
+                <span className="cus-event-date">{formatDateTime(e.created_at)}</span>
+                <span className={`cus-event-delta ${delta > 0 ? 'is-positive' : ''}`}>
+                  {delta > 0 ? '+' : ''}
+                  {mode === 'stamps' ? delta : formatMoney(Math.abs(delta))}
+                </span>
+              </div>
+            )
+          })}
+        </div>
+      )}
+
+      {/* Приватность внизу карточки: это последнее, что делают с
+          клиентом, и оно не должно стоять рядом с «Edit». */}
+      <div className="cus-privacy">
+        <h4>Privacy</h4>
+        <button type="button" className="text-button is-danger" onClick={onErase}>
+          <ShieldOff aria-hidden /> Erase personal data
+        </button>
+      </div>
+    </>
+  )
+}
+
+/**
+ * Профиль клиента: чтение, правка и стирание в одной панели.
+ *
+ * Панель, а не модалка: список остаётся на месте, выбранная строка видна
+ * рядом, и щелчок по соседней открывает её — как в заказах и каталоге.
+ */
 function GuestCard({ guest, onModeKnown, onChanged, onClose }) {
   const [card, setCard] = useState(null)
   const [error, setError] = useState('')
-  const [openOrder, setOpenOrder] = useState(null)
-  const [tab, setTab] = useState('orders')
   const [pane, setPane] = useState('view')
 
   const load = useCallback(() => {
@@ -237,181 +450,50 @@ function GuestCard({ guest, onModeKnown, onChanged, onClose }) {
 
   // Режим приходит с сервера (115): штампы — счёт, баллы — деньги
   const mode = card?.loyalty_mode === 'stamps' ? 'stamps' : 'points'
-  const orders = card?.orders ?? []
-  const favorites = card?.favorites ?? []
-  const events = card?.events ?? []
-  // Kassa 121: ресторанное поведение и внутренние метки. У точки без кассы
-  // заказы пусты, а этот блок полон — профиль осмыслен и без POS.
-  const rsv = card?.reservations
-  const tags = card?.tags ?? []
   const title = card?.name || guest.name || formatPhone(card?.phone || guest.phone)
+  const subtitle = card?.phone ? formatPhone(card.phone) : null
 
   return (
     <Drawer
       labelledBy="guest-card-title"
       title={title}
-      subtitle={card?.phone ? formatPhone(card.phone) : null}
+      subtitle={subtitle}
       onClose={onClose}
+      /*
+       * Чтение стоит рядом со списком: щелчок по соседнему клиенту должен
+       * открыть его, а не закрыть панель. Правка и стирание, наоборот,
+       * модальны — в них набран текст, и промах мимо панели не должен ни
+       * переключить клиента, ни потерять набранное.
+       */
+      modal={pane !== 'view'}
       actions={pane === 'view' && card && (
-        <Button onClick={() => setPane('edit')}>
+        <Button size="compact" onClick={() => setPane('edit')}>
           <Pencil aria-hidden /> Edit
         </Button>
       )}
     >
-      <>
-          {pane === 'edit' ? (
-            <ProfileEditor
-              guest={guest}
-              card={card}
-              onCancel={() => setPane('view')}
-              onSaved={() => { setPane('view'); load(); onChanged() }}
-            />
-          ) : pane === 'erase' ? (
-            <ErasePanel
-              guest={{ ...guest, phone: card?.phone ?? guest.phone }}
-              onCancel={() => setPane('view')}
-              onDone={() => { onChanged(); onClose() }}
-            />
-          ) : (
-            <>
-              <div className="guest-stats">
-                <div><span>{mode === 'stamps' ? 'Stamps' : 'Points'}</span>
-                  <strong>{mode === 'stamps' ? guest.stamps : formatMoney(guest.points)}</strong></div>
-                <div><span>Visits</span><strong>{guest.visits}</strong></div>
-                <div><span>Total spent</span><strong>{formatMoney(guest.total_spent)}</strong></div>
-                <div><span>Last visit</span><strong>{lastVisitLabel(guest.last_visit_at)}</strong></div>
-              </div>
-
-              {rsv && rsv.total > 0 && (
-                <div className="guest-favs">
-                  <span className="guest-section-label">Bookings</span>
-                  <div className="guest-fav-list">
-                    <span className="guest-fav">{rsv.visits} visits</span>
-                    {rsv.upcoming > 0 && <span className="guest-fav">{rsv.upcoming} upcoming</span>}
-                    {rsv.no_shows > 0 && (
-                      <span className="guest-fav is-warn">{rsv.no_shows} no-show</span>
-                    )}
-                    {rsv.cancelled > 0 && <span className="guest-fav">{rsv.cancelled} cancelled</span>}
-                    {rsv.zone && <span className="guest-fav">{rsv.zone}</span>}
-                    {rsv.avg_party && <span className="guest-fav">~{rsv.avg_party} guests</span>}
-                  </div>
-                </div>
-              )}
-
-              {tags.length > 0 && (
-                <div className="guest-favs">
-                  <span className="guest-section-label">Tags</span>
-                  <div className="guest-fav-list">
-                    {tags.map((tag) => <span className="guest-fav" key={tag}>{tag}</span>)}
-                  </div>
-                </div>
-              )}
-
-              {card?.notes && (
-                <p className="guest-note">{card.notes}</p>
-              )}
-
-              {favorites.length > 0 && (
-                <div className="guest-favs">
-                  <span className="guest-section-label">Usually orders</span>
-                  <div className="guest-fav-list">
-                    {favorites.map((f) => (
-                      <span className="guest-fav" key={f.name}>{f.name} · {f.qty}</span>
-                    ))}
-                  </div>
-                </div>
-              )}
-
-              <Tabs
-                className="guest-tabs"
-                label="Guest history"
-                items={[
-                  { key: 'orders', label: 'Orders' },
-                  { key: 'events', label: 'Loyalty log' },
-                ]}
-                value={tab}
-                onChange={setTab}
-              />
-
-              {error && <p className="form-error" role="alert">{error}</p>}
-
-              {!card && !error ? (
-                <p className="empty-state">Loading…</p>
-              ) : tab === 'orders' ? (
-                orders.length === 0 ? (
-                  <p className="empty-state">No orders yet</p>
-                ) : (
-                  <div className="guest-orders">
-                    {orders.map((o) => (
-                      <div className="guest-order" key={o.id}>
-                        <button
-                          className="guest-order-head"
-                          onClick={() => setOpenOrder(openOrder === o.id ? null : o.id)}
-                        >
-                          <strong>#{o.daily_number}</strong>
-                          <span className="guest-order-date">{formatDateTime(o.created_at)}</span>
-                          <span className="guest-order-total">{formatMoney(o.total)}</span>
-                          <span className="guest-order-chevron">{openOrder === o.id ? '▴' : '▾'}</span>
-                        </button>
-                        {openOrder === o.id && (
-                          <div className="guest-order-items">
-                            {o.items.length === 0 ? (
-                              <p className="empty-state">No items</p>
-                            ) : o.items.map((it, i) => (
-                              <div className="guest-order-item" key={i}>
-                                <span className="qty">{it.qty}×</span>
-                                <span className="name">
-                                  {it.name}{it.variant_name ? ` · ${it.variant_name}` : ''}
-                                </span>
-                                <span className="sum">{formatMoney(it.line_total)}</span>
-                              </div>
-                            ))}
-                            {o.loyalty_discount > 0 && (
-                              <div className="guest-order-item is-discount">
-                                <span className="name">Loyalty reward</span>
-                                <span className="sum">−{formatMoney(o.loyalty_discount)}</span>
-                              </div>
-                            )}
-                          </div>
-                        )}
-                      </div>
-                    ))}
-                  </div>
-                )
-              ) : events.length === 0 ? (
-                <p className="empty-state">Nothing earned yet</p>
-              ) : (
-                <div className="guest-events">
-                  {events.map((e, i) => {
-                    const delta = mode === 'stamps' ? e.stamps_delta : e.points_delta
-                    return (
-                      <div className="guest-event" key={i}>
-                        <span className="guest-event-date">{formatDateTime(e.created_at)}</span>
-                        <span className={`guest-event-delta ${delta > 0 ? 'is-positive' : ''}`}>
-                          {delta > 0 ? '+' : ''}
-                          {mode === 'stamps' ? delta : formatMoney(Math.abs(delta))}
-                        </span>
-                      </div>
-                    )
-                  })}
-                </div>
-              )}
-
-              {/* Приватность внизу карточки: это последнее, что делают с
-                  клиентом, и оно не должно стоять рядом с «Edit». */}
-              <div className="guest-privacy">
-                <span className="guest-section-label">Privacy</span>
-                <button
-                  type="button"
-                  className="text-button is-danger"
-                  onClick={() => setPane('erase')}
-                >
-                  <ShieldOff aria-hidden /> Erase personal data
-                </button>
-              </div>
-            </>
-          )}
-      </>
+      {pane === 'edit' ? (
+        <ProfileEditor
+          guest={guest}
+          card={card}
+          onCancel={() => setPane('view')}
+          onSaved={() => { setPane('view'); load(); onChanged() }}
+        />
+      ) : pane === 'erase' ? (
+        <ErasePanel
+          guest={{ ...guest, phone: card?.phone ?? guest.phone }}
+          onCancel={() => setPane('view')}
+          onDone={() => { onChanged(); onClose() }}
+        />
+      ) : (
+        <ProfileView
+          guest={guest}
+          card={card}
+          mode={mode}
+          error={error}
+          onErase={() => setPane('erase')}
+        />
+      )}
     </Drawer>
   )
 }
@@ -434,20 +516,31 @@ function DuplicateGroup({ group, busy, onMerge }) {
       <div className="dup-options" role="radiogroup" aria-label="Profile to keep">
         {(group.guests ?? []).map((g) => {
           const label = g.name || formatPhone(g.phone)
+          const chosen = g.id === targetId
           return (
             <button
               type="button"
               role="radio"
-              aria-checked={g.id === targetId}
-              className={`dup-option${g.id === targetId ? ' is-selected' : ''}`}
+              aria-checked={chosen}
+              className={`dup-option${chosen ? ' is-selected' : ''}`}
               key={g.id}
               onClick={() => setTargetId(g.id)}
             >
-              <strong>{label}</strong>
-              <small>{formatPhone(g.phone)}</small>
-              <span>
-                {g.visits} visit{g.visits === 1 ? '' : 's'} · {formatMoney(g.total_spent)}
-                {' · '}{lastVisitLabel(g.last_visit_at)}
+              <span className="dup-option-mark" aria-hidden>
+                {chosen && <Check />}
+              </span>
+              <span className="dup-option-body">
+                <strong>{label}</strong>
+                <small>{formatPhone(g.phone)}</small>
+                <span>
+                  {visitsLabel(g.visits)} · {formatMoney(g.total_spent)}
+                  {' · '}{lastVisitLabel(g.last_visit_at)}
+                </span>
+              </span>
+              {/* Те же слова, что в подтверждении: «останется» и «уйдёт из
+                  списка». Иначе владелец сверяет две разные формулировки. */}
+              <span className="dup-option-state">
+                {chosen ? 'Keeping' : 'Disappears from the list'}
               </span>
             </button>
           )
@@ -587,21 +680,40 @@ export default function GuestsManager({ context, tab: tabFromUrl, onTabChange })
 
   return (
     <>
-      <PageHeader title="Customers" />
+      <PageHeader
+        title="Customers"
+        actions={(
+          <>
+            <Button
+              disabled={!total}
+              onClick={exportCsv}
+              title="Download the customers you are looking at right now"
+            >
+              <Download aria-hidden /> Export CSV
+            </Button>
+            <IconButton
+              className="cus-refresh"
+              label="Refresh customers"
+              onClick={() => { load(); loadAside() }}
+              disabled={loading}
+              aria-busy={loading || undefined}
+            >
+              <RefreshCw />
+            </IconButton>
+          </>
+        )}
+      />
 
-      <div className="overview-toolbar">
-        <label className="guest-search">
-          <Search aria-hidden />
-          <span className="visually-hidden">Search customers</span>
-          <input
-            type="search"
-            placeholder="Name or phone"
-            value={search}
-            onChange={(e) => setSearch(e.target.value)}
-          />
-        </label>
+      <div className="cus-toolbar">
+        <SearchField
+          label="Search customers"
+          value={search}
+          onChange={setSearch}
+          placeholder="Name or phone"
+          className="order-search cus-search"
+        />
 
-        <label className="guest-sort">
+        <label className="cus-select">
           <span className="visually-hidden">Sort customers</span>
           <select value={sort} onChange={(e) => setSort(e.target.value)}>
             {SORTS.map((s) => <option key={s.key} value={s.key}>{s.label}</option>)}
@@ -612,84 +724,83 @@ export default function GuestsManager({ context, tab: tabFromUrl, onTabChange })
             последней пары список подсказок пустеет, и без неё владелец
             оставался на экране без выхода. */}
         {(duplicates.length > 0 || view === 'duplicates') && (
-          <button
-            type="button"
-            className={view === 'duplicates' ? 'primary-button compact' : 'secondary-button'}
+          <Button
+            variant={view === 'duplicates' ? 'primary' : 'secondary'}
+            size="compact"
             aria-pressed={view === 'duplicates'}
             onClick={() => setView(view === 'duplicates' ? 'list' : 'duplicates')}
           >
             <GitMerge aria-hidden />
             {view === 'duplicates' ? 'Back to list' : `Possible duplicates (${duplicates.length})`}
-          </button>
+          </Button>
         )}
 
-        <button
-          type="button"
-          className="secondary-button"
-          disabled={!total}
-          onClick={exportCsv}
-          title="Download the customers you are looking at right now"
-        >
-          <Download aria-hidden /> Export CSV
-        </button>
-
-        <button
-          className="icon-button"
-          onClick={() => { load(); loadAside() }}
-          aria-label="Refresh customers"
-          disabled={loading}
-        ><RefreshCw /></button>
+        {/* Счётчик — загруженный срез, а не размер базы: листать нечем,
+            и обещать «столько у вас клиентов» кабинет не вправе. */}
+        <p className="cus-count" role="status">
+          {loading && !guests ? 'Loading…' : loadedCountLabel(total)}
+        </p>
       </div>
 
       {view === 'list' && (
-        <div className="segment-bar" role="radiogroup" aria-label="Customer segment">
-          {SEGMENTS.map((s) => (
-            <button
-              type="button"
-              role="radio"
-              aria-checked={segment === s.key}
-              className={`segment-chip${segment === s.key ? ' is-selected' : ''}`}
-              key={s.key}
-              title={s.hint || undefined}
-              onClick={() => setSegment(s.key)}
-            >
-              {s.label}
-            </button>
-          ))}
-          {tagCounts.map((t) => (
-            <button
-              type="button"
-              className={`segment-chip is-tag${tags.includes(t.tag) ? ' is-selected' : ''}`}
-              aria-pressed={tags.includes(t.tag)}
-              key={t.tag}
-              onClick={() => setTags((prev) => (
-                prev.includes(t.tag) ? prev.filter((x) => x !== t.tag) : [...prev, t.tag]
-              ))}
-            >
-              {t.tag} <small>{t.guests}</small>
-            </button>
-          ))}
+        <div className="cus-filters">
+          <div className="cus-chip-row" role="radiogroup" aria-label="Customer segment">
+            {SEGMENTS.map((s) => (
+              <button
+                type="button"
+                role="radio"
+                aria-checked={segment === s.key}
+                className={`segment-chip${segment === s.key ? ' is-selected' : ''}`}
+                key={s.key}
+                title={s.hint || undefined}
+                onClick={() => setSegment(s.key)}
+              >
+                {s.label}
+              </button>
+            ))}
+          </div>
+
+          {/* Метки — отдельная строка и отдельная семантика: сегмент один,
+              меток можно набрать несколько. Одной полосой чипов это
+              различие приходилось угадывать. */}
+          {tagCounts.length > 0 && (
+            <div className="cus-chip-row is-tags" role="group" aria-label="Filter by tag">
+              {tagCounts.map((t) => {
+                const on = tags.includes(t.tag)
+                return (
+                  <button
+                    type="button"
+                    className={`cus-tag-chip is-tone-${tagTone(t.tag)}${on ? ' is-on' : ''}`}
+                    aria-pressed={on}
+                    key={t.tag}
+                    onClick={() => setTags((prev) => (
+                      prev.includes(t.tag) ? prev.filter((x) => x !== t.tag) : [...prev, t.tag]
+                    ))}
+                  >
+                    {on && <Check aria-hidden />}
+                    {t.tag} <small>{t.guests}</small>
+                  </button>
+                )
+              })}
+            </div>
+          )}
         </div>
       )}
 
-      {error && <p className="form-error" role="alert">{error}</p>}
+      {error && <ErrorText>{error}</ErrorText>}
 
       {view === 'duplicates' ? (
         duplicates.length === 0 ? (
-          <section className="section-placeholder panel">
-            <span className="section-icon"><GitMerge /></span>
-            <div>
-              <h2>No duplicates left</h2>
-              <p>Every profile here looks like a different person.</p>
-              <button
-                type="button"
-                className="primary-button compact"
-                onClick={() => setView('list')}
-              >
+          <EmptyPanel
+            icon={<GitMerge />}
+            title="No duplicates left"
+            description="Every profile here looks like a different person."
+            action={(
+              <Button variant="primary" size="compact" onClick={() => setView('list')}>
                 Back to customers
-              </button>
-            </div>
-          </section>
+              </Button>
+            )}
+          />
         ) : (
           <section className="panel">
             <div className="panel-heading">
@@ -714,30 +825,40 @@ export default function GuestsManager({ context, tab: tabFromUrl, onTabChange })
           </section>
         )
       ) : loading && !guests ? (
-        <p className="empty-state">Loading…</p>
+        <section className="panel"><p className="empty-state">Loading…</p></section>
       ) : total === 0 ? (
-        <section className="section-placeholder panel">
-          <span className="section-icon"><Users /></span>
-          <div>
-            <h2>{filtered ? 'Nothing found' : 'No customers yet'}</h2>
-            <p>
-              {filtered
-                ? 'No customer matches this segment. Try another one or clear the search.'
-                : 'Members appear here once the loyalty programme is switched on and guests start paying at the till.'}
-            </p>
-          </div>
-        </section>
+        <EmptyPanel
+          icon={<Users />}
+          title={filtered ? 'Nothing found' : 'No customers yet'}
+          description={filtered
+            ? 'No customer matches this segment. Try another one or clear the search.'
+            : 'Members appear here once the loyalty programme is switched on and guests start paying at the till.'}
+        />
       ) : (
-        <section className="panel">
-          <div className="panel-heading">
-            <div>
-              <h2>{total} customer{total === 1 ? '' : 's'}</h2>
-              <p>{segmentSummary({ segment, tags, search: query })}</p>
+        <section className="panel cus-panel">
+          {/* Что именно показано, говорится только когда список сужен:
+              у нетронутой базы это повторяло бы порядок сортировки. */}
+          {filtered && (
+            <p className="cus-summary">{segmentSummary({ segment, tags, search: query })}</p>
+          )}
+          <div className="cus-list">
+            {/* Шапка колонок скрыта от читалки: имя строки уже называет
+                все значения, и второй раз перечислять их незачем. */}
+            <div className="cus-head" aria-hidden="true">
+              <span>Customer</span>
+              <span>Loyalty</span>
+              <span className="cus-cell-num">Visits</span>
+              <span className="cus-cell-num">Total spent</span>
+              <span>Last visit</span>
             </div>
-          </div>
-          <div className="data-list">
             {guests.map((g) => (
-              <GuestRow key={g.id} guest={g} mode={mode} onOpen={setSelected} />
+              <CustomerRow
+                key={g.id}
+                guest={g}
+                mode={mode}
+                selected={selected?.id === g.id}
+                onOpen={setSelected}
+              />
             ))}
           </div>
         </section>
@@ -745,6 +866,10 @@ export default function GuestsManager({ context, tab: tabFromUrl, onTabChange })
 
       {selected && (
         <GuestCard
+          /* Ключ по клиенту: панель немодальна, соседнюю строку открывают
+             щелчком, и карточка прошлого клиента не должна досидеть до
+             ответа сервера по новому. */
+          key={selected.id}
           guest={selected}
           onModeKnown={(m) => { if (m && m !== 'off') setMode(m) }}
           onChanged={() => { load(true); loadAside() }}

@@ -499,64 +499,10 @@ a { color: inherit; }
   .device-name small { white-space: normal; }
 }
 
-/* ── Customers: база клиентов лояльности (114) ───────────────── */
-.guest-search { display: flex; align-items: center; gap: 8px; flex: 1; max-width: 320px; height: 38px; padding: 0 12px; border: 1px solid var(--c-border); border-radius: var(--r-md); background: var(--c-surface); }
-.guest-search svg { width: 15px; height: 15px; color: var(--c-text-faint); flex-shrink: 0; }
-.guest-search input { flex: 1; min-width: 0; border: 0; outline: none; font-size: 14px; background: transparent; }
-
-.guest-row { width: 100%; text-align: start; background: none; border: 0; cursor: pointer; font: inherit; }
-.guest-row:hover { background: var(--c-surface-muted); }
-.guest-main { min-width: 0; }
-.guest-main strong { display: block; font-size: 13px; font-weight: 700; color: #25282d; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-.guest-main small { display: block; margin-top: 3px; color: var(--c-text-faint); font-size: 11px; font-variant-numeric: tabular-nums; }
-.guest-meta { display: flex; align-items: center; gap: 18px; flex-shrink: 0; font-variant-numeric: tabular-nums; }
-.guest-balance { font-size: 13px; font-weight: 750; color: #25282d; white-space: nowrap; }
-.guest-visits, .guest-spent { font-size: 12px; color: var(--c-text-muted); white-space: nowrap; }
-.guest-seen { font-size: 12px; color: var(--c-text-subtle); white-space: nowrap; min-width: 62px; text-align: end; }
-
-/* Карточка гостя */
-.guest-stats { display: grid; grid-template-columns: repeat(4, 1fr); gap: 10px; }
-.guest-stats > div { padding: 10px 12px; border: 1px solid var(--c-border-soft); border-radius: var(--r-md); background: var(--c-surface-muted); }
-.guest-stats span { display: block; font-size: 11px; font-weight: 700; color: var(--c-text-subtle); text-transform: uppercase; letter-spacing: .02em; }
-.guest-stats strong { display: block; margin-top: 4px; font-size: 15px; font-weight: 800; color: #25282d; font-variant-numeric: tabular-nums; }
-
-.guest-note { margin: 0; padding: 10px 12px; border-radius: var(--r-md); background: #fff8e6; border: 1px solid #f0e2bd; font-size: 13px; color: #5c4c22; }
-
-.guest-section-label { display: block; margin-bottom: 6px; font-size: 11px; font-weight: 700; color: var(--c-text-subtle); text-transform: uppercase; letter-spacing: .02em; }
-.guest-fav-list { display: flex; flex-wrap: wrap; gap: 6px; }
+/* Чип-подпись визита: сколько гостей, какая зона, сколько неявок.
+   Общий для панели визита и ленты броней; у Customers свой (`cus-chip`),
+   потому что там он стоит в панели с другой плотностью. */
 .guest-fav { padding: 4px 10px; border-radius: var(--r-pill); background: var(--c-surface-hover); font-size: 12px; font-weight: 650; color: var(--c-text-2); }
-
-.guest-tabs { display: inline-flex; gap: 2px; padding: 2px; border: 1px solid var(--c-border-soft); border-radius: var(--r-md); background: var(--c-surface-muted); }
-.guest-tabs button { height: 32px; padding: 0 14px; border: 0; border-radius: var(--r-sm); background: none; font: inherit; font-size: 13px; font-weight: 700; color: var(--c-text-subtle); cursor: pointer; }
-.guest-tabs button.is-active { background: var(--c-surface); color: #25282d; box-shadow: 0 1px 2px rgb(0 0 0 / 8%); }
-
-.guest-orders { display: grid; gap: 6px; }
-.guest-order { border: 1px solid var(--c-border-soft); border-radius: var(--r-md); overflow: hidden; }
-.guest-order-head { display: flex; align-items: center; gap: 12px; width: 100%; padding: 9px 12px; border: 0; background: none; font: inherit; text-align: start; cursor: pointer; }
-.guest-order-head:hover { background: var(--c-surface-muted); }
-.guest-order-head strong { font-size: 13px; font-weight: 750; color: #25282d; font-variant-numeric: tabular-nums; }
-.guest-order-date { flex: 1; font-size: 12px; color: var(--c-text-subtle); font-variant-numeric: tabular-nums; }
-.guest-order-total { font-size: 13px; font-weight: 700; color: #25282d; font-variant-numeric: tabular-nums; }
-.guest-order-chevron { color: var(--c-text-faint); font-size: 11px; }
-.guest-order-items { padding: 8px 12px; border-top: 1px solid var(--c-border-soft); background: var(--c-surface-muted); display: grid; gap: 4px; }
-.guest-order-item { display: flex; align-items: baseline; gap: 8px; font-size: 12px; }
-.guest-order-item .qty { color: var(--c-text-subtle); font-variant-numeric: tabular-nums; flex-shrink: 0; }
-.guest-order-item .name { flex: 1; color: #25282d; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-.guest-order-item .sum { color: #25282d; font-variant-numeric: tabular-nums; flex-shrink: 0; }
-.guest-order-item.is-discount { padding-top: 5px; border-top: 1px solid var(--c-border-soft); }
-.guest-order-item.is-discount .name { color: var(--c-text-subtle); }
-
-.guest-events { display: grid; gap: 4px; }
-.guest-event { display: flex; align-items: center; gap: 12px; padding: 8px 12px; border: 1px solid var(--c-border-soft); border-radius: var(--r-md); }
-.guest-event-date { flex: 1; font-size: 12px; color: var(--c-text-subtle); font-variant-numeric: tabular-nums; }
-.guest-event-delta { font-size: 13px; font-weight: 750; color: #25282d; font-variant-numeric: tabular-nums; }
-.guest-event-delta.is-positive { color: var(--c-success); }
-
-@media (max-width: 640px) {
-  .guest-stats { grid-template-columns: repeat(2, 1fr); }
-  .guest-meta { gap: 10px; }
-  .guest-visits, .guest-spent { display: none; }
-}
 
 /* ── Лента активности: компактная карточка на Home ──────────
    Полный раздел живёт ниже, под префиксом `act-`. */
@@ -2069,58 +2015,45 @@ a { color: inherit; }
 .launch-actions { display: flex; flex-wrap: wrap; gap: 8px; padding: 14px 22px 0; }
 .launch-panel .form-hint { padding: 0 22px 18px; margin-top: 10px; }
 
-/* ── Клиентская база: сегменты, правка, дубли (Kassa 131) ────
-   Раздел стал рабочим местом, а не витриной: срез базы, правка
-   профиля, слияние дублей и стирание данных по просьбе клиента. */
-.guest-sort select { height: 38px; padding: 0 10px; border: 1px solid var(--c-border); border-radius: var(--r-md); background: var(--c-surface); font: inherit; font-size: 13px; color: var(--c-text-2); }
-.guest-row-tags { display: flex; flex-wrap: wrap; gap: 4px; margin-top: 5px; }
-.guest-tag { padding: 2px 8px; border-radius: var(--r-pill); background: var(--c-border-hair); color: #4b5058; font-size: 11px; font-weight: 650; }
-
+/* ── Срезы базы: сегменты общего вида (Kassa 131) ────────────
+   Чип-переключатель делят отчёты, журнал и Customers. */
 .segment-bar { display: flex; flex-wrap: wrap; gap: 8px; margin-bottom: 14px; }
 .segment-chip { min-height: 34px; padding: 0 14px; border: 1px solid #d8dae0; border-radius: var(--r-pill); background: var(--c-surface); color: var(--c-text-2); font: inherit; font-size: 13px; font-weight: 650; cursor: pointer; }
 .segment-chip:hover { border-color: #b9bcc4; }
 .segment-chip.is-selected { border-color: var(--c-text); background: var(--c-text); color: var(--c-on-ink); }
-.segment-chip.is-tag small { margin-inline-start: 6px; color: #868b93; font-size: 11px; font-weight: 650; }
-.segment-chip.is-tag.is-selected small { color: var(--c-border); }
 
-/* Правка профиля живёт прямо в карточке: владелец видит историю и
-   правит то же имя, на которое смотрит. */
-.guest-editor { display: grid; gap: 14px; }
-.guest-editor textarea { padding: 10px 12px; border: 1px solid var(--c-border); border-radius: var(--r-md); font: inherit; font-size: 15px; background: var(--c-surface); resize: vertical; }
-.guest-editor textarea:focus { outline: none; border-color: var(--c-ink); }
-.guest-editor-hint { margin: -6px 0 0; }
-.guest-editor-actions { display: flex; justify-content: flex-end; gap: 10px; }
-.modal-head-actions { display: flex; align-items: center; gap: 8px; }
-
-.guest-privacy { padding-top: 14px; border-top: 1px solid var(--c-surface-active); }
 .text-button.is-danger { color: var(--c-danger); }
 .text-button.is-danger svg { width: 15px; height: 15px; }
-
-.guest-erase { display: grid; gap: 14px; }
-.guest-erase-lead { display: flex; gap: 10px; margin: 0; font-size: 14px; color: var(--c-text); }
-.guest-erase-lead svg { width: 18px; height: 18px; flex-shrink: 0; color: var(--c-danger); }
-.guest-erase-keep { margin: 0; padding: 12px 14px; border: 1px solid var(--c-border-soft); border-radius: var(--r-md); background: var(--c-surface-muted); font-size: 13px; color: var(--c-text-muted); }
 
 /* Дубли — подсказка, а не автоматика: одинаковое имя бывает у двух
    разных людей, поэтому владелец сам выбирает, что останется. */
 .dup-list { display: grid; gap: 10px; padding: 14px 22px 20px; }
 .dup-group { display: grid; gap: 10px; padding: 14px; border: 1px solid var(--c-border-soft); border-radius: 10px; }
 .dup-reason { margin: 0; font-size: 12px; font-weight: 700; color: var(--c-text-subtle); text-transform: uppercase; letter-spacing: .02em; }
-.dup-options { display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 8px; }
-.dup-option { display: grid; gap: 2px; padding: 10px 12px; border: 1px solid #d8dae0; border-radius: var(--r-md); background: var(--c-surface); font: inherit; text-align: start; cursor: pointer; }
-.dup-option strong { font-size: 14px; font-weight: 700; color: var(--c-text); }
+.dup-options { display: grid; grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); gap: 8px; }
+/*
+ * Выбор «что останется» — радиокнопка и выглядит радиокнопкой: раньше
+ * выбранный вариант отличался только рамкой, а решение здесь необратимое.
+ * Отметка, заливка и слово «Keeping» — три сигнала вместо одного цвета.
+ */
+.dup-option { display: grid; grid-template-columns: 18px minmax(0, 1fr); gap: var(--sp-2); padding: var(--sp-3); border: 1px solid var(--c-border); border-radius: var(--r-md); background: var(--c-surface); font: inherit; text-align: start; cursor: pointer; }
+.dup-option:hover { border-color: #b9bcc4; }
+.dup-option-mark { display: inline-flex; align-items: center; justify-content: center; width: 18px; height: 18px; margin-top: 2px; border: 1px solid var(--c-border); border-radius: 50%; }
+.dup-option-mark svg { width: 12px; height: 12px; color: var(--c-on-ink); }
+.dup-option-body { display: grid; gap: 2px; min-width: 0; }
+.dup-option strong { font-size: 14px; font-weight: 700; color: var(--c-text); overflow-wrap: anywhere; }
 .dup-option small { font-size: 12px; color: #868b93; font-variant-numeric: tabular-nums; }
-.dup-option span { font-size: 12px; color: var(--c-text-muted); font-variant-numeric: tabular-nums; }
-.dup-option.is-selected { border-color: var(--c-text); box-shadow: inset 0 0 0 1px var(--c-text); }
+.dup-option-body > span { font-size: 12px; color: var(--c-text-muted); font-variant-numeric: tabular-nums; }
+.dup-option-state { grid-column: 2; margin-top: 4px; color: var(--c-text-faint); font-size: 11px; font-weight: 700; text-transform: uppercase; letter-spacing: .02em; }
+.dup-option.is-selected { border-color: var(--st-accent); background: var(--st-accent-soft); }
+.dup-option.is-selected .dup-option-mark { border-color: var(--st-accent); background: var(--st-accent); }
+.dup-option.is-selected .dup-option-state { color: #1c3f8f; }
 .dup-preview { margin: 0; font-size: 13px; color: var(--c-text-muted); }
 .dup-group .primary-button { justify-self: start; }
 
 @media (max-width: 720px) {
   .overview-toolbar { flex-wrap: wrap; }
-  .guest-search { max-width: none; flex: 1 1 100%; }
   .dup-list { padding: 12px 16px 18px; }
-  .guest-editor-actions { flex-direction: column-reverse; }
-  .guest-editor-actions button { width: 100%; }
 }
 
 /* Пустой экран дублей — с выходом: после слияния последней пары
@@ -3281,4 +3214,356 @@ a { color: inherit; }
   .act-time { min-width: 0; }
   /* Ввод меньше 16px на iOS заставляет браузер приближать страницу */
   .act-toolbar input, .act-select select { font-size: 16px; }
+}
+
+/* ============================================================
+ * Customers — база клиентов лояльности (114/115/131, редизайн).
+ *
+ * Отдельный префикс `cus-`, а не правка `guest-*`: часть прежних классов
+ * делят с этим разделом брони (`guest-fav` в панели визита и ленте), а
+ * `segment-*`, `data-row` и `overview-toolbar` — отчёты, журнал и парк
+ * касс. Менять их ради Customers значило бы менять чужие экраны.
+ *
+ * Почему таблица. Прежняя строка ставила баланс, визиты, сумму и «когда
+ * был» в поток справа: у каждой строки они начинались на своём месте, и
+ * двух клиентов нельзя было сравнить глазом — а именно за этим в базу и
+ * заходят («кто ходит чаще», «кто оставляет больше»). Колонки объявлены
+ * один раз переменной: шапка и строка обязаны совпадать, иначе таблица
+ * врёт подписями.
+ * ============================================================ */
+
+/* Рабочая строка отбора: поиск, порядок, дубли и счётчик среза */
+.cus-toolbar {
+  display: flex; flex-wrap: wrap; align-items: center; gap: var(--sp-2);
+  margin-bottom: var(--sp-3);
+}
+.cus-toolbar .cus-search { flex: 1 1 240px; max-width: 360px; min-height: var(--h-control); }
+.cus-select select {
+  min-height: var(--h-control); padding: 0 30px 0 10px;
+  border: 1px solid var(--c-border); border-radius: var(--r-md);
+  background: var(--c-surface); font: inherit; font-size: 13px;
+}
+/* Тёмная кнопка не описывает ни отступ у иконки, ни её размер: без этого
+   «Back to list» слипалось с иконкой слияния */
+.cus-toolbar .secondary-button, .cus-toolbar .primary-button { min-height: var(--h-control); }
+.cus-toolbar .primary-button { gap: var(--sp-2); }
+.cus-toolbar .primary-button svg { width: 16px; height: 16px; }
+/*
+ * Счётчик говорит о ЗАГРУЖЕННОМ срезе, поэтому стоит тихо у конца
+ * строки отбора, а не заголовком над списком: «128 customers» рядом с
+ * фильтром читается как «столько сейчас на экране», а над панелью
+ * читалось бы как размер базы.
+ */
+.cus-count {
+  margin: 0; margin-inline-start: auto;
+  color: var(--c-text-muted); font-size: 13px;
+  font-variant-numeric: tabular-nums; white-space: nowrap;
+}
+@media (prefers-reduced-motion: no-preference) {
+  .cus-refresh[aria-busy='true'] svg { animation: spin .9s linear infinite; }
+}
+
+/* ── Сегменты и метки ──────────────────────────────────────── */
+.cus-filters { display: grid; gap: var(--sp-2); margin-bottom: var(--sp-3); }
+/* Полоса чипов уезжает боком, а не переносится на четыре строки:
+   на телефоне перенос съедал экран до того, как начинался список */
+.cus-chip-row {
+  display: flex; gap: var(--sp-2); padding-bottom: 2px;
+  overflow-x: auto; overscroll-behavior-x: contain; scrollbar-width: none;
+}
+.cus-chip-row::-webkit-scrollbar { display: none; }
+.cus-chip-row > * { flex: 0 0 auto; }
+/* Метки — отдельная строка: сегмент один, меток набирают несколько, и
+   одной полосой это различие приходилось угадывать. Разделять строки
+   чертой не нужно — она шла через всю страницу и весила больше, чем
+   различие, которое объясняла: чипы метки и так другого вида. */
+.cus-chip-row.is-tags { padding-top: 2px; }
+
+/*
+ * Оттенок метки берётся из самого слова (`tagTone`): одна и та же метка
+ * выглядит одинаково в строке, в фильтре и в профиле. Все четыре пары
+ * бледные и держат контраст ≥ 4.5:1 — метка это подпись, а не состояние,
+ * и «Allergy» не должна кричать громче суммы.
+ */
+:root {
+  --tag-0-bg: #eef2fe; --tag-0-fg: #2b3a7a;
+  --tag-1-bg: #e9f5ee; --tag-1-fg: #1f6b43;
+  --tag-2-bg: #fdf2e3; --tag-2-fg: #6b4a05;
+  --tag-3-bg: #eef4f7; --tag-3-fg: #2f5568;
+}
+.cus-tag, .cus-tag-chip { border: 0; }
+.cus-tag.is-tone-0, .cus-tag-chip.is-tone-0 { background: var(--tag-0-bg); color: var(--tag-0-fg); }
+.cus-tag.is-tone-1, .cus-tag-chip.is-tone-1 { background: var(--tag-1-bg); color: var(--tag-1-fg); }
+.cus-tag.is-tone-2, .cus-tag-chip.is-tone-2 { background: var(--tag-2-bg); color: var(--tag-2-fg); }
+.cus-tag.is-tone-3, .cus-tag-chip.is-tone-3 { background: var(--tag-3-bg); color: var(--tag-3-fg); }
+
+/* inline-block, а не flex: многоточие у длинной метки («Allergy: peanuts
+   and sesame») работает только в потоке текста — flex обрезал бы её по
+   середине слова, без всякого знака, что слово продолжается. */
+.cus-tag {
+  display: inline-block; max-width: 150px; padding: 2px 8px;
+  border-radius: var(--r-pill); line-height: 16px;
+  font-size: 11px; font-weight: 700; white-space: nowrap;
+  overflow: hidden; text-overflow: ellipsis; vertical-align: middle;
+}
+.cus-tag-chip {
+  display: inline-flex; align-items: center; gap: 6px;
+  min-height: 34px; padding: 0 12px; border-radius: var(--r-pill);
+  /* Волосяная обводка: без неё бледный чип не читается как кнопка */
+  box-shadow: inset 0 0 0 1px rgb(22 24 29 / 8%);
+  font: inherit; font-size: 13px; font-weight: 650; cursor: pointer;
+}
+.cus-tag-chip svg { width: 14px; height: 14px; }
+/* Число гостей — подпись, а не значок оповещения: тот же цвет, мельче */
+.cus-tag-chip small { font-size: 11px; font-weight: 650; opacity: .7; font-variant-numeric: tabular-nums; }
+.cus-tag-chip:hover { box-shadow: inset 0 0 0 1px rgb(22 24 29 / 18%); }
+/* Нажатая метка отличается не только цветом: обводка и галочка */
+.cus-tag-chip.is-on { box-shadow: inset 0 0 0 2px currentcolor; }
+
+/* ── Список ────────────────────────────────────────────────── */
+.cus-panel { padding: 0; overflow: hidden; }
+.cus-panel .empty-state { padding: var(--sp-6) var(--sp-4); }
+/* Что именно показано — тихой строкой над колонками, и только когда
+   список сужен: у нетронутой базы это повторяло бы порядок сортировки */
+.cus-summary {
+  margin: 0; padding: 10px var(--sp-4);
+  border-bottom: 1px solid var(--c-border-hair);
+  color: var(--c-text-muted); font-size: 13px;
+}
+
+/*
+ * Имя не забирает всю свободную ширину: на широком экране между ним и
+ * балансом висела пустая треть страницы, и глаз шёл через неё к числам.
+ * Слack достаётся колонке баланса — она текстовая и стоит рядом с
+ * именем, поэтому имя+баланс держатся слева, а числа остаются у края.
+ */
+.cus-list { --cus-cols: minmax(200px, 420px) minmax(140px, 1fr) 88px 132px 104px; min-width: 0; }
+.cus-head, .cus-row {
+  display: grid; grid-template-columns: var(--cus-cols);
+  align-items: center; gap: var(--sp-3); padding-inline: var(--sp-4);
+}
+.cus-head {
+  min-height: 44px; border-bottom: 1px solid var(--c-border-panel);
+  color: var(--c-text-muted); font-size: 12px; font-weight: 650;
+  text-transform: uppercase; letter-spacing: 0.02em;
+}
+/*
+ * Вся строка — одна кнопка. В заказах и каталоге открывает карточку
+ * отдельная кнопка на имени, потому что в строке живут меню действий и
+ * стрелки порядка; здесь у строки одно назначение, и целью служит она
+ * целиком — 70 px на палец и на мышь.
+ */
+.cus-row {
+  width: 100%; min-height: 70px; padding-block: var(--sp-3);
+  border: 0; border-bottom: 1px solid var(--c-border-hair);
+  background: transparent; font: inherit; text-align: start; cursor: pointer;
+}
+.cus-row:last-child { border-bottom: 0; }
+.cus-row:hover { background: var(--c-surface-hover); }
+/* Открытый профиль: бледный кобальт и полоса у начала строки — цвет тут
+   не единственный сигнал, состояние объявлено ещё и aria-expanded */
+.cus-row.is-selected { background: var(--st-accent-soft); box-shadow: inset 3px 0 0 var(--st-accent); }
+/* Обводка внутрь: панель обрезает содержимое, снаружи её было бы не видно */
+.cus-row:focus-visible { outline: 2px solid var(--st-accent); outline-offset: -3px; }
+
+.cus-cell-name { min-width: 0; display: grid; gap: 2px; }
+.cus-cell-name strong {
+  color: var(--c-text-strong); font-size: 14px; font-weight: 650;
+  overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+}
+.cus-cell-name small {
+  color: var(--c-text-subtle); font-size: 12px; font-variant-numeric: tabular-nums;
+}
+.cus-row-tags { display: flex; flex-wrap: wrap; gap: 4px; margin-top: 2px; }
+.cus-cell-loyalty {
+  min-width: 0; color: var(--c-text-2); font-size: 13px;
+  font-variant-numeric: tabular-nums;
+  overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+}
+/* Числа выровнены по краю: две суммы сравнивают глазом, а не считая цифры */
+.cus-cell-num {
+  text-align: end; color: var(--c-text); font-size: 13px;
+  font-variant-numeric: tabular-nums; white-space: nowrap;
+}
+.cus-row .cus-cell-num { font-weight: 650; }
+.cus-cell-seen { color: var(--c-text-muted); font-size: 13px; white-space: nowrap; }
+
+/* ── Профиль клиента ───────────────────────────────────────── */
+/* Четыре главных числа — одной сеткой 2×2, а не четырьмя карточками:
+   в панели 440 px четыре карточки становились четырьмя строчками */
+.cus-stats {
+  display: grid; grid-template-columns: 1fr 1fr;
+  border: 1px solid var(--c-border-panel); border-radius: var(--r-md);
+  overflow: hidden;
+}
+.cus-stats > div {
+  padding: 10px var(--sp-3);
+  border-top: 1px solid var(--c-border-hair);
+  border-inline-start: 1px solid var(--c-border-hair);
+}
+.cus-stats > div:nth-child(-n+2) { border-top: 0; }
+.cus-stats > div:nth-child(odd) { border-inline-start: 0; }
+.cus-stats span { display: block; color: var(--c-text-muted); font-size: 12px; }
+.cus-stats strong {
+  display: block; margin-top: 2px;
+  color: var(--c-text-strong); font-size: 17px; font-weight: 700;
+  font-variant-numeric: tabular-nums;
+}
+
+.cus-section { display: grid; gap: 6px; }
+.cus-section h4, .cus-privacy h4 {
+  margin: 0; color: var(--c-text-muted); font-size: 12px; font-weight: 650;
+  text-transform: uppercase; letter-spacing: 0.02em;
+}
+.cus-chips { display: flex; flex-wrap: wrap; gap: 6px; }
+.cus-chip {
+  display: inline-flex; align-items: center; padding: 4px 10px;
+  border: 1px solid var(--c-border-panel); border-radius: var(--r-pill);
+  background: var(--c-surface); color: var(--c-text-2);
+  font-size: 12px; font-weight: 650;
+}
+/* Неявки — единственное предупреждение в профиле, и оно названо словом */
+.cus-chip.is-warn { border-color: #f3d3d0; background: var(--st-stop-bg); color: var(--st-stop-fg); }
+.cus-note { margin: 0; color: var(--c-text); font-size: 14px; line-height: 1.45; overflow-wrap: anywhere; }
+.cus-note-hint { margin: 0; color: var(--c-text-subtle); font-size: 12px; }
+
+.cus-tabs { display: flex; gap: var(--sp-4); border-bottom: 1px solid var(--c-border-panel); }
+.cus-tabs button {
+  flex: 0 0 auto; min-height: 38px; padding: 0 2px;
+  border: 0; border-bottom: 2px solid transparent; background: transparent;
+  color: var(--c-text-muted); font: inherit; font-size: 14px; font-weight: 600;
+  cursor: pointer;
+}
+.cus-tabs button:hover { color: var(--c-text); }
+.cus-tabs button.is-active {
+  border-bottom-color: var(--st-accent); color: var(--c-text); font-weight: 730;
+}
+
+.cus-orders { display: grid; gap: 6px; }
+.cus-order { border: 1px solid var(--c-border-soft); border-radius: var(--r-md); overflow: hidden; }
+.cus-order.is-open { border-color: var(--c-border-panel); }
+.cus-order-head {
+  display: flex; align-items: center; gap: var(--sp-2);
+  width: 100%; min-height: 40px; padding: 8px var(--sp-3);
+  border: 0; background: transparent; font: inherit; text-align: start; cursor: pointer;
+}
+.cus-order-head:hover { background: var(--c-surface-hover); }
+.cus-order-head strong {
+  color: var(--c-text-strong); font-size: 13px; font-weight: 700;
+  font-variant-numeric: tabular-nums;
+}
+.cus-order-head svg { flex: none; width: 16px; height: 16px; color: var(--c-text-faint); }
+.cus-order-date {
+  flex: 1; min-width: 0; color: var(--c-text-subtle); font-size: 12px;
+  font-variant-numeric: tabular-nums;
+}
+.cus-order-total { color: var(--c-text); font-size: 13px; font-weight: 650; font-variant-numeric: tabular-nums; }
+.cus-order-items {
+  display: grid; gap: 4px; padding: var(--sp-2) var(--sp-3);
+  border-top: 1px solid var(--c-border-hair); background: var(--c-surface-muted);
+}
+.cus-order-items .empty-state { padding: 0; }
+.cus-order-item { display: flex; align-items: baseline; gap: var(--sp-2); font-size: 12px; }
+.cus-order-item .qty { flex: none; color: var(--c-text-subtle); font-variant-numeric: tabular-nums; }
+.cus-order-item .name { flex: 1; min-width: 0; color: var(--c-text); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.cus-order-item .sum { flex: none; color: var(--c-text); font-variant-numeric: tabular-nums; }
+.cus-order-item.is-discount { padding-top: 5px; border-top: 1px solid var(--c-border-hair); }
+.cus-order-item.is-discount .name { color: var(--c-text-subtle); }
+
+.cus-events { display: grid; gap: 4px; }
+.cus-event {
+  display: flex; align-items: center; gap: var(--sp-3); padding: 8px var(--sp-3);
+  border: 1px solid var(--c-border-soft); border-radius: var(--r-md);
+}
+.cus-event-date { flex: 1; color: var(--c-text-subtle); font-size: 12px; font-variant-numeric: tabular-nums; }
+.cus-event-delta { color: var(--c-text); font-size: 13px; font-weight: 700; font-variant-numeric: tabular-nums; }
+.cus-event-delta.is-positive { color: var(--c-success); }
+
+/* ── Правка и приватность ──────────────────────────────────── */
+/*
+ * Поля формы описаны здесь целиком, как в каталоге: прежняя правка
+ * профиля не описывала их вовсе и получала браузерное умолчание —
+ * подпись вставала В СТРОКУ с полем, и «Type 050-123-4567 to confirm»
+ * упиралось в поле подтверждения ровно там, где ошибиться нельзя.
+ * Селектор `label`, а не `> label`: поля в `.field-row` вложены глубже.
+ */
+.cus-form { display: grid; gap: var(--sp-3); }
+.cus-form label { display: grid; gap: 6px; min-width: 0; }
+.cus-form label > span { color: var(--c-text-2); font-size: 13px; font-weight: 700; }
+.cus-form input[type='text'],
+.cus-form input:not([type]) {
+  min-height: var(--h-control); min-width: 0; padding: 0 12px;
+  border: 1px solid var(--c-border); border-radius: var(--r-md);
+  background: var(--c-surface); font: inherit; font-size: 15px;
+}
+.cus-form input:focus { outline: none; border-color: var(--c-ink); }
+.cus-form textarea {
+  padding: 10px 12px; border: 1px solid var(--c-border); border-radius: var(--r-md);
+  background: var(--c-surface); font: inherit; font-size: 15px; resize: vertical;
+}
+.cus-form textarea:focus { outline: none; border-color: var(--c-ink); }
+.cus-form-hint { margin: -6px 0 0; }
+.cus-form-actions { display: flex; justify-content: flex-end; gap: var(--sp-2); }
+.cus-erase-lead { display: flex; gap: 10px; margin: 0; color: var(--c-text); font-size: 14px; }
+.cus-erase-lead svg { flex: none; width: 18px; height: 18px; color: var(--c-danger); }
+/* Что остаётся после стирания — рядом с тем, что исчезнет, а не в справке */
+.cus-erase-keep {
+  margin: 0; padding: var(--sp-3);
+  border: 1px solid var(--c-border-soft); border-radius: var(--r-md);
+  background: var(--c-surface-muted); color: var(--c-text-muted); font-size: 13px;
+}
+/* Стирание отделено чертой: это последнее, что делают с клиентом, и оно
+   не должно стоять рядом с «Edit» */
+.cus-privacy {
+  display: grid; justify-items: start; gap: 6px;
+  margin-top: var(--sp-2); padding-top: var(--sp-3);
+  border-top: 1px solid var(--c-border-soft);
+}
+
+/* ── Планшет ───────────────────────────────────────────────── */
+@media (max-width: 1024px) {
+  .cus-toolbar .cus-search { min-height: var(--h-touch); }
+  .cus-select select { min-height: var(--h-touch); }
+  .cus-chip-row .segment-chip, .cus-tag-chip { min-height: var(--h-touch); }
+  .page-heading-actions .secondary-button { min-height: var(--h-touch); }
+  .page-heading-actions .icon-button { width: var(--h-touch); height: var(--h-touch); }
+  /* Колонки сужаются, а не исчезают; первыми уступают метки —
+     сравнивают клиентов по визитам и сумме, а не по подписям */
+  .cus-list { --cus-cols: minmax(140px, 1fr) minmax(120px, 0.7fr) 72px 118px 96px; }
+  .cus-row-tags { display: none; }
+}
+
+/* ── Телефон: сводка вместо сжатой таблицы ─────────────────── */
+@media (max-width: 720px) {
+  .cus-toolbar .cus-search { flex-basis: 100%; max-width: none; }
+  /* Ввод меньше 16px на iOS заставляет браузер приближать страницу */
+  .cus-toolbar input, .cus-select select { font-size: 16px; }
+  .cus-select { flex: 1 1 140px; min-width: 0; }
+  .cus-select select { width: 100%; }
+  .cus-count { flex: 1 1 auto; margin-inline-start: 0; }
+  .cus-summary { padding-inline: var(--sp-4); }
+
+  /* Пять колонок на 390 px — это не таблица, а нечитаемая сетка:
+     строка становится сводкой в два столбца, шапка теряет смысл */
+  .cus-head { display: none; }
+  .cus-row {
+    grid-template-columns: minmax(0, 1fr) auto;
+    gap: 2px var(--sp-3); padding: var(--sp-3) var(--sp-4);
+  }
+  .cus-cell-name { grid-area: 1 / 1 / 2 / 3; }
+  .cus-row-tags { display: flex; }
+  .cus-cell-loyalty { grid-area: 2 / 1; }
+  .cus-row [data-label='Total spent'] { grid-area: 2 / 2; }
+  .cus-row [data-label='Visits'] { grid-area: 3 / 1; text-align: start; }
+  .cus-row [data-label='Last visit'] { grid-area: 3 / 2; text-align: end; }
+  /* Без шапки число само себя не объясняет: «23» — это визиты или дни? */
+  .cus-row [data-label='Visits']::before {
+    content: attr(data-label) ': ';
+    color: var(--c-text-subtle); font-weight: 500;
+  }
+
+  /* Решение и отказ — во всю ширину и столбиком: пальцем в две кнопки
+     рядом на 390 px попадают мимо */
+  .cus-form-actions { flex-direction: column-reverse; }
+  .cus-form-actions button { width: 100%; min-height: var(--h-touch); }
 }

@@ -8,9 +8,26 @@
 
 // ── Формат ───────────────────────────────────────────────────
 
-/** Деньги приходят целыми агоротами (инвариант кассы) — форматируем в ₪ */
+/**
+ * Деньги приходят целыми агоротами (инвариант кассы) — форматируем в ₪.
+ *
+ * Разряды разделены, как в заказах и отчётах: «₪1284.50» в колонке сумм
+ * читается как «₪128450», и глазу приходится считать нули. Формат
+ * создаётся один раз: в списке на 200 строк он вызывается сотни раз.
+ */
+const MONEY = (() => {
+  try {
+    return new Intl.NumberFormat('en-GB', {
+      style: 'currency', currency: 'ILS', currencyDisplay: 'narrowSymbol',
+    })
+  } catch {
+    return null
+  }
+})()
+
 export function formatMoney(agorot) {
-  return `₪${((agorot ?? 0) / 100).toFixed(2)}`
+  const value = (agorot ?? 0) / 100
+  return MONEY ? MONEY.format(value) : `₪${value.toFixed(2)}`
 }
 
 /** Телефон хранится одними цифрами: 0501234567 → 050-123-4567 */
@@ -41,6 +58,57 @@ export function formatDateTime(iso) {
   return new Date(iso).toLocaleString('en-GB', {
     day: '2-digit', month: 'short', hour: '2-digit', minute: '2-digit',
   })
+}
+
+/** «4 visits» / «1 visit» — единица нужна там, где нет шапки колонки */
+export function visitsLabel(visits) {
+  const n = visits ?? 0
+  return `${n} visit${n === 1 ? '' : 's'}`
+}
+
+// ── Лояльность ───────────────────────────────────────────────
+
+function stampsLabel(stamps) {
+  const n = stamps ?? 0
+  return `${n} stamp${n === 1 ? '' : 's'}`
+}
+
+/**
+ * Баланс строки списка. Программа бывает в двух режимах, и цифра без
+ * названия врёт: 3 — это три штампа или ₪0.03?
+ *
+ * Режим знает только сервер и отдаёт его в карточке гостя (115), а список
+ * приходит раньше первой открытой карточки. До этого показываем то, что
+ * ненулевое: штампы у точки со штампами, баллы у точки с баллами.
+ * Жёстко зашивать баллы по картинке макета нельзя — точка со штампами
+ * увидела бы «₪0.00» на всей базе.
+ */
+export function loyaltyLabel(guest, mode) {
+  const stamps = guest?.stamps ?? 0
+  const points = guest?.points ?? 0
+  if (mode === 'stamps') return stampsLabel(stamps)
+  if (mode === 'points') return `Points ${formatMoney(points)}`
+  return stamps > 0 ? stampsLabel(stamps) : `Points ${formatMoney(points)}`
+}
+
+/**
+ * Доступное имя строки клиента.
+ *
+ * Строка — одна кнопка, и её `aria-label` заменяет читалке ВСЁ
+ * содержимое: числа из ячеек до скринридера не доходят. Поэтому имя
+ * называет то же, что видит глаз, — иначе список для читалки состоит из
+ * двухсот безымянных «Open».
+ */
+export function guestRowLabel(guest, mode) {
+  const phone = formatPhone(guest?.phone)
+  const parts = [guest?.name || phone]
+  if (guest?.name && phone) parts.push(phone)
+  parts.push(loyaltyLabel(guest, mode))
+  parts.push(visitsLabel(guest?.visits))
+  parts.push(`${formatMoney(guest?.total_spent)} spent`)
+  parts.push(`last visit ${lastVisitLabel(guest?.last_visit_at).toLowerCase()}`)
+  if (guest?.tags?.length) parts.push(`tagged ${guest.tags.join(', ')}`)
+  return `Open ${parts.join(' · ')}`
 }
 
 // ── Сегменты ─────────────────────────────────────────────────
@@ -85,9 +153,16 @@ export const SORTS = [
   { key: 'name', label: 'Name' },
 ]
 
+/**
+ * Сколько строк отдаёт сервер за раз (131). Клиентской «страницы» нет:
+ * листать нечем, пока RPC не умеет курсор, — поэтому счётчик над списком
+ * честно говорит «первые 200», а не выдумывает размер базы.
+ */
+export const ROW_LIMIT = 200
+
 /** Аргументы RPC из состояния фильтров. Пустые значения не отправляем. */
 export function segmentParams({
-  search = '', segment = 'all', tags = [], sort = 'recent', limit = 200,
+  search = '', segment = 'all', tags = [], sort = 'recent', limit = ROW_LIMIT,
 } = {}) {
   const preset = SEGMENTS.find((s) => s.key === segment) ?? SEGMENTS[0]
   return {
@@ -116,10 +191,37 @@ export function segmentSummary({ segment = 'all', tags = [], search = '' } = {})
   return `Showing ${parts.join(', ')}.`
 }
 
+/**
+ * Счётчик над списком. Считает ЗАГРУЖЕННЫЕ строки, а не базу: сервер
+ * отдаёт срез, и «128 customers» рядом с фильтром означает «столько
+ * сейчас на экране». На пределе выборки это сказано словами.
+ */
+export function loadedCountLabel(total, limit = ROW_LIMIT) {
+  const n = total ?? 0
+  if (n === 0) return 'No customers'
+  const word = n === 1 ? 'customer' : 'customers'
+  return n >= limit ? `First ${n} ${word}` : `${n} ${word}`
+}
+
 // ── Метки ────────────────────────────────────────────────────
 
 export const TAG_LIMIT = 12
 export const TAG_MAX_LENGTH = 24
+
+/**
+ * Оттенок метки. Одна и та же метка обязана выглядеть одинаково в строке,
+ * в фильтре и в профиле, а «случайный» цвет при каждом рендере превращал
+ * бы список в новогоднюю гирлянду — поэтому оттенок вычисляется из самого
+ * слова. Их четыре, все бледные: метка — подпись, а не состояние.
+ */
+export const TAG_TONES = 4
+
+export function tagTone(tag) {
+  const text = String(tag ?? '')
+  let sum = 0
+  for (let i = 0; i < text.length; i += 1) sum = (sum * 31 + text.charCodeAt(i)) % 9973
+  return sum % TAG_TONES
+}
 
 /**
  * Метки из строки: запятая или перевод строки. Обрезаем, снимаем дубли и
