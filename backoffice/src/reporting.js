@@ -40,6 +40,17 @@ export const PREVIOUS_LABEL = {
 }
 
 /**
+ * Имя прошлого периода для строки «Yesterday ₪3,954.20». Берётся из той
+ * же подписи сравнения: два независимых списка слов рано или поздно
+ * разойдутся, и рядом окажутся «vs yesterday» и «Previous day».
+ */
+export function previousName(period) {
+  const label = PREVIOUS_LABEL[period] || PREVIOUS_LABEL.custom
+  const text = label.replace(/^vs /, '')
+  return text.charAt(0).toUpperCase() + text.slice(1)
+}
+
+/**
  * Изменение к прошлому периоду. Рост с нуля — не «+∞ %», а «был ноль»:
  * процент там не значит ничего, и врать им нельзя.
  */
@@ -80,6 +91,23 @@ export function scopeLine(scope, from, to) {
     : (scope.locations ?? []).map((l) => l.name).join(', ') || 'No locations'
   const currency = (scope.currencies ?? []).join(', ')
   return [rangeLabel(from, to), locations, scope.tz, currency].filter(Boolean).join(' · ')
+}
+
+/**
+ * Подпись выбора точек на самом переключателе — то, ЧТО СПРОСИЛИ, а не
+ * то, что ответил сервер: охват отчёта называет строка scope, и она
+ * появляется только вместе с числами.
+ *
+ * Пустой выбор — это «все точки» (сервер понимает его так же). Одна
+ * точка названа именем: «1 of 3 locations» заставляет открывать список,
+ * чтобы вспомнить, какая именно.
+ */
+export function locationsSummary(locations, ids = []) {
+  const all = locations ?? []
+  const picked = all.filter((l) => (ids ?? []).includes(l.id))
+  if (picked.length === 0) return 'All locations'
+  if (picked.length === 1) return picked[0].name
+  return `${picked.length} of ${all.length} locations`
 }
 
 // ── Разрезы ──────────────────────────────────────────────────

@@ -1,8 +1,8 @@
 import test from 'node:test'
 import assert from 'node:assert/strict'
 import {
-  previousRange, PREVIOUS_LABEL, delta, rangeLabel, scopeLine,
-  channelLabel, orderTypeLabel, salesToCsv, salesFileName,
+  previousRange, previousName, PREVIOUS_LABEL, delta, rangeLabel, scopeLine,
+  locationsSummary, channelLabel, orderTypeLabel, salesToCsv, salesFileName,
   activityParams, activityToCsv, ACTIVITY_TYPES,
   activityDayKey, activityDayLabel, activityDays, activityTime,
 } from './reporting.js'
@@ -37,6 +37,13 @@ test('у каждого периода есть подпись сравнени�
   for (const key of ['today', '7d', 'month', 'year', 'custom']) {
     assert.ok(PREVIOUS_LABEL[key])
   }
+})
+
+test('имя прошлого периода берётся из той же подписи, что и сравнение', () => {
+  assert.equal(previousName('today'), 'Yesterday')
+  assert.equal(previousName('month'), 'Previous month')
+  // Неизвестный период не оставляет строку без имени
+  assert.equal(previousName('decade'), 'Previous period')
 })
 
 // ── Изменение ────────────────────────────────────────────────
@@ -82,6 +89,18 @@ test('без выбора точек охват честно говорит «в
   const line = scopeLine({ all_locations: true, locations: [], tz: 'Asia/Jerusalem', currencies: ['ILS'] },
     new Date(2026, 7, 1), new Date(2026, 7, 2))
   assert.match(line, /All locations/)
+})
+
+test('подпись выбора точек называет одну точку именем, а несколько — счётом', () => {
+  const locations = [
+    { id: 'l1', name: 'Dizengoff' }, { id: 'l2', name: 'Rothschild' }, { id: 'l3', name: 'Florentin' },
+  ]
+  // Пустой выбор — это «все точки», сервер понимает его так же
+  assert.equal(locationsSummary(locations, []), 'All locations')
+  assert.equal(locationsSummary(locations, ['l2']), 'Rothschild')
+  assert.equal(locationsSummary(locations, ['l1', 'l3']), '2 of 3 locations')
+  // Точка, которой больше нет в списке, не считается выбранной
+  assert.equal(locationsSummary(locations, ['gone']), 'All locations')
 })
 
 test('заказ с кассы называется стойкой, а не кодом', () => {

@@ -43,6 +43,12 @@
   --c-danger: #b4453c;
   --c-success: #34734c;
 
+  /* График отчёта: кобальт — «здесь были продажи», тёмный — «выбрано».
+     Два цвета и ровно два смысла: серия столбиков не должна спорить за
+     внимание с тем единственным интервалом, который назван в ридауте. */
+  --c-chart-bar: #2f61c4;
+  --c-chart-bar-active: #12213d;
+
   /* Состояния визита. Один набор на таймлайн, список, лист ожидания и
      панель визита: цвет статуса меняется здесь, а не в семи местах.
      Пары фон/текст держат контраст ≥ 4.5:1 — статус читается и мелким
@@ -251,8 +257,8 @@ a { color: inherit; }
 .rsv-header h1 { margin: 0; font-size: 25px; font-weight: 730; line-height: 1.1; }
 /* Действия раздела (выгрузка, обновление) — в конце той же строки */
 .page-heading-actions { flex: 0 0 auto; display: flex; align-items: center; gap: var(--sp-2); margin-inline-start: auto; }
-/* Строка данных под названием (охват отчёта) занимает всю ширину */
-.page-heading > .scope-line { flex-basis: 100%; margin: 0; }
+/* Строка данных под названием занимает всю ширину */
+.page-heading > p { flex-basis: 100%; margin: 0; }
 
 /* Единственный титульный экран кабинета — приветствие организации до
    активации продуктов. Работать на нём ещё негде, поэтому здесь текст,
@@ -375,7 +381,9 @@ a { color: inherit; }
 @keyframes spin { to { transform: rotate(360deg); } }
 .drawer-scrim { display: none; }
 
-/* ── Обзор продаж ─────────────────────────────────────────── */
+/* ── Обзор: полоса управления, hero, график ────────────────
+   Общее для «Продаж» и аналитики брони; собственная раскладка
+   отчёта продаж — ниже, в своём блоке. */
 .overview-toolbar { display: flex; align-items: center; justify-content: space-between; gap: 12px; margin-bottom: 14px; }
 .period-switch { display: inline-flex; gap: 4px; padding: 4px; border-radius: var(--r-md); background: var(--c-border-soft); }
 .period-switch button { min-height: 38px; padding: 0 16px; border: 0; border-radius: var(--r-sm); background: transparent; color: var(--c-text-muted); font-size: 13px; font-weight: 750; }
@@ -397,24 +405,37 @@ a { color: inherit; }
 .ov-stat { min-height: 108px; }
 .ov-stat .stat-value { font-size: 24px; font-variant-numeric: tabular-nums; }
 
-.ov-adjust { margin-top: 12px; padding: 14px 20px; display: grid; gap: 8px; }
-.ov-adjust div { display: flex; justify-content: space-between; gap: 12px; color: #6c717a; font-size: 13px; }
-.ov-adjust strong { font-variant-numeric: tabular-nums; }
-.ov-adjust .is-negative { color: var(--c-danger); }
+.overview-columns .panel-heading h2 { display: inline-flex; align-items: center; gap: 8px; }
+.overview-columns .panel-heading svg { width: 16px; height: 16px; color: var(--c-text-subtle); }
 
-.chart-panel .panel-heading h2, .overview-columns .panel-heading h2 { display: inline-flex; align-items: center; gap: 8px; }
-.chart-panel .panel-heading svg, .overview-columns .panel-heading svg { width: 16px; height: 16px; color: var(--c-text-subtle); }
-
-.chart-panel { margin-top: 14px; }
-.chart-readout { color: var(--c-text-subtle); font-size: 12px; font-variant-numeric: tabular-nums; }
+.chart-readout { margin: 0; color: var(--c-text-subtle); font-size: 12px; font-variant-numeric: tabular-nums; }
 .chart-readout strong { color: var(--c-ink); }
-.chart-body { padding: 20px 22px 18px; }
 /*
  * Горизонтальный скроллер графика: при 30+ точках столбики не сжимаются,
  * а лист прокручивается пальцем. Скроллер внутренний — на overscroll-behavior-x
  * корня это не влияет (сдвиг всей страницы по-прежнему запрещён).
  */
 .chart-scroll { overflow-x: auto; overscroll-behavior-x: contain; -webkit-overflow-scrolling: touch; scrollbar-width: thin; }
+/*
+ * Шкала стоит колонкой слева от прокручиваемого поля: подписи «сколько
+ * это» не должны уезжать вместе со столбиками. Высота поля задаётся
+ * одной переменной — иначе линии сетки и подписи разъезжаются.
+ */
+.chart-frame { --chart-h: 168px; display: grid; grid-template-columns: auto minmax(0, 1fr); gap: var(--sp-3); }
+/* Разметка идёт сверху вниз (верхняя отметка первой), поэтому колонка
+   обычная: ещё один разворот здесь перевернул бы шкалу вверх ногами */
+.chart-ticks {
+  display: flex; flex-direction: column; justify-content: space-between;
+  height: var(--chart-h); color: var(--c-text-faint); font-size: 10px;
+  font-variant-numeric: tabular-nums; white-space: nowrap; text-align: end;
+}
+/* Подпись центрируется на своей линии, а не висит под ней */
+.chart-ticks span { line-height: 1; transform: translateY(-50%); }
+.chart-plot { position: relative; height: var(--chart-h); }
+.chart-grid { position: absolute; inset: 0; display: flex; flex-direction: column-reverse; justify-content: space-between; }
+.chart-grid i { display: block; border-top: 1px solid var(--c-border-hair); }
+/* Нулевая линия — граница оси, она заметнее остальных */
+.chart-grid i:first-child { border-top-color: var(--c-border-soft); }
 /*
  * Ширину задаёт CSS, а не JS-замер: min-width гарантирует, что столбики
  * не ужмутся в ниточки даже если замер не сработал. max() — график
@@ -423,11 +444,14 @@ a { color: inherit; }
 .chart-inner { min-width: max(100%, calc(var(--bar-count) * var(--min-bar, 30px))); }
 /* Ось времени всегда LTR: часы и дни идут слева направо в любой локали */
 .chart-bars, .chart-axis { direction: ltr; }
-.chart-bars { display: flex; align-items: flex-end; gap: 2px; height: 148px; }
+/* Столбики лежат поверх сетки, поэтому позиционируются в том же поле */
+.chart-bars { position: relative; display: flex; align-items: flex-end; gap: 2px; height: 100%; }
 /* max-width: столбик не расплывается в плиту, когда точек мало */
 .chart-bar { flex: 1 1 0; min-width: 0; max-width: 76px; height: 100%; display: flex; align-items: flex-end; padding: 0; border: 0; background: transparent; }
-.chart-bar .bar { width: 100%; border-radius: 4px 4px 0 0; background: var(--c-border); transition: background-color .15s ease; }
-.chart-bar .bar.is-active { background: var(--c-ink); }
+.chart-bar .bar { width: 100%; border-radius: 3px 3px 0 0; background: var(--c-chart-bar); transition: background-color .15s ease; }
+/* Выбранный интервал — тёмный: он назван в ридауте, и глаз обязан
+   найти на графике именно его, а не самый высокий столбик рядом */
+.chart-bar .bar.is-active { background: var(--c-chart-bar-active); }
 .chart-axis { display: flex; gap: 2px; margin-top: 7px; }
 /* Ширина подписи = ширине столбика, иначе ось разъезжается */
 .chart-axis span { flex: 1 1 0; min-width: 0; max-width: 76px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; text-align: center; color: var(--c-text-faint); font-size: 10px; font-variant-numeric: tabular-nums; }
@@ -446,6 +470,171 @@ a { color: inherit; }
 .data-row strong { font-weight: 750; font-variant-numeric: tabular-nums; white-space: nowrap; }
 .truncate { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .updated-at { margin: 18px 0 0; text-align: center; color: var(--c-text-faint); font-size: 11px; font-variant-numeric: tabular-nums; }
+
+/* ── Продажи ───────────────────────────────────────────────
+ *
+ * Отчёт стоит одной поверхностью: слева чистая выручка со сравнением,
+ * справа график того же периода, под ними тихая полоса «валовая /
+ * заказы / средний чек». Раньше это были тёмная плита, три карточки по
+ * 150px и отдельная панель графика — те же четыре числа, но собрать из
+ * них ответ можно было только прокруткой.
+ *
+ * Управление — компактное, 40px: период, точки и даты стоят одной
+ * строкой над отчётом, а под ними строка охвата, которой число
+ * подписано.
+ */
+.sales-controls { display: flex; flex-wrap: wrap; align-items: center; gap: var(--sp-2); margin-bottom: var(--sp-2); }
+
+/* Сегмент периода. Свой класс, а не общий `.period-switch`: тот же
+   рисунок уже носят вкладки каталога, и менять их заодно нельзя. */
+.sales-periods {
+  display: inline-flex; gap: 2px; max-width: 100%; padding: 3px;
+  border: 1px solid var(--c-border-panel); border-radius: var(--r-md);
+  background: var(--c-surface);
+}
+.sales-periods button {
+  min-height: 32px; padding: 0 14px; border: 0; border-radius: var(--r-sm);
+  background: transparent; color: var(--c-text-muted);
+  font-size: 13px; font-weight: 700; white-space: nowrap;
+}
+.sales-periods button:hover { color: var(--c-text); }
+.sales-periods button.is-active { background: var(--c-ink); color: var(--c-on-ink); }
+
+/* Выбор точек: кнопка со сводкой и список с чекбоксами под ней */
+.sales-locations { position: relative; }
+.sales-picker {
+  min-height: var(--h-control); max-width: 260px; display: inline-flex; align-items: center; gap: var(--sp-2);
+  padding: 0 12px; border: 1px solid var(--c-border); border-radius: var(--r-md);
+  background: var(--c-surface); color: var(--c-text-2); font-size: 13px; font-weight: 650;
+}
+.sales-picker:hover { border-color: #b9bcc4; }
+.sales-picker svg { width: 16px; height: 16px; flex: none; color: var(--c-text-subtle); }
+.sales-picker-caret { margin-inline-start: var(--sp-1); }
+.sales-loc-pop {
+  position: absolute; z-index: 20; inset-inline-start: 0; top: calc(100% + 6px);
+  min-width: 240px; max-width: min(320px, calc(100vw - 32px)); max-height: 60svh; overflow-y: auto;
+  padding: var(--sp-1); border: 1px solid var(--c-border-panel); border-radius: var(--r-md);
+  background: var(--c-surface); box-shadow: var(--shadow-pop);
+}
+.sales-loc-option {
+  min-height: var(--h-control); display: flex; align-items: center; gap: 10px;
+  padding: 0 10px; border-radius: var(--r-sm); font-size: 13px; cursor: pointer;
+}
+.sales-loc-option:hover { background: var(--c-surface-hover); }
+.sales-loc-option input { width: 16px; height: 16px; flex: none; accent-color: var(--c-ink); }
+
+.sales-dates { display: flex; flex-wrap: wrap; align-items: center; gap: var(--sp-2); }
+.sales-dates label { display: inline-flex; align-items: center; gap: var(--sp-2); }
+.sales-dates span { color: var(--c-text-subtle); font-size: 12px; font-weight: 700; }
+.sales-dates input {
+  min-height: var(--h-control); padding: 0 10px; border: 1px solid var(--c-border);
+  border-radius: var(--r-md); background: var(--c-surface); font-size: 13px;
+}
+
+/* ── Поверхность отчёта ───────────────────────────────────── */
+.sales-report { border: 1px solid var(--c-border-panel); border-radius: var(--r-md); background: var(--c-surface); }
+.sales-report-top { display: grid; grid-template-columns: minmax(230px, .85fr) minmax(0, 2.15fr); }
+.sales-net {
+  display: grid; align-content: start; gap: var(--sp-1); min-width: 0;
+  padding: var(--sp-5); border-inline-end: 1px solid var(--c-border-soft);
+}
+.sales-net-label { margin: 0; color: var(--c-text-subtle); font-size: 13px; font-weight: 700; }
+/* Самое сильное место страницы — но не половина экрана */
+.sales-net-value {
+  margin: 2px 0 0; font-size: clamp(30px, 3.2vw, 42px); line-height: 1.05;
+  font-weight: 780; letter-spacing: -.02em; font-variant-numeric: tabular-nums;
+}
+.sales-net-compare { margin: var(--sp-2) 0 0; }
+.sales-net-prev { margin: 0; color: var(--c-text-subtle); font-size: 13px; font-variant-numeric: tabular-nums; }
+/* Ноль после успешной загрузки — это ответ, а не пустота: говорим словом */
+.sales-net-empty { margin: var(--sp-2) 0 0; color: var(--c-text-subtle); font-size: 12px; line-height: 1.45; }
+
+.sales-chart { min-width: 0; padding: var(--sp-4) var(--sp-5); }
+.sales-chart-head { display: flex; flex-wrap: wrap; align-items: baseline; justify-content: space-between; gap: var(--sp-2); margin-bottom: var(--sp-4); }
+.sales-chart-head h2 { margin: 0; font-size: 15px; font-weight: 730; }
+.sales-chart .empty-state { padding: 40px 0; }
+
+/* Полоса показателей: тонкие разделители вместо трёх крупных карточек */
+.sales-strip { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); border-top: 1px solid var(--c-border-soft); }
+.sales-strip > div { display: grid; justify-items: center; gap: 2px; padding: var(--sp-3) var(--sp-4); text-align: center; }
+.sales-strip > div + div { border-inline-start: 1px solid var(--c-border-soft); }
+.sales-strip-label { color: var(--c-text-subtle); font-size: 12px; font-weight: 650; }
+.sales-strip strong { font-size: 20px; font-weight: 750; font-variant-numeric: tabular-nums; }
+.sales-strip .stat-delta { font-size: 11px; }
+
+/* Скидки и возвраты — уменьшение выручки, поэтому красным и со знаком */
+.sales-adjust {
+  display: flex; flex-wrap: wrap; justify-content: center; gap: var(--sp-2) var(--sp-5);
+  padding: var(--sp-3) var(--sp-4); border-top: 1px solid var(--c-border-soft); font-size: 13px;
+}
+.sales-adjust > span { display: inline-flex; align-items: baseline; gap: var(--sp-2); }
+.sales-adjust-label { color: var(--c-text-subtle); }
+.sales-adjust strong { color: var(--c-danger); font-weight: 700; font-variant-numeric: tabular-nums; }
+
+/* ── Разрезы ──────────────────────────────────────────────── */
+.sales-breakdowns { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: var(--sp-3); margin-top: var(--sp-3); align-items: start; }
+.sales-panel .panel-heading { min-height: 0; padding: var(--sp-4) var(--sp-5) var(--sp-2); border-bottom: 0; }
+.sales-panel .panel-heading h2 { display: inline-flex; align-items: center; gap: var(--sp-2); font-size: 15px; font-weight: 730; }
+.sales-panel .panel-heading svg { width: 16px; height: 16px; color: var(--c-text-subtle); }
+.sales-panel .data-list { padding-bottom: var(--sp-3); }
+.sales-row { gap: var(--sp-3); padding-inline: var(--sp-5); }
+.sales-rank { flex: none; width: 16px; color: var(--c-text-faint); font-size: 12px; font-variant-numeric: tabular-nums; }
+.sales-row-name { flex: 0 1 auto; min-width: 0; color: var(--c-text-2); }
+.sales-row-count { flex: none; margin-inline-start: auto; color: var(--c-text-subtle); font-size: 12px; font-variant-numeric: tabular-nums; }
+.sales-row strong { flex: none; min-width: 78px; text-align: end; }
+/* Полоса показывает соотношение, число остаётся ответом */
+.sales-meter { flex: 1 1 48px; min-width: 32px; height: 6px; margin-inline: auto var(--sp-1); border-radius: var(--r-pill); background: var(--c-surface-sunken); }
+.sales-meter i { display: block; width: var(--share, 0%); height: 100%; border-radius: inherit; background: var(--c-chart-bar); }
+.sales-row.has-meter .sales-row-count { margin-inline-start: 0; }
+
+@media (max-width: 1024px) {
+  /* Узкий график хуже сложенной раскладки: сумма и столбики уезжают
+     друг под друга, но остаются читаемыми */
+  .sales-report-top { grid-template-columns: minmax(0, 1fr); }
+  .sales-net { border-inline-end: 0; border-bottom: 1px solid var(--c-border-soft); padding: var(--sp-4) var(--sp-5); }
+}
+
+@media (max-width: 720px) {
+  .sales-controls { gap: var(--sp-2); }
+  /* Период листается внутри себя и не распирает страницу */
+  .sales-periods { overflow-x: auto; scrollbar-width: none; }
+  .sales-periods::-webkit-scrollbar { display: none; }
+  .sales-periods button { flex: 0 0 auto; min-height: var(--h-touch); padding: 0 12px; }
+  .sales-picker { max-width: 100%; min-height: var(--h-touch); }
+  .sales-loc-option { min-height: var(--h-touch); }
+  .sales-dates { flex-basis: 100%; }
+  .sales-dates label { flex: 1 1 140px; }
+  .sales-dates input { width: 100%; min-height: var(--h-touch); }
+
+  .sales-net { padding: var(--sp-4); }
+  .sales-chart { padding: var(--sp-4) var(--sp-3); }
+  /* Подписи шкалы съедают ширину, которая нужна столбикам: сетка
+     остаётся, точные числа — в ридауте над графиком */
+  .chart-frame { --chart-h: 132px; grid-template-columns: minmax(0, 1fr); }
+  .chart-ticks { display: none; }
+
+  .sales-strip { grid-template-columns: minmax(0, 1fr); }
+  .sales-strip > div {
+    grid-template-columns: minmax(0, 1fr) auto; justify-items: start;
+    align-items: baseline; gap: 2px var(--sp-3); padding: var(--sp-3) var(--sp-4); text-align: start;
+  }
+  .sales-strip > div + div { border-inline-start: 0; border-top: 1px solid var(--c-border-hair); }
+  .sales-strip strong { grid-column: 2; grid-row: 1; font-size: 17px; }
+  .sales-strip .stat-delta { grid-column: 1 / -1; }
+  .sales-adjust { justify-content: space-between; }
+
+  .sales-breakdowns { grid-template-columns: minmax(0, 1fr); }
+  .sales-panel .panel-heading { padding: var(--sp-4) var(--sp-4) var(--sp-2); }
+  .sales-row { padding-inline: var(--sp-4); gap: var(--sp-2); }
+  /* Полоса уступает место названию и сумме — первым уходит она, и
+     счётчик возвращается к правому краю, как в остальных разрезах */
+  .sales-meter { display: none; }
+  .sales-row.has-meter .sales-row-count { margin-inline-start: auto; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .chart-bar .bar { transition: none; }
+}
 
 /* ── Девайсы (парк касс) ──────────────────────────────────── */
 .device-summary { display: flex; align-items: center; gap: 16px; font-size: 13px; font-weight: 650; color: var(--c-text-muted); }
@@ -2017,7 +2206,6 @@ a { color: inherit; }
 
 /* ── Срезы базы: сегменты общего вида (Kassa 131) ────────────
    Чип-переключатель делят отчёты, журнал и Customers. */
-.segment-bar { display: flex; flex-wrap: wrap; gap: 8px; margin-bottom: 14px; }
 .segment-chip { min-height: 34px; padding: 0 14px; border: 1px solid #d8dae0; border-radius: var(--r-pill); background: var(--c-surface); color: var(--c-text-2); font: inherit; font-size: 13px; font-weight: 650; cursor: pointer; }
 .segment-chip:hover { border-color: #b9bcc4; }
 .segment-chip.is-selected { border-color: var(--c-text); background: var(--c-text); color: var(--c-on-ink); }
@@ -2063,14 +2251,17 @@ a { color: inherit; }
 /* ── Отчётность: охват, сравнение периодов (Kassa 133) ───────
    Число без периода, точек, зоны и валюты проверить нельзя —
    строка охвата стоит прямо под заголовком раздела. */
-.scope-line { margin: 6px 0 0; color: var(--c-text-subtle); font-size: 13px; }
-.stat-delta { display: inline-flex; align-items: baseline; gap: 5px; font-size: 12px; font-weight: 750; }
+/* Строка охвата стоит под переключателями — там же, где выбирают
+   период и точки: подпись обязана быть рядом с тем, что она подписывает */
+.scope-line { margin: 0 0 var(--sp-3); color: var(--c-text-subtle); font-size: 13px; }
+/* Направление сравнения читается знаком, словом и стрелкой: цветом
+   одним его передавать нельзя */
+.stat-delta { display: inline-flex; align-items: center; gap: 4px; font-size: 12px; font-weight: 750; font-variant-numeric: tabular-nums; }
+.stat-delta svg { width: 13px; height: 13px; flex: none; }
 .stat-delta small { font-weight: 500; color: #868b93; }
 .stat-delta.is-up { color: #2f7d54; }
 .stat-delta.is-down { color: var(--c-danger); }
 .stat-delta.is-flat { color: var(--c-text-subtle); }
-.ov-hero-delta { display: flex; flex-wrap: wrap; align-items: baseline; gap: 10px; margin: 6px 0 0; }
-.ov-hero-prev { color: #868b93; font-size: 13px; font-variant-numeric: tabular-nums; }
 
 /* ── Очередь ожидания (Kassa 137) ─────────────────────────────
    Та же таблица, что у списка броней: очередь и список — родственные

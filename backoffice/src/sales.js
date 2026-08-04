@@ -1,8 +1,8 @@
 import { supabase } from './supabase'
 // Чистые правила отчётности — в отдельном модуле под тесты
 export {
-  previousRange, PREVIOUS_LABEL, delta, rangeLabel, scopeLine,
-  channelLabel, orderTypeLabel, salesToCsv, salesFileName,
+  previousRange, previousName, PREVIOUS_LABEL, delta, rangeLabel, scopeLine,
+  locationsSummary, channelLabel, orderTypeLabel, salesToCsv, salesFileName,
 } from './reporting'
 
 /**
@@ -95,19 +95,29 @@ export function methodLabel(method) {
 }
 
 /**
- * Отчёт за период. Охват по точкам считает сервер (133): пустой список
- * означает «все точки», и это же он потом называет в блоке scope.
+ * Аргументы RPC отчёта. Вынесены из запроса, чтобы охват проверялся
+ * тестом, а не глазами: пустой список точек обязан уходить как NULL —
+ * сервер понимает это как «все точки» (133), а пустой массив вернул бы
+ * отчёт ни по чему.
  */
-export async function fetchSalesReport(from, to, { locationIds = [], tz } = {}) {
+export function salesParams(from, to, { locationIds = [], tz } = {}) {
   const zone = tz || Intl.DateTimeFormat().resolvedOptions().timeZone || 'Asia/Jerusalem'
-  const { data, error } = await supabase.rpc('sales_report', {
+  return {
     p_from: from.toISOString(),
     p_to: to.toISOString(),
     p_tz: zone,
     // Владельца бэкофиса сервер узнаёт по членству (089) — токен не нужен
     p_staff_session: null,
     p_location_ids: locationIds.length ? locationIds : null,
-  })
+  }
+}
+
+/**
+ * Отчёт за период. Охват по точкам считает сервер (133): пустой список
+ * означает «все точки», и это же он потом называет в блоке scope.
+ */
+export async function fetchSalesReport(from, to, options = {}) {
+  const { data, error } = await supabase.rpc('sales_report', salesParams(from, to, options))
   if (error) throw new Error(error.message)
   return data
 }
@@ -223,4 +233,53 @@ export function barsFor(mode, report, from, to) {
   if (mode === 'hour') return hourBars(report)
   if (mode === 'month') return monthBars(report, from, to)
   return dayBars(report, from, to)
+}
+
+/** Название графика — это и есть его режим. */
+export function chartTitle(mode) {
+  if (mode === 'hour') return 'By hour'
+  if (mode === 'month') return 'By month'
+  return 'By day'
+}
+
+/**
+ * Шкала графика: отметки от нуля до «круглой» верхней границы.
+ *
+ * Без неё столбик отвечал только на вопрос «больше или меньше соседнего»:
+ * высота считалась от максимума, и любой день, даже самый тихий,
+ * упирался в потолок. Верхняя отметка НЕ МЕНЬШЕ максимума, шаг — 1, 2,
+ * 2.5 или 5 в ближайшем порядке, и не мельче шекеля: подпись «12.5 ₪»
+ * на оси читается хуже, чем сам столбик.
+ */
+export function chartScale(maxAmount, steps = 4) {
+  const max = Number.isFinite(maxAmount) ? Math.max(maxAmount, 0) : 0
+  if (max <= 0) return { top: 0, ticks: [] }
+  const rough = max / Math.max(1, steps)
+  const power = 10 ** Math.floor(Math.log10(rough))
+  const norm = rough / power
+  const nice = norm <= 1 ? 1 : norm <= 2 ? 2 : norm <= 2.5 ? 2.5 : norm <= 5 ? 5 : 10
+  const step = Math.max(100, Math.round(nice * power))
+  const top = Math.ceil(max / step) * step
+  const ticks = []
+  for (let value = 0; value <= top; value += step) ticks.push(value)
+  return { top, ticks }
+}
+
+/**
+ * Доля столбика или полосы в процентах, 0..100.
+ *
+ * Ноль в знаменателе здесь не гипотетический: у способа оплаты сумма
+ * складывается вместе с возвратами (133) и бывает нулевой и даже
+ * отрицательной — деления на ноль и полосы отрицательной ширины быть не
+ * должно.
+ */
+export function barShare(amount, top) {
+  if (!(top > 0) || !(amount > 0)) return 0
+  return Math.min(100, (amount / top) * 100)
+}
+
+/** «1 order» / «18 orders»: число само по себе не говорит, чего оно */
+export function ordersLabel(count, unit = 'order') {
+  const n = Number.isFinite(count) ? count : 0
+  return `${n} ${unit}${n === 1 ? '' : 's'}`
 }
