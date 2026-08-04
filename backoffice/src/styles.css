@@ -237,8 +237,18 @@ a { color: inherit; }
 .content { width: min(1280px, 100%); margin: 0 auto; padding: 44px 38px 72px; }
 .page-heading { max-width: 760px; margin-bottom: 34px; }
 .page-heading h1 { margin: 0; font-size: clamp(34px, 4vw, 50px); line-height: 1.04; font-weight: 740; }
-.page-heading > p:last-child { margin: 16px 0 0; color: #666b73; font-size: 17px; line-height: 1.5; }
+.page-heading > p:last-child,
+.page-heading-copy > p:last-child { margin: 16px 0 0; color: #666b73; font-size: 17px; line-height: 1.5; }
 .compact-heading h1 { font-size: 40px; }
+/* Действия раздела рядом с заголовком: на узком экране они переносятся
+   под текст, но не растягиваются на всю строку — это не главное
+   действие страницы, а выгрузка и обновление. */
+.page-heading.has-actions {
+  max-width: none; display: flex; flex-wrap: wrap;
+  align-items: flex-start; justify-content: space-between; gap: var(--sp-3);
+}
+.page-heading-copy { flex: 1 1 320px; min-width: 0; max-width: 760px; }
+.page-heading-actions { flex: 0 0 auto; display: flex; align-items: center; gap: var(--sp-2); }
 
 .stats-grid { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 14px; }
 .stat-card { min-height: 150px; display: flex; align-items: flex-start; gap: 18px; padding: 24px; border: 1px solid var(--c-border-panel); border-radius: var(--r-md); background: var(--c-surface); }
@@ -535,7 +545,8 @@ a { color: inherit; }
   .guest-visits, .guest-spent { display: none; }
 }
 
-/* ── Лента активности ─────────────────────────────────────── */
+/* ── Лента активности: компактная карточка на Home ──────────
+   Полный раздел живёт ниже, под префиксом `act-`. */
 .activity-panel { margin-top: 20px; }
 /*
  * Строки списка обязаны уметь сжиматься. Элемент grid по умолчанию имеет
@@ -561,8 +572,6 @@ a { color: inherit; }
 .activity-amount { font-size: 13px; font-weight: 750; font-variant-numeric: tabular-nums; color: #25282d; }
 .activity-amount.is-refund { color: var(--c-danger); }
 .activity-time { font-size: 11px; color: var(--c-text-faint); font-variant-numeric: tabular-nums; }
-
-.activity-more { display: flex; justify-content: center; padding: 14px 22px 6px; }
 
 /* ── Настройки точки ──────────────────────────────────────── */
 .location-tabs { display: flex; flex-wrap: wrap; gap: 8px; margin-bottom: 16px; }
@@ -792,7 +801,8 @@ a { color: inherit; }
   .page-heading { margin-bottom: 22px; }
   .page-heading h1 { font-size: 32px; }
   .compact-heading h1 { font-size: 30px; }
-  .page-heading > p:last-child { font-size: 15px; }
+  .page-heading > p:last-child,
+  .page-heading-copy > p:last-child { font-size: 15px; }
   .form-panel { padding: 18px 16px; }
   .form-panel > .panel-heading { margin: -18px -16px 16px; padding: 16px; }
   .panel-heading { align-items: flex-start; }
@@ -3144,4 +3154,126 @@ a { color: inherit; }
   .cat-header-actions .primary-button,
   .cat-header-actions .secondary-button { flex: 1 1 auto; justify-content: center; }
   .cat-cards li { gap: var(--sp-2); padding: var(--sp-2); }
+}
+
+/* ============================================================
+ * Activity — журнал регистра (редизайн).
+ *
+ * Префикс `act-`, а не правка `activity-*`: те классы носит компактная
+ * карточка на Home, и менять их ради полного раздела значило бы менять
+ * чужой экран. Карточка остаётся плотной лентой последних событий,
+ * журнал — рабочей страницей с днями и точным временем.
+ *
+ * Своих цветов раздел не заводит: тон события собран из общих токенов
+ * (`--c-success`, `--c-danger`, серые границы), потому что открытие
+ * смены здесь — то же событие, что и на дашборде.
+ * ============================================================ */
+
+/* Панель фильтров: поиск шире всего, дальше — окно, точка и счётчик */
+.act-toolbar {
+  display: flex; flex-wrap: wrap; align-items: center; gap: var(--sp-2);
+  margin-bottom: var(--sp-3);
+}
+.act-toolbar .act-search { flex: 1 1 260px; max-width: 420px; min-height: 40px; }
+.act-select select {
+  min-height: 40px; padding: 0 10px;
+  border: 1px solid var(--c-border); border-radius: var(--r-md);
+  background: var(--c-surface); font: inherit; font-size: 13px; color: var(--c-text-2);
+}
+/* Счётчик описывает ЗАГРУЖЕННОЕ окно: сколько всего событий подходит
+   под фильтры, RPC не сообщает, и обещать это число нельзя. */
+.act-count {
+  margin: 0; margin-inline-start: auto;
+  color: var(--c-text-muted); font-size: 13px; white-space: nowrap;
+  font-variant-numeric: tabular-nums;
+}
+
+/*
+ * Типы событий — одна строка с прокруткой, а не растущая стена пилюль:
+ * на планшете перенос уводил журнал на полэкрана вниз. Вертикальные
+ * отступы оставлены под кольцо фокуса — `overflow-x` его обрезает.
+ */
+.act-types {
+  display: flex; gap: var(--sp-2); margin-bottom: var(--sp-4);
+  padding: 3px 0; overflow-x: auto; overscroll-behavior-x: contain;
+  scrollbar-width: none;
+}
+.act-types::-webkit-scrollbar { display: none; }
+.act-types .segment-chip { flex: 0 0 auto; min-height: 38px; }
+
+/* Журнал: одна панель, дни — заголовками внутри */
+.act-day + .act-day { border-top: 1px solid var(--c-border-panel); }
+.act-day-head {
+  margin: 0; padding: var(--sp-4) 20px var(--sp-2);
+  font-size: 14px; font-weight: 700; color: var(--c-text);
+}
+.act-list { list-style: none; margin: 0; padding: 0 20px 6px; min-width: 0; }
+.act-row {
+  display: flex; align-items: center; gap: 14px;
+  min-height: 68px; padding: var(--sp-3) 0; min-width: 0;
+}
+.act-row + .act-row { border-top: 1px solid var(--c-border-hair); }
+
+/* Тон события — усиление, а не носитель смысла: что произошло, написано
+   словом в заголовке строки, и значок повторяет это формой. */
+.act-mark {
+  width: 34px; height: 34px; flex: none;
+  display: grid; place-items: center;
+  border: 1px solid transparent; border-radius: 50%;
+}
+.act-mark svg { width: 17px; height: 17px; }
+.act-mark.is-open   { border-color: #b4d7c2; background: #f1f8f4; color: var(--c-success); }
+.act-mark.is-close  { border-color: var(--c-border); background: var(--c-surface-muted); color: var(--c-text-2); }
+.act-mark.is-refund { border-color: #e8c3bf; background: #fdf3f2; color: var(--c-danger); }
+
+.act-body { flex: 1 1 auto; min-width: 0; }
+.act-body strong { display: block; font-size: 14px; font-weight: 700; color: var(--c-text); }
+/* Подстрочник переносится, а не обрезается: длинная причина возврата —
+   это и есть ответ на вопрос «почему», ради которого сюда пришли. */
+.act-body small {
+  display: block; margin-top: 3px;
+  color: var(--c-text-muted); font-size: 13px; line-height: 1.35;
+  overflow-wrap: anywhere;
+}
+
+.act-meta {
+  flex: none; display: flex; align-items: baseline; gap: 20px;
+  font-variant-numeric: tabular-nums;
+}
+.act-amount { font-size: 14px; font-weight: 700; color: var(--c-text); white-space: nowrap; }
+.act-amount.is-open { color: var(--c-text-muted); font-weight: 650; }
+.act-amount.is-refund { color: var(--c-danger); }
+.act-time { min-width: 42px; text-align: end; color: var(--c-text-muted); font-size: 13px; }
+
+/* «Load more» — под панелью, как продолжение журнала, а не строка внутри него */
+.act-more { display: flex; justify-content: center; margin-top: var(--sp-4); }
+
+@media (prefers-reduced-motion: no-preference) {
+  .act-refresh[aria-busy='true'] svg { animation: spin .9s linear infinite; }
+}
+
+/* Планшет: те же элементы, но целями под палец */
+@media (max-width: 1024px) {
+  .act-toolbar .act-search { min-height: 44px; }
+  .act-select select { min-height: 44px; }
+  .act-types .segment-chip { min-height: 44px; }
+  .page-heading-actions .secondary-button { min-height: 44px; }
+  .page-heading-actions .icon-button { width: 44px; height: 44px; }
+}
+
+@media (max-width: 720px) {
+  .act-toolbar .act-search { flex-basis: 100%; max-width: none; }
+  .act-select { flex: 1 1 140px; min-width: 0; }
+  .act-select select { width: 100%; }
+  /* Пустая живая область не должна занимать строку: `flex: auto` держит
+     её при тексте и схлопывает, когда сказать нечего. */
+  .act-count { flex: 1 1 auto; margin-inline-start: 0; }
+  .act-day-head { padding-inline: var(--sp-4); }
+  .act-list { padding-inline: var(--sp-4); }
+  /* Сумма и время встают столбиком у края: в строку они отбирали бы
+     ширину у заголовка события и упирались в него. */
+  .act-meta { flex-direction: column; align-items: flex-end; gap: 2px; }
+  .act-time { min-width: 0; }
+  /* Ввод меньше 16px на iOS заставляет браузер приближать страницу */
+  .act-toolbar input, .act-select select { font-size: 16px; }
 }

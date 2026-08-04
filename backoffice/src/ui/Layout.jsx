@@ -13,13 +13,27 @@ import { Search } from 'lucide-react'
 /**
  * Заголовок страницы. `compact` — рабочий режим (40px), крупный вариант
  * остаётся только там, где страница действительно титульная.
+ *
+ * `actions` — действия раздела справа от заголовка (выгрузка, обновление).
+ * Разметка с обёрткой появляется только когда они переданы: разделы без
+ * действий обязаны отрендериться ровно так же, как раньше.
  */
-export function PageHeader({ eyebrow, title, description, compact = true, children }) {
-  return (
-    <section className={compact ? 'page-heading compact-heading' : 'page-heading'}>
+export function PageHeader({ eyebrow, title, description, compact = true, actions, children }) {
+  const copy = (
+    <>
       {eyebrow && <p className="eyebrow">{eyebrow}</p>}
       <h1>{title}</h1>
       {description && <p>{description}</p>}
+    </>
+  )
+  const className = compact ? 'page-heading compact-heading' : 'page-heading'
+  if (!actions) {
+    return <section className={className}>{copy}{children}</section>
+  }
+  return (
+    <section className={`${className} has-actions`}>
+      <div className="page-heading-copy">{copy}</div>
+      <div className="page-heading-actions">{actions}</div>
       {children}
     </section>
   )

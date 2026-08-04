@@ -4,6 +4,7 @@ import { activityParams } from './reporting'
 // Чистые правила журнала — в отдельном модуле под тесты
 export {
   ACTIVITY_TYPES, activityParams, activityToCsv, activityFileName,
+  activityDays, activityDayKey, activityDayLabel, activityTime,
 } from './reporting'
 
 /**

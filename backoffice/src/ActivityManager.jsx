@@ -1,10 +1,11 @@
 import { useCallback, useEffect, useMemo, useState } from 'react'
-import { Activity, Download, RefreshCw, LogIn, LogOut, RotateCcw, Search } from 'lucide-react'
+import { Activity, Download, RefreshCw, LogIn, LogOut, RotateCcw } from 'lucide-react'
 import {
   fetchActivity, TYPE_META, eventTitle, eventAmount, eventDetail, timeAgo,
-  ACTIVITY_TYPES, activityToCsv, activityFileName,
+  ACTIVITY_TYPES, activityToCsv, activityFileName, activityDays, activityTime,
 } from './activity'
-import { PageHeader } from './ui/Layout'
+import { ErrorText, PageHeader, SearchField } from './ui/Layout'
+import { Button, IconButton } from './ui/Button'
 
 /**
  * «Activity» — журнал событий кассы (открытие/закрытие смены, возврат) из
@@ -14,6 +15,17 @@ import { PageHeader } from './ui/Layout'
  *
  * Новых типов событий здесь не выдумано: показывается ровно то, что
  * пишут триггеры БД.
+ *
+ * Редизайн по `docs/claude-activity-approved-redesign-plan.md`: лента
+ * стала журналом с заголовками дней и точным временем. День — это
+ * рабочий вопрос («что было вчера»), а «4d» на него не отвечает; дни
+ * считаются в часах точки, той же зоне, которой подписана выгрузка.
+ * Группировка — только оформление: отбор, порядок и keyset-пагинация
+ * остались серверными и нетронутыми.
+ *
+ * Компактная карточка на Home намеренно оставлена прежней — там у ленты
+ * другая работа (последние шесть событий), и относительное время в ней
+ * уместнее точного.
  */
 
 const TYPE_ICON = {
@@ -22,7 +34,7 @@ const TYPE_ICON = {
   refund_issued: RotateCcw,
 }
 
-/** Список строк ленты — общий для Home и полного раздела */
+/** Компактная лента Home: шесть последних событий и относительное время */
 export function ActivityList({ events }) {
   if (events.length === 0) return <p className="empty-state">No activity yet.</p>
   return (
@@ -99,6 +111,37 @@ function rangeBounds(key) {
   return { from: start, to: null }
 }
 
+/**
+ * Строка журнала: тон, заголовок, подстрочник и — справа — сумма и точное
+ * время. Заголовки и суммы считают те же помощники, что и раньше
+ * (`eventTitle`/`eventAmount`/`eventDetail`), здесь только раскладка.
+ */
+export function JournalRow({ event, timeZone }) {
+  const meta = TYPE_META[event.type] || { tone: 'open' }
+  const Icon = TYPE_ICON[event.type] || Activity
+  const amount = eventAmount(event)
+  const detail = eventDetail(event)
+  const line = [event.location_name || 'No location', event.device_name, detail]
+    .filter(Boolean).join(' · ')
+  return (
+    <li className="act-row">
+      {/* Иконка — усиление, а не носитель смысла: тип события написан
+          словом в заголовке строки, поэтому значок скрыт от озвучки. */}
+      <span className={`act-mark is-${meta.tone}`} aria-hidden><Icon /></span>
+      <div className="act-body">
+        <strong>{eventTitle(event)}</strong>
+        <small>{line}</small>
+      </div>
+      <div className="act-meta">
+        {amount && <span className={`act-amount is-${meta.tone}`}>{amount}</span>}
+        <time className="act-time" dateTime={event.created_at || undefined}>
+          {activityTime(event.created_at, timeZone)}
+        </time>
+      </div>
+    </li>
+  )
+}
+
 export default function ActivityManager({ context }) {
   const [events, setEvents] = useState(null)
   const [loading, setLoading] = useState(true)
@@ -155,6 +198,23 @@ export default function ActivityManager({ context }) {
 
   const total = events?.length ?? 0
   const filtered = types.length > 0 || range !== 'all' || locationId !== '' || query.trim() !== ''
+  const first = loading && !events
+
+  // Дни считаются от загруженного окна: сервер отдаёт события по убыванию
+  // времени, и группировка этот порядок только размечает.
+  const days = useMemo(() => activityDays(events, { timeZone }), [events, timeZone])
+
+  /*
+   * Счётчик говорит про ЗАГРУЖЕННОЕ, а не про весь журнал: сколько всего
+   * событий подходит под фильтры, RPC не сообщает, и «8 events» рядом с
+   * кнопкой «Load more» читалось бы как «больше ничего нет».
+   *
+   * Он же — единственная живая область раздела: строки ленты объявлять
+   * поштучно не нужно, а «загружаю» и «загружено столько-то» — нужно.
+   */
+  const status = first ? 'Loading…'
+    : total === 0 ? ''
+    : `${total} ${total === 1 ? 'event' : 'events'} loaded`
 
   return (
     <>
@@ -162,21 +222,38 @@ export default function ActivityManager({ context }) {
         eyebrow={context.organization?.name}
         title="Activity"
         description="Shifts opened and closed, and refunds issued on your registers."
+        actions={(
+          <>
+            <Button
+              disabled={!total}
+              onClick={exportCsv}
+              title="Download exactly what is on screen"
+            >
+              <Download aria-hidden /> Export CSV
+            </Button>
+            <IconButton
+              className="act-refresh"
+              label="Refresh activity"
+              onClick={() => load(true)}
+              disabled={loading}
+              aria-busy={loading || undefined}
+            >
+              <RefreshCw />
+            </IconButton>
+          </>
+        )}
       />
 
-      <div className="overview-toolbar">
-        <label className="guest-search">
-          <Search aria-hidden />
-          <span className="visually-hidden">Search activity</span>
-          <input
-            type="search"
-            placeholder="Staff, reason or device"
-            value={search}
-            onChange={(e) => setSearch(e.target.value)}
-          />
-        </label>
+      <div className="act-toolbar">
+        <SearchField
+          label="Search activity"
+          value={search}
+          onChange={setSearch}
+          placeholder="Staff, reason or device"
+          className="order-search act-search"
+        />
 
-        <label className="guest-sort">
+        <label className="act-select">
           <span className="visually-hidden">Time range</span>
           <select value={range} onChange={(e) => setRange(e.target.value)}>
             {RANGES.map((r) => <option key={r.key} value={r.key}>{r.label}</option>)}
@@ -184,7 +261,7 @@ export default function ActivityManager({ context }) {
         </label>
 
         {locations.length > 1 && (
-          <label className="guest-sort">
+          <label className="act-select">
             <span className="visually-hidden">Location</span>
             <select value={locationId} onChange={(e) => setLocationId(e.target.value)}>
               <option value="">All locations</option>
@@ -193,22 +270,13 @@ export default function ActivityManager({ context }) {
           </label>
         )}
 
-        <button
-          type="button"
-          className="secondary-button"
-          disabled={!total}
-          onClick={exportCsv}
-          title="Download exactly what is on screen"
-        >
-          <Download aria-hidden /> Export CSV
-        </button>
-        <button className="icon-button" onClick={() => load(true)} aria-label="Refresh activity" disabled={loading}><RefreshCw /></button>
+        <p className="act-count" role="status">{status}</p>
       </div>
 
       {/* Тип события — множественный выбор, и отбирает его СЕРВЕР:
           прежний фильтр отвечал на вопрос «что было среди последних
           пятидесяти», а не «что было». */}
-      <div className="segment-bar" role="group" aria-label="Event types">
+      <div className="act-types" role="group" aria-label="Event types">
         <button
           type="button"
           className={`segment-chip${types.length === 0 ? ' is-selected' : ''}`}
@@ -232,33 +300,45 @@ export default function ActivityManager({ context }) {
         ))}
       </div>
 
-      {error && <p className="form-error" role="alert">{error}</p>}
+      {error && <ErrorText>{error}</ErrorText>}
 
-      {loading && !events ? (
-        <p className="empty-state">Loading…</p>
-      ) : (
+      {first || total === 0 ? (
         <section className="panel">
-          {total === 0 ? (
-            <p className="empty-state">
-              {filtered
-                ? 'No events match these filters.'
-                : 'No activity yet. Shifts and refunds from your registers appear here.'}
-            </p>
-          ) : (
-            <ActivityList events={events} />
-          )}
-          {!done && total > 0 && (
-            <div className="activity-more">
-              <button
-                className="secondary-button"
+          <p className="empty-state">
+            {first ? 'Loading…'
+              : filtered ? 'No events match these filters.'
+              : 'No activity yet. Shifts and refunds from your registers appear here.'}
+          </p>
+        </section>
+      ) : (
+        <>
+          <section className="panel act-journal">
+            {days.map((day) => (
+              <section className="act-day" key={day.key}>
+                <h2 className="act-day-head">{day.label}</h2>
+                <ul className="act-list">
+                  {day.events.map((event) => (
+                    <JournalRow key={event.id} event={event} timeZone={timeZone} />
+                  ))}
+                </ul>
+              </section>
+            ))}
+          </section>
+
+          {/* Дальше вглубь ведёт время последнего показанного события
+              (keyset): смещение на такой ленте пропускало бы события,
+              пришедшие во время чтения. */}
+          {!done && (
+            <div className="act-more">
+              <Button
                 onClick={() => load(false, events[events.length - 1].created_at)}
                 disabled={loading}
               >
                 {loading ? 'Loading…' : 'Load more'}
-              </button>
+              </Button>
             </div>
           )}
-        </section>
+        </>
       )}
     </>
   )

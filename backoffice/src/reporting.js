@@ -237,3 +237,106 @@ export function activityToCsv(events, { timeZone = 'Asia/Jerusalem' } = {}) {
 export function activityFileName(date = new Date()) {
   return `activity-${date.toISOString().slice(0, 10)}.csv`
 }
+
+/**
+ * День, к которому относится событие. Считается в часах ТОЧКИ — той же
+ * зоне, которой уже подписана выгрузка журнала: закрытие смены в 00:30 по
+ * Иерусалиму принадлежит своему дню, а не вчерашнему дню UTC и не тому
+ * дню, который показывают часы владельца в другом поясе.
+ *
+ * Битую дату не прячем и не роняем на ней раздел: у события есть ключ
+ * `unknown`, и оно остаётся видимым.
+ */
+export const UNKNOWN_DAY = 'unknown'
+
+/*
+ * `new Date(null)` — это не ошибка, а 1 января 1970 года: пустую отметку
+ * времени приходится отсеивать до разбора, иначе событие без даты уедет
+ * в группу «1970» и будет выглядеть настоящим.
+ */
+function activityMoment(value) {
+  if (value === null || value === undefined || value === '') return null
+  const at = new Date(value)
+  return Number.isNaN(at.getTime()) ? null : at
+}
+
+export function activityDayKey(iso, timeZone = 'Asia/Jerusalem') {
+  const at = activityMoment(iso)
+  if (!at) return UNKNOWN_DAY
+  try {
+    // en-CA даёт ровно YYYY-MM-DD — ключ сортируется как строка
+    const key = new Intl.DateTimeFormat('en-CA', {
+      timeZone, year: 'numeric', month: '2-digit', day: '2-digit',
+    }).format(at)
+    return /^\d{4}-\d{2}-\d{2}$/.test(key) ? key : UNKNOWN_DAY
+  } catch {
+    return UNKNOWN_DAY
+  }
+}
+
+/**
+ * Заголовок дня: «Today · 4 August», «Yesterday · 3 August», иначе дата
+ * словом. Год дописывается, когда он не текущий, — иначе «4 August»
+ * прошлого года читается как позавчерашний.
+ */
+export function activityDayLabel(key, { timeZone = 'Asia/Jerusalem', now = Date.now() } = {}) {
+  if (key === UNKNOWN_DAY) return 'Date unknown'
+  const today = activityDayKey(now, timeZone)
+  const yesterday = activityDayKey(now - 86_400_000, timeZone)
+  const human = humanActivityDay(key, key.slice(0, 4) !== today.slice(0, 4))
+  if (key === today) return `Today · ${human}`
+  if (key === yesterday) return `Yesterday · ${human}`
+  return human
+}
+
+/*
+ * Ключ — уже локальная дата точки, поэтому форматируется как есть, в UTC:
+ * подставить сюда зону значило бы сдвинуть день второй раз.
+ */
+function humanActivityDay(key, withYear) {
+  try {
+    return new Intl.DateTimeFormat('en-GB', {
+      timeZone: 'UTC', day: 'numeric', month: 'long',
+      ...(withYear ? { year: 'numeric' } : {}),
+    }).format(new Date(`${key}T12:00:00Z`))
+  } catch {
+    return key
+  }
+}
+
+/**
+ * Загруженные события, разложенные по дням. Группировка — только
+ * оформление: порядок сервера (свежие сверху) сохраняется и внутри дня, и
+ * между днями, потому что дни идут в порядке первой встречи. Поэтому
+ * дозагрузка следующей страницы дописывает события в конец своего дня и
+ * не может ни переставить, ни задвоить уже показанное.
+ */
+export function activityDays(events, { timeZone = 'Asia/Jerusalem', now = Date.now() } = {}) {
+  const groups = new Map()
+  for (const event of events ?? []) {
+    const key = activityDayKey(event?.created_at, timeZone)
+    if (!groups.has(key)) groups.set(key, [])
+    groups.get(key).push(event)
+  }
+  return [...groups.entries()].map(([key, list]) => ({
+    key,
+    label: activityDayLabel(key, { timeZone, now }),
+    events: list,
+  }))
+}
+
+/**
+ * Точное время события в часах точки: в журнале за день это единственный
+ * способ понять, когда смену открыли, — «4h» на такой вопрос не отвечает.
+ */
+export function activityTime(iso, timeZone = 'Asia/Jerusalem') {
+  const at = activityMoment(iso)
+  if (!at) return '—'
+  try {
+    return new Intl.DateTimeFormat('en-GB', {
+      timeZone, hour: '2-digit', minute: '2-digit', hourCycle: 'h23',
+    }).format(at)
+  } catch {
+    return '—'
+  }
+}

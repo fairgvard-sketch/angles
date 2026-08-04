@@ -4,6 +4,7 @@ import {
   previousRange, PREVIOUS_LABEL, delta, rangeLabel, scopeLine,
   channelLabel, orderTypeLabel, salesToCsv, salesFileName,
   activityParams, activityToCsv, ACTIVITY_TYPES,
+  activityDayKey, activityDayLabel, activityDays, activityTime,
 } from './reporting.js'
 
 // ── Период сравнения ─────────────────────────────────────────
@@ -191,4 +192,70 @@ test('выгрузка журнала помечает время зоной т�
   assert.match(row, /method=card/)
   // Устройства не было — пустая ячейка, а не «главная касса»
   assert.match(row, /Dizengoff,,/)
+})
+
+// ── Журнал: дни и время ──────────────────────────────────────
+
+const TLV = 'Asia/Jerusalem'
+const NOW = new Date('2026-08-04T09:00:00Z').getTime() // 4 августа, 12:00 в Тель-Авиве
+
+test('день считается в часах точки, а не в UTC', () => {
+  // 31 июля 21:30 UTC — это уже 1 августа в Иерусалиме
+  assert.equal(activityDayKey('2026-07-31T21:30:00Z', TLV), '2026-08-01')
+  assert.equal(activityDayKey('2026-07-31T21:30:00Z', 'UTC'), '2026-07-31')
+})
+
+test('сегодня и вчера названы словом, дата остаётся рядом', () => {
+  assert.equal(activityDayLabel('2026-08-04', { timeZone: TLV, now: NOW }), 'Today · 4 August')
+  assert.equal(activityDayLabel('2026-08-03', { timeZone: TLV, now: NOW }), 'Yesterday · 3 August')
+  assert.equal(activityDayLabel('2026-07-28', { timeZone: TLV, now: NOW }), '28 July')
+})
+
+test('у прошлого года дата с годом — иначе она читается как позавчерашняя', () => {
+  assert.equal(activityDayLabel('2025-12-31', { timeZone: TLV, now: NOW }), '31 December 2025')
+})
+
+test('битая дата не роняет раздел и не прячет событие', () => {
+  assert.equal(activityDayKey(null, TLV), 'unknown')
+  assert.equal(activityDayKey('позавчера', TLV), 'unknown')
+  assert.equal(activityDayLabel('unknown', { timeZone: TLV, now: NOW }), 'Date unknown')
+  assert.equal(activityTime(undefined, TLV), '—')
+
+  const days = activityDays([{ id: 'e1', created_at: 'позавчера' }], { timeZone: TLV, now: NOW })
+  assert.equal(days.length, 1)
+  assert.equal(days[0].events[0].id, 'e1', 'событие осталось в ленте')
+})
+
+test('группировка не меняет порядок сервера — ни внутри дня, ни между днями', () => {
+  const rows = [
+    { id: 'a', created_at: '2026-08-04T06:02:00Z' },
+    { id: 'b', created_at: '2026-08-04T05:47:00Z' },
+    { id: 'c', created_at: '2026-08-03T14:42:00Z' },
+  ]
+  const days = activityDays(rows, { timeZone: TLV, now: NOW })
+  assert.deepEqual(days.map((d) => d.key), ['2026-08-04', '2026-08-03'])
+  assert.deepEqual(days.map((d) => d.label), ['Today · 4 August', 'Yesterday · 3 August'])
+  assert.deepEqual(days[0].events.map((e) => e.id), ['a', 'b'])
+  assert.deepEqual(days[1].events.map((e) => e.id), ['c'])
+})
+
+test('дозагрузка дописывает в конец своего дня, а не задваивает и не переставляет', () => {
+  const first = [
+    { id: 'a', created_at: '2026-08-04T06:02:00Z' },
+    { id: 'b', created_at: '2026-08-03T14:42:00Z' },
+  ]
+  const next = [
+    { id: 'c', created_at: '2026-08-03T08:10:00Z' },
+    { id: 'd', created_at: '2026-08-02T17:00:00Z' },
+  ]
+  const days = activityDays([...first, ...next], { timeZone: TLV, now: NOW })
+  assert.deepEqual(days.map((d) => d.key), ['2026-08-04', '2026-08-03', '2026-08-02'])
+  assert.deepEqual(days[1].events.map((e) => e.id), ['b', 'c'], 'вчерашний день дополнился')
+  assert.equal(days.flatMap((d) => d.events).length, 4, 'ни одно событие не задвоилось')
+})
+
+test('в журнале время точное и в часах точки', () => {
+  // 21:30 UTC = 00:30 следующего дня в Иерусалиме
+  assert.equal(activityTime('2026-07-31T21:30:00Z', TLV), '00:30')
+  assert.equal(activityTime('2026-08-04T06:02:00Z', TLV), '09:02')
 })
