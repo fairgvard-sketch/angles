@@ -219,9 +219,7 @@ export default function ActivityManager({ context }) {
   return (
     <>
       <PageHeader
-        eyebrow={context.organization?.name}
         title="Activity"
-        description="Shifts opened and closed, and refunds issued on your registers."
         actions={(
           <>
             <Button

@@ -242,11 +242,7 @@ export default function DevicesManager({ context }) {
 
   return (
     <>
-      <PageHeader
-        eyebrow={context.organization?.name}
-        title="Devices"
-        description="POS terminals connected to your organisation."
-      />
+      <PageHeader title="Devices" />
 
       <div className="order-toolbar">
         <SearchField

@@ -587,11 +587,7 @@ export default function GuestsManager({ context, tab: tabFromUrl, onTabChange })
 
   return (
     <>
-      <PageHeader
-        eyebrow={context.organization?.name}
-        title="Customers"
-        description="Loyalty members, their visits and what they buy."
-      />
+      <PageHeader title="Customers" />
 
       <div className="overview-toolbar">
         <label className="guest-search">

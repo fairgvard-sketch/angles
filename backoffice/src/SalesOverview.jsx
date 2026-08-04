@@ -213,7 +213,7 @@ export default function SalesOverview({ context }) {
 
   return (
     <>
-      <PageHeader eyebrow={context?.organization?.name} title="Sales">
+      <PageHeader title="Sales">
         {/* Охват приходит с сервера вместе с числами: период, точки, зона
             и валюта. Без него число невозможно проверить. */}
         <p className="scope-line">{scopeLine(report?.scope, from, to)}</p>

@@ -102,7 +102,8 @@ describe('строка журнала', () => {
 describe('раздел Activity', () => {
   it('обещает ровно три вида событий и ни одного лишнего', () => {
     const html = render(h(ActivityManager, { context: context(ONE) }))
-    assert.match(html, /Shifts opened and closed, and refunds issued on your registers\./)
+    // Виды событий обещают сами чипы фильтра, а не подпись под заголовком
+    assert.match(html, /<h1>Activity<\/h1>/)
     for (const chip of ['All events', 'Shifts opened', 'Shifts closed', 'Refunds']) {
       assert.ok(html.includes(chip), `чип «${chip}» на месте`)
     }

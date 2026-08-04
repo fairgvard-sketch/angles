@@ -470,14 +470,18 @@ function ActivationHome({ context, onReloadContext }) {
   const requests = Array.isArray(context?.product_requests) ? context.product_requests : []
   return (
     <>
-      <PageHeader
-        compact={false}
-        eyebrow="YOUR BUSINESS"
-        title={context.organization?.name || 'ANGLE business'}
-        description={requests.length > 0
-          ? 'Your workspace is ready. The ANGLE team is activating your products — this usually takes less than a business day.'
-          : 'Your workspace is ready. Choose a product to get started.'}
-      />
+      {/* Единственный титульный заголовок кабинета: работать здесь ещё
+          негде, и экран целиком — приветствие, а не рабочий раздел.
+          Разделы за ним живут одной рабочей строкой (PageHeader). */}
+      <section className="welcome-heading">
+        <p className="eyebrow">YOUR BUSINESS</p>
+        <h1>{context.organization?.name || 'ANGLE business'}</h1>
+        <p>
+          {requests.length > 0
+            ? 'Your workspace is ready. The ANGLE team is activating your products — this usually takes less than a business day.'
+            : 'Your workspace is ready. Choose a product to get started.'}
+        </p>
+      </section>
       <ProductsCard context={context} onReloadContext={onReloadContext} />
     </>
   )
@@ -603,15 +607,14 @@ function SectionPage({ section, context, onNavigate }) {
   const planned = PLANNED_SECTIONS[section]
   return (
     <>
-      <PageHeader
-        eyebrow={context.organization?.name}
-        title={item.label}
-        description={planned?.summary}
-      />
+      <PageHeader title={item.label} />
       <section className="section-placeholder panel">
         <span className="section-icon"><Icon /></span>
         <div>
           <h2>Not built yet</h2>
+          {/* Что здесь появится — объясняет сама заглушка, а не подпись
+              к заголовку раздела. */}
+          {planned?.summary && <p>{planned.summary}</p>}
           <p>
             This module is planned and is visible only in the developer
             workspace. Nothing here is available to customer accounts, and no
@@ -631,11 +634,7 @@ function SectionPage({ section, context, onNavigate }) {
 function AccountSettingsPage({ email, onSignOut }) {
   return (
     <>
-      <PageHeader
-        eyebrow="ACCOUNT"
-        title="Settings"
-        description="Manage your back-office account and session."
-      />
+      <PageHeader title="Settings" />
       <section className="panel account-settings-panel">
         <div className="account-settings-copy">
           <h2>Account</h2>

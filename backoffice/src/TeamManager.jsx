@@ -527,11 +527,7 @@ export default function TeamManager({ context, tab: tabFromUrl, onTabChange }) {
 
   return (
     <>
-      <PageHeader
-        eyebrow={context.organization?.name}
-        title="Team"
-        description="People who work on the register, their PINs and what they are allowed to do."
-      />
+      <PageHeader title="Team" />
 
       <div className="menu-tabs location-tabs" role="tablist" aria-label="Team section">
         {TABS.map((t) => (

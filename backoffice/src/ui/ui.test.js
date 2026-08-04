@@ -79,11 +79,13 @@ describe('StatusBadge', () => {
 })
 
 describe('PageHeader, Panel и пустые состояния', () => {
-  it('заголовок раздела компактный по умолчанию', () => {
-    const html = render(h(PageHeader, { eyebrow: 'Bulochka', title: 'Devices', description: 'POS terminals.' }))
-    assert.match(html, /class="page-heading compact-heading"/)
+  it('заголовок раздела — одно название, без организации и описания', () => {
+    const html = render(h(PageHeader, { title: 'Devices' }))
+    assert.match(html, /class="page-heading"/)
     assert.match(html, /<h1>Devices<\/h1>/)
-    assert.match(html, /Bulochka/)
+    // Организация и точка стоят в шапке приложения: дублировать их
+    // над каждым разделом незачем
+    assert.doesNotMatch(html, /eyebrow/)
   })
 
   it('панель без заголовка не рисует пустую шапку', () => {

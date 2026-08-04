@@ -1534,7 +1534,7 @@ export default function QrChannels({ context, locationId, tab: tabFromUrl, onTab
   if (locations.length === 0) {
     return (
       <>
-        <PageHeader eyebrow={context.organization?.name} title="QR Menu & Online" />
+        <PageHeader title="QR Menu & Online" />
         <p className="empty-state">No locations are linked to this account.</p>
       </>
     )
@@ -1550,11 +1550,7 @@ export default function QrChannels({ context, locationId, tab: tabFromUrl, onTab
 
   return (
     <>
-      <PageHeader
-        eyebrow={context.organization?.name}
-        title="QR Menu & Online"
-        description="The pages your guests open by scanning a code — ordering and table booking."
-      />
+      <PageHeader title="QR Menu & Online" />
 
       {/* Ровно два канала — ровно две вкладки. Клавиатура и RTL живут в
           общем примитиве Tabs, а не переписываются здесь заново. */}

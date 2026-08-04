@@ -122,13 +122,15 @@ export default function HomeDashboard({ context, locationId, onNavigate, childre
 
   return (
     <>
-      <PageHeader
-        eyebrow={context.organization?.name}
-        title="Dashboard"
-        description={`${todayLabel(now, tz)}${location ? ` · ${location.name}` : ''}`}
-      />
+      <PageHeader title="Dashboard" />
 
       <div className="order-toolbar dashboard-toolbar">
+        {/* День и точка — данные, за которые отвечают числа ниже, а не
+            подпись к разделу: они остаются на экране и после того, как
+            заголовок стал рабочей строкой. */}
+        <span className="dashboard-day">
+          {todayLabel(now, tz)}{location ? ` · ${location.name}` : ''}
+        </span>
         {/* Частичный отказ — состояние продукта, а не ошибка: остальные
             виджеты обязаны остаться на экране. */}
         {data?.failed?.length > 0 && (

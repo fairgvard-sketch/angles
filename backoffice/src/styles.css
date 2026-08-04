@@ -235,20 +235,31 @@ a { color: inherit; }
 .icon-button svg { width: 19px; height: 19px; }
 .mobile-menu { display: none; }
 .content { width: min(1280px, 100%); margin: 0 auto; padding: 44px 38px 72px; }
-.page-heading { max-width: 760px; margin-bottom: 34px; }
-.page-heading h1 { margin: 0; font-size: clamp(34px, 4vw, 50px); line-height: 1.04; font-weight: 740; }
-.page-heading > p:last-child,
-.page-heading-copy > p:last-child { margin: 16px 0 0; color: #666b73; font-size: 17px; line-height: 1.5; }
-.compact-heading h1 { font-size: 40px; }
-/* Действия раздела рядом с заголовком: на узком экране они переносятся
-   под текст, но не растягиваются на всю строку — это не главное
-   действие страницы, а выгрузка и обновление. */
-.page-heading.has-actions {
-  max-width: none; display: flex; flex-wrap: wrap;
-  align-items: flex-start; justify-content: space-between; gap: var(--sp-3);
+/* Рабочая строка раздела — общий заголовок всего кабинета. Та же
+   типографика, что у собственных строк Orders, Catalogue и
+   Reservations: разделы обязаны выглядеть одинаково. */
+.page-heading,
+.ord-header,
+.cat-header,
+.rsv-header {
+  display: flex; flex-wrap: wrap; align-items: center;
+  gap: var(--sp-3); margin-bottom: var(--sp-3);
 }
-.page-heading-copy { flex: 1 1 320px; min-width: 0; max-width: 760px; }
-.page-heading-actions { flex: 0 0 auto; display: flex; align-items: center; gap: var(--sp-2); }
+.page-heading h1,
+.ord-header h1,
+.cat-header h1,
+.rsv-header h1 { margin: 0; font-size: 25px; font-weight: 730; line-height: 1.1; }
+/* Действия раздела (выгрузка, обновление) — в конце той же строки */
+.page-heading-actions { flex: 0 0 auto; display: flex; align-items: center; gap: var(--sp-2); margin-inline-start: auto; }
+/* Строка данных под названием (охват отчёта) занимает всю ширину */
+.page-heading > .scope-line { flex-basis: 100%; margin: 0; }
+
+/* Единственный титульный экран кабинета — приветствие организации до
+   активации продуктов. Работать на нём ещё негде, поэтому здесь текст,
+   а не рабочая строка. */
+.welcome-heading { max-width: 760px; margin-bottom: 34px; }
+.welcome-heading h1 { margin: 0; font-size: clamp(34px, 4vw, 50px); line-height: 1.04; font-weight: 740; }
+.welcome-heading > p:last-child { margin: 16px 0 0; color: #666b73; font-size: 17px; line-height: 1.5; }
 
 .stats-grid { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 14px; }
 .stat-card { min-height: 150px; display: flex; align-items: flex-start; gap: 18px; padding: 24px; border: 1px solid var(--c-border-panel); border-radius: var(--r-md); background: var(--c-surface); }
@@ -266,6 +277,8 @@ a { color: inherit; }
  * Иерархия задаётся размером числа, а не рамкой и не цветом.
  */
 .dashboard-toolbar { justify-content: flex-end; }
+/* День и точка стоят слева, всё остальное в полосе — справа */
+.dashboard-day { margin-inline-end: auto; color: var(--c-text-subtle); font-size: 13px; }
 .dashboard-partial {
   display: inline-flex; align-items: center; gap: var(--sp-2);
   color: var(--c-danger); font-size: 12px; font-weight: 650;
@@ -798,11 +811,17 @@ a { color: inherit; }
   .stat-detail { display: none; }
   .overview-grid { grid-template-columns: 1fr; }
   .content { padding: 24px 16px 48px; }
-  .page-heading { margin-bottom: 22px; }
-  .page-heading h1 { font-size: 32px; }
-  .compact-heading h1 { font-size: 30px; }
-  .page-heading > p:last-child,
-  .page-heading-copy > p:last-child { font-size: 15px; }
+  .page-heading,
+  .ord-header,
+  .cat-header,
+  .rsv-header { gap: var(--sp-2); }
+  .page-heading h1,
+  .ord-header h1,
+  .cat-header h1,
+  .rsv-header h1 { font-size: 22px; }
+  .welcome-heading { margin-bottom: 22px; }
+  .welcome-heading h1 { font-size: 32px; }
+  .welcome-heading > p:last-child { font-size: 15px; }
   .form-panel { padding: 18px 16px; }
   .form-panel > .panel-heading { margin: -18px -16px 16px; padding: 16px; }
   .panel-heading { align-items: flex-start; }
@@ -1569,11 +1588,7 @@ a { color: inherit; }
  * список, лист ожидания и полотно отвечают на вопросы про один и тот же
  * день.
  */
-.rsv-header {
-  display: flex; flex-wrap: wrap; align-items: center; gap: var(--sp-3);
-  margin-bottom: var(--sp-3);
-}
-.rsv-header h1 { margin: 0; font-size: 25px; font-weight: 730; line-height: 1.1; }
+/* Раскладка и типографика строки — общие, см. .page-heading */
 .rsv-header .order-search { flex: 1 1 220px; max-width: 340px; min-height: 40px; }
 .rsv-header-actions { display: flex; align-items: center; gap: var(--sp-2); margin-inline-start: auto; }
 .rsv-header-actions button { min-height: 40px; }
@@ -1915,8 +1930,6 @@ a { color: inherit; }
 @media (max-width: 720px) {
   .desk-actions button { min-height: 44px; }
   /* Палец, а не курсор: в шапке раздела нет ни одной цели меньше 44px */
-  .rsv-header { gap: var(--sp-2); }
-  .rsv-header h1 { font-size: 22px; }
   .rsv-header .order-search { flex-basis: 100%; max-width: none; min-height: 44px; }
   .rsv-header-actions { width: 100%; margin-inline-start: 0; }
   .rsv-header-actions button { flex: 1 1 0; min-height: 44px; }
@@ -2257,12 +2270,8 @@ a { color: inherit; }
   --st-accent-soft: #eef3fe;
 }
 
-/* Рабочая строка раздела: заголовок, поиск и состояние связи */
-.ord-header {
-  display: flex; flex-wrap: wrap; align-items: center; gap: var(--sp-3);
-  margin-bottom: var(--sp-3);
-}
-.ord-header h1 { margin: 0; font-size: 25px; font-weight: 730; line-height: 1.1; }
+/* Рабочая строка раздела: заголовок, поиск и состояние связи.
+   Раскладка и типографика строки — общие, см. .page-heading */
 .ord-header .order-search { flex: 1 1 220px; max-width: 340px; min-height: 40px; }
 .ord-header-live {
   display: flex; align-items: center; gap: var(--sp-2);
@@ -2728,12 +2737,8 @@ a { color: inherit; }
  * продуктом.
  * ============================================================ */
 
-/* Рабочая строка раздела: заголовок, точка, поиск и создание */
-.cat-header {
-  display: flex; flex-wrap: wrap; align-items: center; gap: var(--sp-3);
-  margin-bottom: var(--sp-3);
-}
-.cat-header h1 { margin: 0; font-size: 25px; font-weight: 730; line-height: 1.1; }
+/* Рабочая строка раздела: заголовок, точка, поиск и создание.
+   Раскладка и типографика строки — общие, см. .page-heading */
 /* Поиск сжимается, но не выталкивает кнопки создания за край экрана */
 .cat-header .cat-search { flex: 1 1 200px; max-width: 340px; min-height: 38px; }
 .cat-header-actions {

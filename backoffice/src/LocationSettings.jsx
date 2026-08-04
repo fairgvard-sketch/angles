@@ -5,7 +5,6 @@ import {
 } from './settings'
 import { fetchCategories, updateCategory } from './menu'
 import { agorotToInput, inputToAgorot } from './online'
-import { hasCapability } from './navigation'
 import { PageHeader } from './ui/Layout'
 
 /**
@@ -97,7 +96,7 @@ export default function LocationSettings({ context, locationId, tab: tabFromUrl,
   if (locations.length === 0) {
     return (
       <>
-        <PageHeader eyebrow={context.organization?.name} title="Locations" />
+        <PageHeader title="Locations" />
         <p className="empty-state">No locations are linked to this account.</p>
       </>
     )
@@ -105,13 +104,7 @@ export default function LocationSettings({ context, locationId, tab: tabFromUrl,
 
   return (
     <>
-      <PageHeader
-        eyebrow={context.organization?.name}
-        title="Locations"
-        description={hasCapability(context, 'pos_operate')
-          ? 'Business details, taxes, loyalty and register defaults — shared with every connected register.'
-          : 'Business details, taxes and the address guests see on your public pages.'}
-      />
+      <PageHeader title="Locations" />
 
       <div className="location-tabs settings-topic-tabs" role="tablist" aria-label="Settings topic">
         {TABS.map((t) => (
