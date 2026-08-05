@@ -8,6 +8,7 @@ import {
 } from './team'
 import { fetchLocation, patchLocationSettings } from './settings'
 import { PageHeader } from './ui/Layout'
+import HoursManager from './HoursManager'
 
 /**
  * Команда в бэкофисе — паритет с кассовым разделом «Сотрудники»: список,
@@ -20,6 +21,7 @@ import { PageHeader } from './ui/Layout'
 
 const TABS = [
   { key: 'staff', label: 'Staff' },
+  { key: 'hours', label: 'Hours' },
   { key: 'roles', label: 'Roles' },
   { key: 'perms', label: 'Permissions' },
 ]
@@ -600,6 +602,10 @@ export default function TeamManager({ context, tab: tabFromUrl, onTabChange }) {
           )}
         </>
       )}
+
+      {/* Часы стоят в «Команде», а не отдельным разделом: их открывают о
+          том же человеке, что и карточку сотрудника, и в один клик от неё */}
+      {tab === 'hours' && <HoursManager context={context} />}
 
       {tab === 'roles' && <RolesTab roles={roles} staff={staff} reload={reload} />}
 

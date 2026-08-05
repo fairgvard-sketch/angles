@@ -3758,3 +3758,109 @@ a { color: inherit; }
   .cus-form-actions { flex-direction: column-reverse; }
   .cus-form-actions button { width: 100%; min-height: var(--h-touch); }
 }
+
+/* ============================================================
+ * ЧАСЫ СОТРУДНИКОВ (Team → Hours)
+ *
+ * Таблица месяца и карточка человека рядом с ней — та же геометрия,
+ * что у клиентской базы: колонки объявлены переменной, шапка и строка
+ * обязаны совпадать, иначе таблица врёт подписями.
+ * ============================================================ */
+
+.hrs-toolbar {
+  display: flex; flex-wrap: wrap; align-items: center; gap: var(--sp-2);
+  margin-bottom: var(--sp-3);
+}
+.hrs-toolbar .secondary-button, .hrs-toolbar .primary-button { min-height: var(--h-control); }
+/* Месяц — не выпадающий список: его листают вперёд-назад, а не выбирают
+   из двенадцати вариантов, и название обязано быть видно всегда */
+.hrs-month {
+  display: flex; align-items: center; gap: 2px;
+  border: 1px solid var(--c-border); border-radius: var(--r-md);
+  background: var(--c-surface);
+}
+.hrs-month strong {
+  min-width: 150px; padding: 0 var(--sp-2);
+  font-size: 13px; font-weight: 700; text-align: center;
+}
+
+/* Отбор точки и итог месяца повторяют клиентскую базу по виду, но
+   называются своим именем: чужой префикс в разметке заставляет искать
+   правила раздела не там, где они лежат. */
+.hrs-select select {
+  min-height: var(--h-control); padding: 0 30px 0 10px;
+  border: 1px solid var(--c-border); border-radius: var(--r-md);
+  background: var(--c-surface); font: inherit; font-size: 13px;
+}
+.hrs-total {
+  margin: 0; margin-inline-start: auto;
+  color: var(--c-text-muted); font-size: 13px;
+  font-variant-numeric: tabular-nums; white-space: nowrap;
+}
+.hrs-panel { padding: 0; overflow: hidden; }
+.hrs-panel .empty-state { padding: var(--sp-6) var(--sp-4); }
+
+.hrs-list { --hrs-cols: minmax(200px, 1fr) 72px 80px 96px; min-width: 0; }
+.hrs-head, .hrs-row {
+  display: grid; grid-template-columns: var(--hrs-cols);
+  align-items: center; gap: var(--sp-3); padding-inline: var(--sp-4);
+}
+.hrs-head {
+  min-height: 44px; border-bottom: 1px solid var(--c-border-panel);
+  color: var(--c-text-muted); font-size: 12px; font-weight: 650;
+  text-transform: uppercase; letter-spacing: 0.02em;
+}
+.hrs-head > :not(:first-child) { text-align: end; }
+.hrs-row {
+  width: 100%; min-height: 58px;
+  border: 0; border-bottom: 1px solid var(--c-border-hair);
+  background: transparent; font: inherit; text-align: start; cursor: pointer;
+}
+.hrs-row:last-child { border-bottom: 0; }
+.hrs-row:hover { background: var(--c-surface-hover); }
+.hrs-row.is-selected { background: var(--st-accent-soft); box-shadow: inset 3px 0 0 var(--st-accent); }
+.hrs-row:focus-visible { outline: 2px solid var(--st-accent); outline-offset: -3px; }
+.hrs-cell-name { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-weight: 650; }
+.hrs-cell-name small { color: var(--c-text-muted); font-weight: 500; }
+.hrs-cell-num { text-align: end; font-variant-numeric: tabular-nums; color: var(--c-text-2); }
+.hrs-cell-num.is-strong { color: var(--c-text-strong); font-weight: 700; }
+
+/* ── Карточка сотрудника ───────────────────────────────────── */
+/* Строка дня повторяет печатную: дата, буква недели, интервал, часы */
+.hrs-days { display: grid; }
+.hrs-day {
+  display: grid; grid-template-columns: 88px 34px minmax(0, 1fr) 56px 40px;
+  align-items: center; gap: var(--sp-2);
+  min-height: 44px; border-bottom: 1px solid var(--c-border-hair);
+  font-size: 13px; font-variant-numeric: tabular-nums;
+}
+.hrs-day:last-child { border-bottom: 0; }
+.hrs-day-date { font-weight: 650; }
+.hrs-day-dow { color: var(--c-text-muted); }
+.hrs-day-range { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; color: var(--c-text-2); }
+.hrs-day-hours { text-align: end; font-weight: 700; }
+/* Незакрытая смена — не ошибка, но её видно: часы всё ещё идут */
+.hrs-day-hours.is-open { color: var(--c-success); }
+.hrs-day-actions { display: flex; justify-content: end; }
+.hrs-card-actions { display: flex; flex-wrap: wrap; gap: var(--sp-2); margin-top: var(--sp-3); }
+.hrs-hint { margin: var(--sp-3) 0 0; color: var(--c-text-muted); font-size: 12px; }
+.hrs-remove { color: var(--c-danger); justify-self: start; }
+
+/* ── Печать табеля ─────────────────────────────────────────── */
+/* На экране источника печати нет; в печать уходит только он */
+@media screen {
+  .hrs-print { display: none; }
+}
+@media print {
+  body * { visibility: hidden; }
+  .hrs-print, .hrs-print * { visibility: visible; }
+  .hrs-print {
+    position: absolute; inset-block-start: 0; inset-inline-start: 0;
+    width: 100%; padding: 12mm; color: #000; font-size: 12pt;
+  }
+  .hrs-print h1 { margin: 0 0 4pt; font-size: 16pt; }
+  .hrs-print table { width: 100%; border-collapse: collapse; margin-top: 8pt; }
+  .hrs-print td { padding: 3pt 0; border-bottom: 1px solid #ddd; font-variant-numeric: tabular-nums; }
+  .hrs-print td:last-child { text-align: end; font-weight: 700; }
+  .hrs-print-total { margin-top: 10pt; font-weight: 700; }
+}
