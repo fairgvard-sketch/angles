@@ -73,6 +73,28 @@ export function formatDayLine(day, tz, dowLetters = HEBREW_DOW) {
   return `${formatDay(day.day)} ${dowLetters[day.dow] || ''} ${formatRanges(day, tz)}`.trim()
 }
 
+/**
+ * Первый приход и последний уход дня. Табель читают по границам дня
+ * («пришёл в 07:00, ушёл в 15:00»), а не по каждой отметке.
+ */
+export function dayBounds(day) {
+  const sorted = [...day.entries].sort((a, b) => a.clock_in.localeCompare(b.clock_in))
+  return { in: sorted[0].clock_in, out: sorted[sorted.length - 1].clock_out }
+}
+
+/**
+ * Перерыв внутри дня = время «на работе» минус отработанное. Отдельных
+ * отметок перерыва касса не просит (лишний тап в спешке), поэтому он
+ * считается из разрыва между сменами: ушёл в 11:00, вернулся в 12:00 —
+ * час перерыва. Незакрытый день перерыва не показывает.
+ */
+export function dayBreakSeconds(day) {
+  const { in: start, out } = dayBounds(day)
+  if (!out) return 0
+  const span = (new Date(out).getTime() - new Date(start).getTime()) / 1000
+  return Math.max(0, Math.round(span - day.seconds))
+}
+
 // ── Период ───────────────────────────────────────────────────
 
 /** Ключ YYYY-MM-DD в локальном поясе (toISOString сдвинул бы дату) */
@@ -125,29 +147,39 @@ export function idleStaff(worked, roster, locationId = null) {
 
 /**
  * CSV для Excel: BOM (иврит не рассыпается), разделитель «;», десятичные
- * часы с запятой. Строка = смена, снизу — итоги по людям: файл уходит в
- * зарплату как есть, без ручной доводки.
+ * часы с запятой.
+ *
+ * Строка = ДЕНЬ, как на экране и на распечатке кассы: у владельца и
+ * бухгалтера должно сойтись число строк, иначе они сверяют разные
+ * документы. День с перерывом не разбивается надвое — приход, уход,
+ * перерыв и колонка со сменами говорят о нём всё.
  */
 export function hoursToCsv(staff, tz, dowLetters = EN_DOW) {
   const esc = (v) => (/[";\n]/.test(v) ? `"${String(v).replace(/"/g, '""')}"` : String(v))
   const row = (cells) => cells.map(esc).join(';')
-  const lines = [row(['Employee', 'Date', 'Day', 'In', 'Out', 'Hours', 'Decimal', 'Location', 'Note'])]
+  const lines = [row([
+    'Employee', 'Date', 'Day', 'In', 'Out', 'Break', 'Hours', 'Decimal',
+    'Shifts', 'Location', 'Note',
+  ])]
 
   for (const person of staff || []) {
     for (const day of groupByDay(person.entries)) {
-      for (const e of day.entries) {
-        lines.push(row([
-          person.name,
-          formatDay(day.day),
-          dowLetters[day.dow] || '',
-          formatTime(e.clock_in, tz),
-          e.clock_out ? formatTime(e.clock_out, tz) : '',
-          formatHm(e.seconds),
-          decimalHours(e.seconds),
-          e.location_name || '',
-          e.note || '',
-        ]))
-      }
+      const bounds = dayBounds(day)
+      lines.push(row([
+        person.name,
+        formatDay(day.day),
+        dowLetters[day.dow] || '',
+        formatTime(bounds.in, tz),
+        bounds.out ? formatTime(bounds.out, tz) : '',
+        formatHm(dayBreakSeconds(day)),
+        formatHm(day.seconds),
+        decimalHours(day.seconds),
+        // Разбитый перерывом день — интервалы целиком, иначе по границам
+        // дня не понять, откуда взялся перерыв
+        day.entries.length > 1 ? formatRanges(day, tz) : '',
+        day.entries[0]?.location_name || '',
+        day.entries.map((e) => e.note).filter(Boolean).join('; '),
+      ]))
     }
   }
 

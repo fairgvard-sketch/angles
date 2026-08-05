@@ -3,7 +3,8 @@ import { dateKey } from './hours'
 // Чистые правила табеля — в отдельном модуле под тесты
 export {
   HEBREW_DOW, EN_DOW, groupByDay, formatDay, formatTime, formatHm, decimalHours,
-  formatRanges, formatDayLine, dateKey, monthRange, monthTitle, shiftMonth,
+  formatRanges, formatDayLine, dayBounds, dayBreakSeconds,
+  dateKey, monthRange, monthTitle, shiftMonth,
   hoursToCsv, hoursFileName, idleStaff,
 } from './hours'
 

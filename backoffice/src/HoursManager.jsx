@@ -2,7 +2,8 @@ import { useCallback, useEffect, useMemo, useState } from 'react'
 import { ChevronLeft, ChevronRight, Download, Pencil, Plus, Printer } from 'lucide-react'
 import {
   fetchHours, saveEntry, deleteEntry, TZ,
-  groupByDay, formatDay, formatTime, formatHm, formatRanges,
+  groupByDay, formatDay, formatTime, formatHm, decimalHours, formatRanges,
+  dayBounds, dayBreakSeconds,
   dateKey, monthRange, monthTitle, shiftMonth, hoursToCsv, hoursFileName,
   idleStaff, EN_DOW, HEBREW_DOW,
 } from './timesheet'
@@ -127,6 +128,11 @@ function EntryEditor({ staff, entry, locations, defaultLocationId, onCancel, onS
 /** Карточка сотрудника: дни месяца, печать, выгрузка, правка */
 function StaffCard({ person, from, to, locations, locationId, onClose, onChanged }) {
   const days = useMemo(() => groupByDay(person.entries), [person.entries])
+  const breakSeconds = useMemo(
+    () => days.reduce((sum, day) => sum + dayBreakSeconds(day), 0),
+    [days],
+  )
+  const locationName = person.entries[0]?.location_name || null
   const [editing, setEditing] = useState(null) // { entry } | {} = новая смена
   const [removing, setRemoving] = useState(null)
   const [removeError, setRemoveError] = useState('')
@@ -155,7 +161,13 @@ function StaffCard({ person, from, to, locations, locationId, onClose, onChanged
       <Drawer
         labelledBy="hours-card-title"
         title={person.name}
-        subtitle={`${formatDay(dateKey(from))} — ${formatDay(dateKey(to))} · ${formatHm(person.seconds)}`}
+        subtitle={[
+          `${formatDay(dateKey(from))} — ${formatDay(dateKey(to))}`,
+          locationName,
+          // Часы и десятичные рядом: первое читает сотрудник, второе идёт
+          // в зарплату, и пересчитывать «8:30 → 8.5» руками никто не должен
+          `${formatHm(person.seconds)} · ${decimalHours(person.seconds)}`,
+        ].filter(Boolean).join(' · ')}
         onClose={onClose}
         /* Панель стоит рядом с таблицей: щелчок по соседнему сотруднику
            обязан открыть его, а не закрыть карточку. */
@@ -175,30 +187,66 @@ function StaffCard({ person, from, to, locations, locationId, onClose, onChanged
           <p className="empty-state">No punches in this period.</p>
         ) : (
           <div className="hrs-days">
-            {days.map((day) => (
-              <div className="hrs-day" key={day.day}>
-                <span className="hrs-day-date">{formatDay(day.day)}</span>
-                <span className="hrs-day-dow">{EN_DOW[day.dow]}</span>
-                <span className="hrs-day-range">{formatRanges(day, TZ)}</span>
-                <span className={day.hasOpen ? 'hrs-day-hours is-open' : 'hrs-day-hours'}>
-                  {formatHm(day.seconds)}
-                </span>
-                <span className="hrs-day-actions">
-                  {day.entries.map((entry) => (
-                    <IconButton
-                      key={entry.id}
-                      label={`Edit shift on ${formatDay(day.day)}`}
-                      title={entry.edited_at
-                        ? `Corrected${entry.edited_by_name ? ` by ${entry.edited_by_name}` : ''}`
-                        : 'Edit'}
-                      onClick={() => setEditing({ entry })}
-                    >
-                      <Pencil />
-                    </IconButton>
-                  ))}
-                </span>
-              </div>
-            ))}
+            {/* Колонки те же, что в отчёте, к которому привык владелец:
+                приход, уход, перерыв, итог */}
+            <div className="hrs-day hrs-day-head">
+              <span>Date</span>
+              <span />
+              <span>In</span>
+              <span>Out</span>
+              <span>Break</span>
+              <span>Total</span>
+              <span />
+            </div>
+            {days.map((day) => {
+              const bounds = dayBounds(day)
+              const gap = dayBreakSeconds(day)
+              return (
+                <div
+                  className="hrs-day"
+                  key={day.day}
+                  // Разбитый день: интервалы целиком — подсказкой, чтобы строка
+                  // осталась одной, а правда о дне не потерялась
+                  title={day.entries.length > 1 ? formatRanges(day, TZ) : undefined}
+                >
+                  <span className="hrs-day-date">{formatDay(day.day)}</span>
+                  <span className="hrs-day-dow">{EN_DOW[day.dow]}</span>
+                  <span className="hrs-day-time">{formatTime(bounds.in, TZ)}</span>
+                  <span className="hrs-day-time">{bounds.out ? formatTime(bounds.out, TZ) : '…'}</span>
+                  <span className={gap > 0 ? 'hrs-day-time' : 'hrs-day-time is-none'}>{formatHm(gap)}</span>
+                  <span className={day.hasOpen ? 'hrs-day-hours is-open' : 'hrs-day-hours'}>
+                    {formatHm(day.seconds)}
+                    <small>{decimalHours(day.seconds)}</small>
+                  </span>
+                  <span className="hrs-day-actions">
+                    {day.entries.map((entry) => (
+                      <IconButton
+                        key={entry.id}
+                        label={`Edit shift on ${formatDay(day.day)}`}
+                        title={entry.edited_at
+                          ? `Corrected${entry.edited_by_name ? ` by ${entry.edited_by_name}` : ''}`
+                          : 'Edit'}
+                        onClick={() => setEditing({ entry })}
+                      >
+                        <Pencil />
+                      </IconButton>
+                    ))}
+                  </span>
+                </div>
+              )
+            })}
+            <div className="hrs-day hrs-day-total">
+              <span>Total</span>
+              <span />
+              <span />
+              <span />
+              <span>{breakSeconds > 0 ? formatHm(breakSeconds) : ''}</span>
+              <span className="hrs-day-hours">
+                {formatHm(person.seconds)}
+                <small>{decimalHours(person.seconds)}</small>
+              </span>
+              <span />
+            </div>
           </div>
         )}
 
@@ -243,21 +291,29 @@ function StaffCard({ person, from, to, locations, locationId, onClose, onChanged
       {/* Источник печати: на экране скрыт, в печать уходит только он */}
       <div className="hrs-print">
         <h1>{person.name}</h1>
+        {locationName && <p>{locationName}</p>}
         <p>{formatDay(dateKey(from))} — {formatDay(dateKey(to))}</p>
         <table>
           <tbody>
-            {days.map((day) => (
-              <tr key={day.day}>
-                <td>{formatDay(day.day)}</td>
-                <td>{HEBREW_DOW[day.dow]}</td>
-                <td>{formatRanges(day, TZ)}</td>
-                <td>{formatHm(day.seconds)}</td>
-              </tr>
-            ))}
+            {days.map((day) => {
+              const bounds = dayBounds(day)
+              return (
+                <tr key={day.day}>
+                  <td>{formatDay(day.day)}</td>
+                  <td>{HEBREW_DOW[day.dow]}</td>
+                  <td>{formatTime(bounds.in, TZ)}</td>
+                  <td>{bounds.out ? formatTime(bounds.out, TZ) : '…'}</td>
+                  <td>{formatHm(dayBreakSeconds(day))}</td>
+                  <td>{formatHm(day.seconds)}</td>
+                </tr>
+              )
+            })}
           </tbody>
         </table>
         <p className="hrs-print-total">
-          Days {person.days} · Shifts {person.shifts} · Total {formatHm(person.seconds)}
+          Days {person.days} · Shifts {person.shifts}
+          {breakSeconds > 0 ? ` · Breaks ${formatHm(breakSeconds)}` : ''}
+          {' · Total '}{formatHm(person.seconds)} ({decimalHours(person.seconds)})
         </p>
       </div>
     </>
@@ -366,7 +422,7 @@ export default function HoursManager({ context }) {
           <Download aria-hidden /> Excel
         </Button>
 
-        <p className="hrs-total">{formatHm(totalSeconds)} in total</p>
+        <p className="hrs-total">{formatHm(totalSeconds)} · {decimalHours(totalSeconds)} in total</p>
       </div>
 
       {error && <p className="form-error" role="alert">{error}</p>}
@@ -405,6 +461,7 @@ export default function HoursManager({ context }) {
                 <span className="hrs-cell-num">{row.shifts || '—'}</span>
                 <span className={row.shifts ? 'hrs-cell-num is-strong' : 'hrs-cell-num'}>
                   {row.shifts ? formatHm(row.seconds) : '—'}
+                  {row.shifts > 0 && <small>{decimalHours(row.seconds)}</small>}
                 </span>
               </button>
             ))}

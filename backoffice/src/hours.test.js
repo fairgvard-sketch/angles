@@ -3,7 +3,8 @@ import assert from 'node:assert/strict'
 import {
   groupByDay, formatDay, formatTime, formatHm, decimalHours, formatRanges,
   formatDayLine, dateKey, monthRange, monthTitle, shiftMonth,
-  hoursToCsv, hoursFileName, idleStaff, HEBREW_DOW, EN_DOW,
+  hoursToCsv, hoursFileName, idleStaff, dayBounds, dayBreakSeconds,
+  HEBREW_DOW, EN_DOW,
 } from './hours.js'
 
 const TZ = 'Asia/Jerusalem'
@@ -121,8 +122,24 @@ test('выгрузка начинается с BOM — иначе Excel расс
   assert.ok(hoursToCsv([person], TZ).startsWith('﻿'))
 })
 
-test('строка смены содержит дату, интервал и часы', () => {
-  assert.match(hoursToCsv([person], TZ), /Anna;01\.08\.2026;Sat;07:00;15:00;8:00;8,00;Rothschild;/)
+test('строка дня: приход, уход, перерыв и часы в двух видах', () => {
+  assert.match(hoursToCsv([person], TZ), /Anna;01\.08\.2026;Sat;07:00;15:00;0:00;8:00;8,00;;Rothschild;/)
+})
+
+test('день с перерывом остаётся ОДНОЙ строкой — как на экране и на бумаге', () => {
+  const split = {
+    ...person,
+    seconds: 7 * 3600,
+    shifts: 2,
+    entries: [
+      entry({ id: 'a', clock_in: '2026-08-01T04:00:00Z', clock_out: '2026-08-01T08:00:00Z', seconds: 4 * 3600 }),
+      entry({ id: 'b', clock_in: '2026-08-01T09:00:00Z', clock_out: '2026-08-01T12:00:00Z', seconds: 3 * 3600 }),
+    ],
+  }
+  const rows = hoursToCsv([split], TZ).split('\r\n')
+  assert.match(rows[1], /07:00;15:00;1:00;7:00;7,00/)
+  assert.ok(rows[1].includes('07:00 - 11:00, 12:00 - 15:00'))
+  assert.equal(rows[2], '', 'после дня сразу блок итогов, второй строки дня нет')
 })
 
 test('точка с запятой в заметке экранируется', () => {
@@ -178,4 +195,37 @@ test('без фильтра точки виден весь активный шт
 test('порядок — по имени', () => {
   const shuffled = [roster[2], roster[0], roster[1]]
   assert.deepEqual(idleStaff([], shuffled, null).map((s) => s.name), ['Anna', 'Boris', 'Vika'])
+})
+
+// ── Границы дня и перерыв ────────────────────────────────────
+
+test('день из одной смены: приход и уход её же, перерыва нет', () => {
+  const [day] = groupByDay([entry()])
+  assert.deepEqual(dayBounds(day), { in: '2026-08-01T04:00:00Z', out: '2026-08-01T12:00:00Z' })
+  assert.equal(dayBreakSeconds(day), 0)
+})
+
+test('разрыв между сменами дня и есть перерыв', () => {
+  // 07:00–11:00 и 12:00–15:00: на работе 8 часов, отработано 7, перерыв час
+  const [day] = groupByDay([
+    entry({ id: 'a', clock_in: '2026-08-01T04:00:00Z', clock_out: '2026-08-01T08:00:00Z', seconds: 4 * 3600 }),
+    entry({ id: 'b', clock_in: '2026-08-01T09:00:00Z', clock_out: '2026-08-01T12:00:00Z', seconds: 3 * 3600 }),
+  ])
+  assert.equal(dayBreakSeconds(day), 3600)
+  assert.equal(day.seconds, 7 * 3600)
+})
+
+test('границы берутся по времени, а не по порядку в ответе', () => {
+  const [day] = groupByDay([
+    entry({ id: 'b', clock_in: '2026-08-01T09:00:00Z', clock_out: '2026-08-01T12:00:00Z', seconds: 3 * 3600 }),
+    entry({ id: 'a', clock_in: '2026-08-01T04:00:00Z', clock_out: '2026-08-01T08:00:00Z', seconds: 4 * 3600 }),
+  ])
+  assert.equal(dayBounds(day).in, '2026-08-01T04:00:00Z')
+  assert.equal(dayBreakSeconds(day), 3600)
+})
+
+test('незакрытый день перерыва не показывает — он ещё не кончился', () => {
+  const [day] = groupByDay([entry({ clock_out: null, is_open: true })])
+  assert.equal(dayBounds(day).out, null)
+  assert.equal(dayBreakSeconds(day), 0)
 })

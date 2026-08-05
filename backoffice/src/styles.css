@@ -3828,21 +3828,36 @@ a { color: inherit; }
 .hrs-cell-name small { color: var(--c-text-muted); font-weight: 500; }
 .hrs-cell-num { text-align: end; font-variant-numeric: tabular-nums; color: var(--c-text-2); }
 .hrs-cell-num.is-strong { color: var(--c-text-strong); font-weight: 700; }
+.hrs-cell-num small { margin-inline-start: 6px; color: var(--c-text-muted); font-weight: 500; }
 
 /* ── Карточка сотрудника ───────────────────────────────────── */
 /* Строка дня повторяет печатную: дата, буква недели, интервал, часы */
 .hrs-days { display: grid; }
 .hrs-day {
-  display: grid; grid-template-columns: 88px 34px minmax(0, 1fr) 56px 40px;
+  display: grid;
+  grid-template-columns: 82px 30px 46px 46px 46px minmax(0, 1fr) 40px;
   align-items: center; gap: var(--sp-2);
   min-height: 44px; border-bottom: 1px solid var(--c-border-hair);
   font-size: 13px; font-variant-numeric: tabular-nums;
 }
 .hrs-day:last-child { border-bottom: 0; }
+/* Шапка колонок: те же четыре имени, что в отчёте старой системы */
+.hrs-day-head {
+  min-height: 32px; color: var(--c-text-muted);
+  font-size: 11px; font-weight: 650; text-transform: uppercase; letter-spacing: .02em;
+}
+.hrs-day-head > :nth-child(n+3) { text-align: end; }
 .hrs-day-date { font-weight: 650; }
 .hrs-day-dow { color: var(--c-text-muted); }
+.hrs-day-time { text-align: end; color: var(--c-text-2); }
+/* Нулевой перерыв не должен спорить с настоящими числами */
+.hrs-day-time.is-none { color: var(--c-text-subtle); }
 .hrs-day-range { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; color: var(--c-text-2); }
 .hrs-day-hours { text-align: end; font-weight: 700; }
+/* Десятичные часы — рядом и тише: их читает бухгалтер, а не сотрудник */
+.hrs-day-hours small { margin-inline-start: 6px; color: var(--c-text-muted); font-weight: 500; }
+.hrs-day-total { border-top: 1px solid var(--c-border-panel); border-bottom: 0; font-weight: 700; }
+.hrs-day-total > :first-child { color: var(--c-text-muted); font-size: 11px; text-transform: uppercase; }
 /* Незакрытая смена — не ошибка, но её видно: часы всё ещё идут */
 .hrs-day-hours.is-open { color: var(--c-success); }
 .hrs-day-actions { display: flex; justify-content: end; }
