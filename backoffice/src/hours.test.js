@@ -3,7 +3,7 @@ import assert from 'node:assert/strict'
 import {
   groupByDay, formatDay, formatTime, formatHm, decimalHours, formatRanges,
   formatDayLine, dateKey, monthRange, monthTitle, shiftMonth,
-  hoursToCsv, hoursFileName, HEBREW_DOW, EN_DOW,
+  hoursToCsv, hoursFileName, idleStaff, HEBREW_DOW, EN_DOW,
 } from './hours.js'
 
 const TZ = 'Asia/Jerusalem'
@@ -140,4 +140,42 @@ test('имя файла называет период и сотрудника', 
   const { from, to } = monthRange(2026, 7)
   assert.equal(hoursFileName(from, to, 'Anna'), 'hours_Anna_2026-08-01_2026-08-31.csv')
   assert.equal(hoursFileName(from, to), 'hours_2026-08-01_2026-08-31.csv')
+})
+
+// ── Штат без смен ────────────────────────────────────────────
+
+const roster = [
+  { id: 's1', name: 'Anna', is_active: true, location_id: null },
+  { id: 's2', name: 'Boris', is_active: true, location_id: 'loc-1' },
+  { id: 's3', name: 'Vika', is_active: true, location_id: 'loc-2' },
+  { id: 's4', name: 'Grisha', is_active: false, location_id: 'loc-1' },
+]
+
+test('в списке есть и те, кто в этом месяце не работал — иначе их не открыть', () => {
+  assert.deepEqual(idleStaff([], roster, 'loc-1').map((s) => s.id), ['s1', 's2'])
+})
+
+test('отработавший не задваивается', () => {
+  assert.deepEqual(idleStaff([{ staff_id: 's2' }], roster, 'loc-1').map((s) => s.id), ['s1'])
+})
+
+test('уволенный без смен в список не поднимается', () => {
+  assert.ok(!idleStaff([], roster, 'loc-1').some((s) => s.id === 's4'))
+})
+
+test('фильтр точки не показывает чужих сотрудников', () => {
+  assert.ok(!idleStaff([], roster, 'loc-1').some((s) => s.id === 's3'))
+})
+
+test('сотрудник без точки работает на всех', () => {
+  assert.deepEqual(idleStaff([], roster, 'loc-2').map((s) => s.id), ['s1', 's3'])
+})
+
+test('без фильтра точки виден весь активный штат', () => {
+  assert.deepEqual(idleStaff([], roster, null).map((s) => s.id), ['s1', 's2', 's3'])
+})
+
+test('порядок — по имени', () => {
+  const shuffled = [roster[2], roster[0], roster[1]]
+  assert.deepEqual(idleStaff([], shuffled, null).map((s) => s.name), ['Anna', 'Boris', 'Vika'])
 })

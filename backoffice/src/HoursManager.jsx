@@ -4,8 +4,9 @@ import {
   fetchHours, saveEntry, deleteEntry, TZ,
   groupByDay, formatDay, formatTime, formatHm, formatRanges,
   dateKey, monthRange, monthTitle, shiftMonth, hoursToCsv, hoursFileName,
-  EN_DOW, HEBREW_DOW,
+  idleStaff, EN_DOW, HEBREW_DOW,
 } from './timesheet'
+import { fetchStaff } from './team'
 import { Panel } from './ui/Layout'
 import { Button, IconButton } from './ui/Button'
 import Drawer from './ui/Drawer'
@@ -278,6 +279,7 @@ export default function HoursManager({ context }) {
   const [cursor, setCursor] = useState({ year: now.getFullYear(), month: now.getMonth() })
   const [locationId, setLocationId] = useState('')
   const [report, setReport] = useState(null)
+  const [roster, setRoster] = useState([])
   const [error, setError] = useState('')
   const [selected, setSelected] = useState(null)
 
@@ -299,7 +301,35 @@ export default function HoursManager({ context }) {
 
   useEffect(() => { load() }, [load])
 
-  const staff = report?.staff || []
+  /*
+   * Штат нужен отдельно от часов: отчёт отвечает «кто сколько отработал»,
+   * и человека в отпуске, в выходной или забывшего отметиться в нём нет.
+   * А открыть надо именно его — посмотреть другой месяц или дописать
+   * пропущенную смену.
+   */
+  useEffect(() => {
+    let alive = true
+    fetchStaff()
+      .then((list) => { if (alive) setRoster(list) })
+      // Часы важнее списка: без штата раздел работает, просто без нулевых строк
+      .catch(() => { if (alive) setRoster([]) })
+    return () => { alive = false }
+  }, [])
+
+  /*
+   * Отработавшие сверху, остальной штат — следом с прочерком. Уволенных не
+   * добавляем, но со сменами периода они остаются: часы отработаны, из
+   * табеля их не вычёркивают.
+   */
+  const staff = useMemo(() => {
+    const worked = report?.staff || []
+    const rest = idleStaff(worked, roster, locationId || null).map((s) => ({
+      staff_id: s.id, name: s.name, role: s.role, is_active: true,
+      seconds: 0, days: 0, shifts: 0, has_open: false, entries: [],
+    }))
+    return [...worked, ...rest]
+  }, [report?.staff, roster, locationId])
+
   const person = staff.find((s) => s.staff_id === selected) || null
   const totalSeconds = report?.totals?.seconds ?? 0
 
@@ -328,8 +358,10 @@ export default function HoursManager({ context }) {
 
         <Button
           size="compact"
-          disabled={staff.length === 0}
-          onClick={() => download(hoursToCsv(staff, TZ), hoursFileName(from, to))}
+          disabled={(report?.staff || []).length === 0}
+          /* В файл идут только отработавшие: строка «0:00» в зарплатной
+             выгрузке читается как «не заплатили», а не «не работал» */
+          onClick={() => download(hoursToCsv(report?.staff || [], TZ), hoursFileName(from, to))}
         >
           <Download aria-hidden /> Excel
         </Button>
@@ -343,7 +375,7 @@ export default function HoursManager({ context }) {
         {report === null ? (
           <p className="empty-state">Loading…</p>
         ) : staff.length === 0 ? (
-          <p className="empty-state">Nobody punched in this month.</p>
+          <p className="empty-state">Nobody has been added to the team yet.</p>
         ) : (
           <div className="hrs-list">
             <div className="hrs-head">
@@ -356,7 +388,12 @@ export default function HoursManager({ context }) {
               <button
                 type="button"
                 key={row.staff_id}
-                className={row.staff_id === selected ? 'hrs-row is-selected' : 'hrs-row'}
+                className={[
+                  'hrs-row',
+                  row.staff_id === selected ? 'is-selected' : '',
+                  // Не работал в этом месяце — строка тише, но открывается
+                  row.shifts ? '' : 'is-idle',
+                ].filter(Boolean).join(' ')}
                 aria-expanded={row.staff_id === selected}
                 onClick={() => setSelected(row.staff_id === selected ? null : row.staff_id)}
               >
@@ -364,9 +401,11 @@ export default function HoursManager({ context }) {
                   {row.name}
                   {row.has_open && <small> · on shift</small>}
                 </span>
-                <span className="hrs-cell-num">{row.days}</span>
-                <span className="hrs-cell-num">{row.shifts}</span>
-                <span className="hrs-cell-num is-strong">{formatHm(row.seconds)}</span>
+                <span className="hrs-cell-num">{row.shifts ? row.days : '—'}</span>
+                <span className="hrs-cell-num">{row.shifts || '—'}</span>
+                <span className={row.shifts ? 'hrs-cell-num is-strong' : 'hrs-cell-num'}>
+                  {row.shifts ? formatHm(row.seconds) : '—'}
+                </span>
               </button>
             ))}
           </div>

@@ -4,7 +4,7 @@ import { dateKey } from './hours'
 export {
   HEBREW_DOW, EN_DOW, groupByDay, formatDay, formatTime, formatHm, decimalHours,
   formatRanges, formatDayLine, dateKey, monthRange, monthTitle, shiftMonth,
-  hoursToCsv, hoursFileName,
+  hoursToCsv, hoursFileName, idleStaff,
 } from './hours'
 
 /**
