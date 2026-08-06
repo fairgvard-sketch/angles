@@ -2058,6 +2058,33 @@ a { color: inherit; }
  * откуда позиция; на телефоне колонка прячется — там важнее имя и цена.
  */
 
+/*
+ * Готовность канала: полоса «что мешает гостю». Не тревожная плашка на
+ * пол-экрана — строка с делом и адресом, где оно чинится.
+ */
+.channel-blockers {
+  margin-bottom: var(--sp-3); padding: var(--sp-3) var(--sp-4);
+  border: 1px solid #f0e2bd; border-radius: var(--r-md); background: #fffdf8;
+}
+.channel-blockers-title {
+  display: flex; align-items: center; gap: var(--sp-2); margin: 0;
+  color: #8a6d1e; font-size: 13px; font-weight: 700;
+}
+.channel-blockers-title svg { width: 16px; height: 16px; flex: none; }
+.channel-blockers-list { list-style: none; display: grid; gap: var(--sp-2); margin: var(--sp-2) 0 0; padding: 0; }
+.channel-blockers-list li {
+  display: flex; align-items: center; justify-content: space-between;
+  gap: var(--sp-3); min-width: 0;
+}
+.channel-blockers-list span { display: grid; gap: 2px; min-width: 0; }
+.channel-blockers-list strong { font-size: 13px; font-weight: 700; }
+.channel-blockers-list small { color: var(--c-text-subtle); font-size: 12px; }
+.channel-blockers-list button { flex: none; }
+
+@media (max-width: 640px) {
+  .channel-blockers-list li { flex-wrap: wrap; }
+}
+
 /* Парк касс: секции «требует внимания / рабочие / архив» */
 .fleet-section { margin-top: var(--sp-5); }
 .fleet-section:first-of-type { margin-top: var(--sp-3); }

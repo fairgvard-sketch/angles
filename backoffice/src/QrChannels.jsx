@@ -30,8 +30,12 @@ import {
   addRule, moveRule, removeRule, ruleList, rulesSummary, toSettings, updateRule,
 } from './reservation-rules'
 import { hasCapability } from './navigation'
+import { fetchCategories, fetchItems } from './menu'
+import { fetchLaunchChecklist } from './launch'
+import { blockerSummary, menuBlockers, reserveBlockers } from './channel-readiness'
 import { PageHeader } from './ui/Layout'
 import Tabs from './ui/Tabs'
+import { Button } from './ui/Button'
 
 /**
  * QR-каналы гостя: онлайн-заказы и бронирование столов.
@@ -73,6 +77,38 @@ const TABS = [
  * отличить от ссылки в профиле (Kassa 124): гость видит одну и ту же
  * страницу, но в отчёте это разные каналы. По умолчанию совпадают.
  */
+/**
+ * Что мешает гостю воспользоваться каналом.
+ *
+ * Только невыполненное и только настоящее: список зелёных галочек про
+ * то, что и так работает, владелец перестаёт читать на второй раз.
+ * Каждая строка ведёт туда, где чинится, — в другой раздел или в
+ * группу настроек этого же экрана.
+ */
+function ChannelBlockers({ blockers, channel, onGo }) {
+  if (blockers.length === 0) return null
+  return (
+    <section className="channel-blockers" aria-label="Before guests can use this channel">
+      <p className="channel-blockers-title">
+        <AlertTriangle aria-hidden /> {blockerSummary(blockers, channel)}
+      </p>
+      <ul className="channel-blockers-list">
+        {blockers.map((blocker) => (
+          <li key={blocker.id}>
+            <span>
+              <strong>{blocker.title}</strong>
+              {blocker.detail && <small>{blocker.detail}</small>}
+            </span>
+            {blocker.action && (
+              <Button onClick={() => onGo(blocker.action)}>{blocker.action.label}</Button>
+            )}
+          </li>
+        ))}
+      </ul>
+    </section>
+  )
+}
+
 function ChannelBar({ title, enabled, onToggle, onLabel, offLabel, url, qrUrl, qrName, offNote }) {
   const [copyState, copy] = useCopy(url)
   const codeUrl = qrUrl || url
@@ -1623,6 +1659,11 @@ export default function QrChannels({ context, locationId, tab: tabFromUrl, onTab
   // не теряет герой со ссылкой из виду. Состояние живёт здесь, чтобы
   // переживать перерисовку после сохранения настройки.
   const [openGroup, setOpenGroup] = useState(null)
+  // Готовность канала считается по данным, которые уже есть на сервере:
+  // каталог точки и серверный чеклист брони (126). Ничего нового не
+  // придумываем и ничего не кэшируем сверх нужного.
+  const [catalogue, setCatalogue] = useState(null)
+  const [checklist, setChecklist] = useState(null)
 
   useEffect(() => {
     if (!activeId) return undefined
@@ -1643,6 +1684,28 @@ export default function QrChannels({ context, locationId, tab: tabFromUrl, onTab
       .catch((loadError) => { if (!cancelled) setError(loadError.message) })
     return () => { cancelled = true }
   }, [activeId])
+
+  /*
+   * Данные готовности грузятся по вкладке, а не все сразу: каталог
+   * нужен только меню, чеклист — только брони. Отказ здесь не ломает
+   * экран: не знаем — молчим, а не пугаем выдуманным блокером.
+   */
+  useEffect(() => {
+    if (!activeId) return undefined
+    let cancelled = false
+    if (tab === 'online') {
+      setCatalogue(null)
+      Promise.all([fetchCategories(), fetchItems()])
+        .then(([categories, items]) => { if (!cancelled) setCatalogue({ categories, items }) })
+        .catch(() => { if (!cancelled) setCatalogue(null) })
+    } else {
+      setChecklist(null)
+      fetchLaunchChecklist(activeId)
+        .then((data) => { if (!cancelled) setChecklist(data) })
+        .catch(() => { if (!cancelled) setChecklist(null) })
+    }
+    return () => { cancelled = true }
+  }, [activeId, tab])
 
   /**
    * Оптимистичная запись: тумблер отзывается сразу, при ошибке откатываем.
@@ -1721,6 +1784,30 @@ export default function QrChannels({ context, locationId, tab: tabFromUrl, onTab
       ) : (
         <div className="qr-workspace">
           <div className="qr-workspace-main">
+            {/* Готовность канала — до настроек: бесполезно править вид
+                страницы, на которой гостю нечего заказать. */}
+            <ChannelBlockers
+              channel={tab}
+              blockers={tab === 'online'
+                ? menuBlockers({
+                  categories: catalogue?.categories,
+                  items: catalogue?.items,
+                  locationId: activeId,
+                  tables,
+                  settings: settings.online_orders,
+                })
+                : reserveBlockers(checklist)}
+              onGo={(action) => {
+                // Блокер ведёт либо в другой раздел, либо в группу
+                // настроек этого же экрана — второе не должно уводить
+                // владельца со страницы.
+                if (action.view && typeof onNavigate === 'function') {
+                  onNavigate(action.view, null, action.tab ?? null)
+                } else if (action.group) {
+                  setOpenGroup(action.group)
+                }
+              }}
+            />
             {tab === 'online' ? (
               // key по точке: поля витрины неуправляемые (defaultValue), без
               // пересоздания они сохранили бы значения предыдущей точки.
