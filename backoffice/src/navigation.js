@@ -37,7 +37,11 @@ export const NAV_GROUPS = [
  * это цифры.
  */
 export const NAV_ITEMS = [
-  { id: 'overview', label: 'Dashboard', group: null },
+  // Дашборд читает продажи, заказы, брони и каналы ОДНОЙ точки. Без
+  // `scoped` он показывал их без переключателя, и у сети молча выигрывала
+  // первая точка в списке: числа были ничьи. Кассы и предупреждение о
+  // смене остаются общими по организации и называют свою точку в строке.
+  { id: 'overview', label: 'Dashboard', group: null, scoped: true },
   { id: 'orders', label: 'Orders', group: 'work', scoped: true },
   { id: 'reservations', label: 'Reservations', group: 'work', scoped: true },
   { id: 'sales', label: 'Sales', group: 'insights' },
@@ -139,6 +143,20 @@ export function groupedNavigation(context) {
       .filter((group) => group.items.length > 0),
   }
 }
+
+/**
+ * Продукты ANGLE и как они называются для владельца.
+ *
+ * Живёт рядом с `productState`, а не в App.jsx: названия нужны и
+ * карточке продуктов в аккаунте, и дашборду — он сообщает о заявке,
+ * которая ждёт активации. Два списка названий рано или поздно разойдутся.
+ */
+export const PRODUCT_META = [
+  { id: 'menu', label: 'ANGLE Menu', detail: 'QR menu for phones and your website' },
+  { id: 'online_orders', label: 'ANGLE Orders', detail: 'Online orders without a register' },
+  { id: 'reservations', label: 'ANGLE Reserve', detail: 'Table bookings and host desk' },
+  { id: 'pos', label: 'ANGLE POS', detail: 'The register, shifts and receipts' },
+]
 
 /**
  * Жизненный цикл карточки продукта (100/104/105): Active / Developer /

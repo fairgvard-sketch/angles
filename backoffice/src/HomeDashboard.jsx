@@ -1,11 +1,12 @@
-import { useCallback, useEffect, useMemo, useState } from 'react'
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import {
-  AlertTriangle, CalendarDays, ChevronRight, Info, MonitorSmartphone, QrCode,
-  RefreshCw, ShoppingBag, Wifi,
+  AlertTriangle, ArrowDownRight, ArrowUpRight, CalendarDays, ChevronRight, Info,
+  Minus, MonitorSmartphone, QrCode, RefreshCw, ShoppingBag, Wifi,
 } from 'lucide-react'
 import {
-  attentionItems, fleetSummary, loadDashboard, ordersSummary, reservationsSummary,
-  timeLabel, todayLabel,
+  attentionItems, chartSummary, dayStamp, fetchDaySales, fleetSummary, heroKind,
+  hourlyComparison, loadDashboard, ordersSummary, reservationsSummary, timeLabel,
+  todayBars, todayLabel,
 } from './dashboard'
 import { deviceStatus, lastSeenLabel, STATUS_LABEL } from './devices'
 import { elapsedLabel } from './orders-inbox'
@@ -16,63 +17,154 @@ import { Button, IconButton } from './ui/Button'
 import { EmptyState, PageHeader, Panel, StatusBadge } from './ui/Layout'
 
 /**
- * Главная кабинета: что происходит сейчас и что требует внимания.
+ * Главная кабинета: как идёт день и что требует решения.
  *
- * Виджеты привязаны к capability — Menu-клиент не увидит смену на кассе,
- * а POS-клиент без брони не увидит визитов. Ни одного придуманного
- * показателя: всё, что здесь есть, читается с сервера.
+ * Редизайн по `docs/claude-dashboard-redesign-plan.md`. Прежний экран был
+ * стопкой из восьми панелей и открывался обычно пустым «Needs attention»,
+ * за ним шли четыре карточки-счётчика, а под ними — копия сайдбара
+ * «Quick access» и карточка продуктов. Первый экран уходил на то, что
+ * ничего не случилось.
+ *
+ * Теперь порядок ответов такой: что требует решения → как идёт день →
+ * где стоит живая работа → что только что произошло.
+ *
+ * Правило, которое важнее вёрстки, не изменилось: показываем ТОЛЬКО то,
+ * что есть на сервере, и каждый виджет привязан к capability. Menu-клиент
+ * не увидит смену на кассе, Reserve-клиент — выручку.
  */
 
-function Metric({ label, value, detail, tone }) {
+// ── Требует внимания ────────────────────────────────────────
+
+const ATTENTION_ICON = { alert: AlertTriangle, warn: AlertTriangle, info: Info }
+
+/**
+ * Список решений. Панели с заголовком и описанием у него больше нет:
+ * пустой список — обычный день, и он не должен занимать пол-экрана,
+ * чтобы сообщить, что новостей нет. Место при этом фиксированное —
+ * владелец всегда знает, куда смотреть.
+ */
+function Attention({ items, onNavigate }) {
+  if (items.length === 0) {
+    return (
+      <p className="dash-clear">
+        <Info aria-hidden /> Nothing needs a decision right now.
+      </p>
+    )
+  }
   return (
-    <div className={`metric${tone ? ` is-${tone}` : ''}`}>
-      <span className="metric-label">{label}</span>
-      <strong className="metric-value">{value}</strong>
-      {detail && <span className="metric-detail">{detail}</span>}
+    <section className="dash-attention" aria-label="Needs attention">
+      {items.map((item) => {
+        const Icon = ATTENTION_ICON[item.tone] || Info
+        return (
+          <div className={`dash-attention-row is-${item.tone}`} key={item.id}>
+            <span className="dash-attention-icon" aria-hidden><Icon /></span>
+            <span className="dash-attention-text">
+              <strong>{item.title}</strong>
+              {item.detail && <small>{item.detail}</small>}
+            </span>
+            {item.action && (
+              <Button
+                variant="secondary"
+                onClick={() => onNavigate(item.action.view, null, item.action.tab)}
+              >
+                {item.action.label}
+              </Button>
+            )}
+          </div>
+        )
+      })}
+    </section>
+  )
+}
+
+// ── Как идёт день ───────────────────────────────────────────
+
+const DELTA_ICON = { up: ArrowUpRight, down: ArrowDownRight, flat: Minus }
+
+/**
+ * Кривая дня. Не интерактивна намеренно: разбирать день по часам умеет
+ * Sales, здесь нужен только его силуэт. Столбики для читалки — пустое
+ * место, поэтому та же информация лежит рядом словами.
+ */
+function DayCurve({ bars, comparison }) {
+  const top = bars.reduce((max, bar) => Math.max(max, bar.amount), 0)
+  const Icon = comparison ? (DELTA_ICON[comparison.direction] || Minus) : null
+  return (
+    <div className="dash-curve">
+      <p className="visually-hidden">{chartSummary(bars, formatMoney)}</p>
+      <div className="dash-curve-bars" aria-hidden>
+        {bars.map((bar, index) => (
+          <span
+            className={`dash-curve-bar${index === bars.length - 1 ? ' is-now' : ''}`}
+            key={bar.key}
+            title={`${bar.full} · ${formatMoney(bar.amount)}`}
+            style={{ '--h': `${top > 0 ? Math.max(2, Math.round((bar.amount / top) * 100)) : 2}%` }}
+          />
+        ))}
+      </div>
+      <p className="dash-curve-line">
+        <span className="dash-curve-title">Sales by hour</span>
+        {comparison && (
+          <>
+            {/* Процент подписан почасовыми продажами, а не чистой выручкой
+                над ним: в by_hour нет возвратов, и приписать его чистой
+                выручке значило бы сказать неправду о другом числе.
+                Класс общий с Sales: направление там читается знаком,
+                словом и стрелкой — здесь ровно то же. */}
+            <span className={`stat-delta is-${comparison.direction}`}>
+              <Icon aria-hidden /> {comparison.text}
+            </span>
+            <span className="dash-curve-vs">vs yesterday by {comparison.at}</span>
+          </>
+        )}
+      </p>
     </div>
   )
 }
 
-const ATTENTION_ICON = { alert: AlertTriangle, warn: AlertTriangle, info: Info }
-
-function Attention({ items, onNavigate }) {
-  if (items.length === 0) {
-    return (
-      <Panel title="Needs attention" description="Everything that usually needs a decision is clear.">
-        <EmptyState>Nothing is waiting for you right now.</EmptyState>
-      </Panel>
-    )
-  }
+/**
+ * Блок «сегодня». У кассы день меряется деньгами, у standalone-заказов —
+ * очередью, у Reserve — визитами; Menu-клиенту мерить нечем, и блока у
+ * него нет вовсе (`heroKind` вернёт null, а выдуманный ноль хуже пустоты).
+ */
+function Today({ label, value, curve, bars, comparison, strip, loading, failed }) {
+  // Упавший отчёт — не пустой день: «продаж пока нет» было бы сообщением
+  // о нуле, которого никто не проверял. Про отказ сказано в строке дня.
+  const showCurve = curve && !failed
   return (
-    <Panel title="Needs attention" description="Sorted by what costs most if it waits.">
-      <div className="data-list attention-list">
-        {items.map((item) => {
-          const Icon = ATTENTION_ICON[item.tone] || Info
-          return (
-            <div className={`data-row attention-row is-${item.tone}`} key={item.id}>
-              <span className="attention-icon" aria-hidden><Icon /></span>
-              <span className="attention-text">
-                <strong>{item.title}</strong>
-                {item.detail && <small>{item.detail}</small>}
-              </span>
-              {item.action && (
-                <Button
-                  variant="secondary"
-                  onClick={() => onNavigate(item.action.view, null, item.action.tab)}
-                >
-                  {item.action.label}
-                </Button>
-              )}
-            </div>
-          )
-        })}
+    <section className="dash-today" aria-label="Today">
+      {/* Число слева, день справа — та же раскладка, что у отчёта Sales:
+          два экрана про одну выручку не должны читаться по-разному. Без
+          кривой колонка одна, иначе пустая половина с разделителем. */}
+      <div className={`dash-today-top${showCurve ? '' : ' is-solo'}`}>
+        <div className="dash-today-head">
+          <p className="dash-today-label">{label}</p>
+          <p className="dash-today-value">{value}</p>
+        </div>
+        {showCurve && (
+          bars.length > 0
+            ? <DayCurve bars={bars} comparison={comparison} />
+            : <p className="empty-state dash-today-empty">
+                {loading ? 'Loading…' : 'No sales yet today.'}
+              </p>
+        )}
       </div>
-    </Panel>
+      {strip.length > 0 && (
+        <p className="dash-today-strip">
+          {strip.map((part, index) => (
+            <span key={part}>{index > 0 && <i aria-hidden>·</i>}{part}</span>
+          ))}
+        </p>
+      )}
+    </section>
   )
 }
 
+// ── Экран ───────────────────────────────────────────────────
+
 export default function HomeDashboard({ context, locationId, onNavigate, children }) {
   const [data, setData] = useState(null)
+  const [yesterday, setYesterday] = useState(null)
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState('')
   const [now, setNow] = useState(() => Date.now())
@@ -81,12 +173,43 @@ export default function HomeDashboard({ context, locationId, onNavigate, childre
   const location = locations.find((l) => l.id === locationId) || locations[0] || null
   const tz = location?.timezone || undefined
 
+  /**
+   * Вчерашний день уже не изменится, поэтому его отчёт тянется один раз
+   * на день и точку: тихое обновление раз в минуту его не трогает. Ключ
+   * меняется — сравнение сбрасывается, иначе на новой точке несколько
+   * секунд висел бы процент от старой.
+   */
+  const yesterdayRef = useRef({ key: null, report: null })
+
   const load = useCallback(async (silent = false) => {
     if (!silent) setLoading(true)
     setError('')
     try {
       setData(await loadDashboard(context, locationId, { tz }))
-      setNow(Date.now())
+      const stamp = Date.now()
+      setNow(stamp)
+
+      if (!hasCapability(context, 'pos_reports')) {
+        yesterdayRef.current = { key: null, report: null }
+        setYesterday(null)
+        return
+      }
+      const key = `${dayStamp(stamp, tz)}|${locationId || ''}`
+      if (yesterdayRef.current.key !== key) {
+        yesterdayRef.current = { key, report: null }
+        setYesterday(null)
+      }
+      if (!yesterdayRef.current.report) {
+        try {
+          const report = await fetchDaySales(locationId, { tz, offsetDays: -1 })
+          yesterdayRef.current = { key, report }
+          setYesterday(report)
+        } catch {
+          // Сравнение необязательно: без него блок «сегодня» живёт целиком,
+          // а неверный процент был бы хуже отсутствующего.
+          setYesterday(null)
+        }
+      }
     } catch (e) {
       setError(e.message)
     } finally {
@@ -107,6 +230,9 @@ export default function HomeDashboard({ context, locationId, onNavigate, childre
   const fleet = fleetSummary(data?.fleet)
   const summary = data?.sales?.summary
   const openShift = (data?.shifts || []).find((s) => s.location_id === location?.id) || null
+  // Точку в строке кассы называем только там, где точек несколько:
+  // одинокому владельцу «Стойка 2 · Пинскер 29» ничего не уточняет.
+  const manyLocations = locations.length > 1
 
   const attention = useMemo(() => (data ? attentionItems({
     context,
@@ -120,29 +246,86 @@ export default function HomeDashboard({ context, locationId, onNavigate, childre
     tz,
   }) : []), [data, context, locations, now, tz])
 
+  const kind = heroKind(context)
+  const bars = useMemo(
+    () => (kind === 'sales' ? todayBars(data?.sales, now, tz) : []),
+    [kind, data, now, tz]
+  )
+  const comparison = useMemo(
+    () => (kind === 'sales' ? hourlyComparison(data?.sales, yesterday, now, tz) : null),
+    [kind, data, yesterday, now, tz]
+  )
+
+  // Тихая полоса под главным числом: то, что раньше стояло отдельными
+  // карточками и спорило с ним за внимание.
+  const strip = (() => {
+    const parts = []
+    if (kind === 'sales') {
+      if (summary) {
+        parts.push(`${summary.orders_count ?? 0} orders`)
+        parts.push(`avg ${formatMoney(summary.avg_check)}`)
+      }
+      if (can('pos_operate')) {
+        parts.push(openShift
+          ? `shift open since ${timeLabel(openShift.opened_at, tz)}`
+          : 'shift closed')
+      }
+    } else if (kind === 'orders' && orders) {
+      parts.push(`${orders.waiting} waiting`)
+      parts.push(`${orders.inProgress} in progress`)
+      parts.push(`${orders.ready} ready`)
+      if (orders.oldestAt) parts.push(`longest wait ${elapsedLabel(orders.oldestAt, now)}`)
+    } else if (kind === 'bookings' && bookings) {
+      parts.push(`${bookings.guests} guests expected`)
+      if (bookings.next) parts.push(`next at ${timeLabel(bookings.next.reserved_at, tz)}`)
+    }
+    return parts
+  })()
+
+  // Главное число дня. У продаж оно может не приехать (упавший отчёт) —
+  // тогда честный прочерк, но никогда не ноль.
+  const HERO_LABEL = { sales: 'Net sales', orders: 'Online orders today', bookings: 'Bookings today' }
+  const heroValue = (() => {
+    if (kind === 'sales') {
+      if (!summary) return loading ? '…' : '—'
+      return formatMoney(summary.gross_sales - summary.refunds)
+    }
+    if (kind === 'orders') return orders?.today ?? '—'
+    if (kind === 'bookings') return bookings?.today ?? '—'
+    return '—'
+  })()
+
   return (
     <>
-      <PageHeader title="Dashboard" />
-
-      <div className="order-toolbar dashboard-toolbar">
-        {/* День и точка — данные, за которые отвечают числа ниже, а не
-            подпись к разделу: они остаются на экране и после того, как
-            заголовок стал рабочей строкой. */}
-        <span className="dashboard-day">
-          {todayLabel(now, tz)}{location ? ` · ${location.name}` : ''}
-        </span>
-        {/* Частичный отказ — состояние продукта, а не ошибка: остальные
-            виджеты обязаны остаться на экране. */}
-        {data?.failed?.length > 0 && (
-          <span className="dashboard-partial">
-            <AlertTriangle aria-hidden /> Some data could not be loaded
-          </span>
+      <PageHeader
+        title="Dashboard"
+        actions={(
+          <IconButton
+            onClick={() => load()}
+            label="Refresh dashboard"
+            disabled={loading}
+            aria-busy={loading || undefined}
+          >
+            <RefreshCw />
+          </IconButton>
         )}
-        {error && <span className="dashboard-partial">{error}</span>}
-        <IconButton onClick={() => load()} label="Refresh dashboard" disabled={loading}>
-          <RefreshCw />
-        </IconButton>
-      </div>
+      >
+        {/* День и время последнего успешного обновления — данные, за
+            которые отвечают числа ниже. Точка отсюда ушла в шапку
+            кабинета, где её можно переключить. */}
+        <p className="dash-day">
+          {todayLabel(now, tz)}
+          <span className="dash-updated">updated {timeLabel(new Date(now).toISOString(), tz)}</span>
+          {/* Частичный отказ — состояние продукта, а не ошибка: остальные
+              виджеты обязаны остаться на экране. */}
+          {data?.failed?.length > 0 && (
+            <span className="dash-partial">
+              <AlertTriangle aria-hidden /> Some data could not be loaded
+            </span>
+          )}
+          {error && <span className="dash-partial">{error}</span>}
+        </p>
+      </PageHeader>
 
       {loading && !data ? (
         <EmptyState>Loading…</EmptyState>
@@ -150,47 +333,23 @@ export default function HomeDashboard({ context, locationId, onNavigate, childre
         <>
           <Attention items={attention} onNavigate={onNavigate} />
 
-          <section className="dashboard-metrics" aria-label="Today">
-            {can('pos_reports') && (
-              <Metric
-                label="Net sales today"
-                value={summary ? formatMoney(summary.gross_sales - summary.refunds) : '—'}
-                detail={summary ? `${summary.orders_count ?? 0} orders · avg ${formatMoney(summary.avg_check)}` : 'No sales yet'}
-              />
-            )}
-            {can('orders_desk') && orders && (
-              <Metric
-                label="Online orders"
-                value={orders.today}
-                detail={orders.waiting > 0
-                  ? `${orders.waiting} waiting for an answer`
-                  : 'Nothing waiting'}
-                tone={orders.waiting > 0 ? 'alert' : null}
-              />
-            )}
-            {can('reservations_desk') && bookings && (
-              <Metric
-                label="Bookings today"
-                value={bookings.today}
-                detail={bookings.today > 0 ? `${bookings.guests} guests expected` : 'No bookings yet'}
-              />
-            )}
-            {can('pos_operate') && (
-              <Metric
-                label="Shift"
-                value={openShift ? 'Open' : 'Closed'}
-                detail={openShift
-                  ? `Since ${timeLabel(openShift.opened_at, tz)}`
-                  : 'Opened on the register'}
-              />
-            )}
-          </section>
+          {kind && (
+            <Today
+              label={HERO_LABEL[kind]}
+              value={heroValue}
+              curve={kind === 'sales'}
+              bars={bars}
+              comparison={comparison}
+              strip={strip}
+              loading={loading}
+              failed={data?.failed?.includes('sales')}
+            />
+          )}
 
-          <div className="overview-grid">
+          <div className="dash-grid">
             {can('orders_desk') && orders && (
               <Panel
                 title="Orders"
-                description="What guests ordered and where it stands."
                 actions={<Button variant="text" onClick={() => onNavigate('orders')}>Open <ChevronRight /></Button>}
               >
                 <div className="data-list">
@@ -211,7 +370,6 @@ export default function HomeDashboard({ context, locationId, onNavigate, childre
             {can('reservations_desk') && bookings && (
               <Panel
                 title="Reservations"
-                description="Today’s visits and who arrives next."
                 actions={<Button variant="text" onClick={() => onNavigate('reservations')}>Open <ChevronRight /></Button>}
               >
                 {bookings.upcoming.length === 0 ? (
@@ -233,13 +391,23 @@ export default function HomeDashboard({ context, locationId, onNavigate, childre
                     ))}
                   </div>
                 )}
+                {/* Итог дня стоит и тогда, когда ближайших визитов уже нет:
+                    «сколько сегодня всего» — это число из убранной карточки,
+                    и терять его вместе со списком нельзя. */}
+                {bookings.today > 0 && (
+                  <div className="data-list">
+                    <div className="data-row dash-row-total">
+                      <span>Today</span>
+                      <strong>{bookings.today} bookings · {bookings.guests} guests</strong>
+                    </div>
+                  </div>
+                )}
               </Panel>
             )}
 
             {can('pos_operate') && fleet && (
               <Panel
                 title="Devices"
-                description="Registers connected to this organisation."
                 actions={<Button variant="text" onClick={() => onNavigate('devices')}>Open <ChevronRight /></Button>}
               >
                 <div className="data-list">
@@ -248,7 +416,16 @@ export default function HomeDashboard({ context, locationId, onNavigate, childre
                   </div>
                   {fleet.worst && (
                     <div className="data-row">
-                      <span>{fleet.worst.name || 'Register'}</span>
+                      {/* Парк — общий по организации, и молчащая касса в
+                          другой точке остаётся проблемой владельца. Чтобы
+                          строка не выглядела принадлежащей выбранной точке,
+                          у сети она называет свою. */}
+                      <span>
+                        {fleet.worst.name || 'Register'}
+                        {manyLocations && fleet.worst.location_name && (
+                          <small> · {fleet.worst.location_name}</small>
+                        )}
+                      </span>
                       <StatusBadge
                         className="device-status"
                         tone={deviceStatus(fleet.worst)}
@@ -266,7 +443,6 @@ export default function HomeDashboard({ context, locationId, onNavigate, childre
             {data?.channels && (
               <Panel
                 title="Online channels"
-                description="What your guests can do right now."
                 actions={<Button variant="text" onClick={() => onNavigate('online')}>Open <ChevronRight /></Button>}
               >
                 <div className="data-list">
@@ -304,7 +480,7 @@ export default function HomeDashboard({ context, locationId, onNavigate, childre
             )}
 
             {!can('pos_operate') && !can('orders_desk') && !can('reservations_desk') && (
-              <Panel title="Devices" description="Registers connected to this organisation.">
+              <Panel title="Devices">
                 <EmptyState>
                   <MonitorSmartphone aria-hidden /> This workspace has no register — everything runs from here.
                 </EmptyState>
@@ -314,8 +490,8 @@ export default function HomeDashboard({ context, locationId, onNavigate, childre
         </>
       )}
 
-      {/* Быстрые действия и карточка продуктов остаются под сводкой:
-          они про настройку, а не про «что происходит сейчас». */}
+      {/* Журнал «что только что произошло» — последним: он про прошлое,
+          а экран отвечает на вопрос о настоящем. */}
       {children}
     </>
   )

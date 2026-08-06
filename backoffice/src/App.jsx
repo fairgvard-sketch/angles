@@ -20,7 +20,7 @@ import {
 } from 'lucide-react'
 import { isSupabaseConfigured, supabase } from './supabase'
 import {
-  NAV_ITEMS, groupedNavigation, hasCapability, isLocationScoped, productState,
+  NAV_ITEMS, PRODUCT_META, groupedNavigation, hasCapability, isLocationScoped, productState,
 } from './navigation'
 import { DEFAULT_VIEW, parseRoute, routeToUrl, sameRoute } from './routing'
 import SalesOverview from './SalesOverview'
@@ -396,13 +396,10 @@ function HelpPanel({ context, email, onNavigate, onClose }) {
  * (request_product_activation), активирует оператор ANGLE. Карточка —
  * маркетинг/UX-состояние; настоящие запреты живут на сервере
  * (module_disabled).
+ *
+ * Названия продуктов живут в `navigation.js` рядом с `productState`: о
+ * заявке, которая ждёт активации, сообщает ещё и дашборд.
  */
-const PRODUCT_META = [
-  { id: 'menu', label: 'ANGLE Menu', detail: 'QR menu for phones and your website' },
-  { id: 'online_orders', label: 'ANGLE Orders', detail: 'Online orders without a register' },
-  { id: 'reservations', label: 'ANGLE Reserve', detail: 'Table bookings and host desk' },
-  { id: 'pos', label: 'ANGLE POS', detail: 'The register, shifts and receipts' },
-]
 
 function ProductRow({ context, product, onReloadContext }) {
   const [busy, setBusy] = useState(false)
@@ -488,95 +485,19 @@ function ActivationHome({ context, onReloadContext }) {
 }
 
 /**
- * Быстрые действия Dashboard (Phase 2): каждое привязано к capability и
- * подписано тем, что даёт. Menu-only владельцу нечего делать в разделе
- * команды, а Reserve-only — в каталоге.
- */
-const QUICK_ACTIONS = [
-  {
-    view: 'locations', capability: null, icon: Store,
-    title: 'Locations', detail: 'Address, hours, taxes and guest-facing details',
-  },
-  {
-    view: 'orders', capability: 'orders_desk', icon: ShoppingBag,
-    title: 'Order inbox', detail: 'What guests ordered and where it stands',
-  },
-  {
-    view: 'reservations', capability: 'reservations_desk', icon: CalendarDays,
-    title: 'Host desk', detail: 'Today’s bookings, tables and waitlist',
-  },
-  {
-    view: 'sales', capability: 'pos_reports', icon: BarChart3,
-    title: 'Sales', detail: 'Revenue, orders and top items',
-  },
-  {
-    view: 'menu', capability: 'catalog_manage', icon: MenuIcon,
-    title: 'Catalogue', detail: 'Prices, items and modifiers',
-  },
-  {
-    view: 'online', capability: 'public_menu', icon: QrCode,
-    title: 'QR Menu & Online', detail: 'Guest link, ordering and table booking',
-  },
-  {
-    view: 'team', capability: 'pos_operate', icon: Users,
-    title: 'Team access', detail: 'Roles, PINs and permissions',
-  },
-]
-
-/**
- * Описание кабинета словами клиента, а не набором продуктов ANGLE.
- * Standalone-клиенту нельзя говорить, что его организация «подключена к
- * ANGLE POS»: у него нет кассы, и это выглядит как чужой аккаунт.
- */
-function overviewIntro(context) {
-  const pos = hasCapability(context, 'pos_operate')
-  const orders = hasCapability(context, 'orders_desk')
-  const reserve = hasCapability(context, 'reservations_desk')
-  const menu = hasCapability(context, 'public_menu')
-  if (pos) return 'Everything that configures and supports your registers, in one place.'
-  const parts = []
-  if (menu) parts.push('menu')
-  if (orders) parts.push('online orders')
-  if (reserve) parts.push('table bookings')
-  if (parts.length === 0) return 'Your business settings, in one place.'
-  const list = parts.length > 1
-    ? `${parts.slice(0, -1).join(', ')} and ${parts[parts.length - 1]}`
-    : parts[0]
-  // Про кассу не упоминаем вовсе — даже отрицанием: клиент без неё не
-  // должен гадать, чего ему не хватает.
-  return `Your ${list} — set up and run from here.`
-}
-
-/**
- * Главная. Виджеты «что сейчас» живут в HomeDashboard; здесь остаётся
- * то, что про настройку: быстрые действия, продукты и журнал.
+ * Главная. Всё «что сейчас» живёт в HomeDashboard; здесь остаётся только
+ * журнал последних событий.
  *
- * Прежние три счётчика (точки, сотрудники, кассы) и список точек убраны
- * намеренно: они отвечали на вопрос «из чего состоит мой аккаунт», а
- * владельцу, открывшему кабинет утром, нужен ответ «что происходит и что
- * требует внимания». Точки никуда не делись — они в быстрых действиях и
- * в своём разделе.
+ * Быстрых действий больше нет: семь кнопок повторяли семь пунктов
+ * сайдбара, то есть занимали экран, ничего не добавляя. Карточка
+ * продуктов уехала в аккаунт — это состояние подписки, а не сегодняшний
+ * день; заявка, которая ждёт активации, приходит сюда строкой «требует
+ * внимания».
  */
-function Overview({ context, locationId, onNavigate, onReloadContext }) {
+function Overview({ context, locationId, onNavigate }) {
   const pos = hasCapability(context, 'pos_operate')
-  const actions = QUICK_ACTIONS.filter((action) => (
-    action.capability === null || hasCapability(context, action.capability)
-  ))
   return (
     <HomeDashboard context={context} locationId={locationId} onNavigate={onNavigate}>
-      <section className="panel quick-panel">
-        <div className="panel-heading"><div><h2>Quick access</h2><p>Common owner tasks.</p></div></div>
-        <div className="quick-list">
-          {actions.map(({ view, icon: Icon, title, detail }) => (
-            <button key={view} onClick={() => onNavigate(view)}>
-              <Icon /><span><strong>{title}</strong><small>{detail}</small></span><ChevronRight />
-            </button>
-          ))}
-        </div>
-      </section>
-
-      <ProductsCard context={context} onReloadContext={onReloadContext} />
-
       {pos && <ActivityCard onNavigate={onNavigate} />}
     </HomeDashboard>
   )
@@ -631,7 +552,15 @@ function SectionPage({ section, context, onNavigate }) {
   )
 }
 
-function AccountSettingsPage({ email, onSignOut }) {
+/**
+ * Аккаунт: кто вошёл и что подключено организации.
+ *
+ * Карточка продуктов переехала сюда с главной: подписка — не событие
+ * сегодняшнего дня, её открывают отдельно и редко. Экран активации
+ * (`ActivationHome`) показывает ту же карточку — организация без
+ * продукта попадает на неё раньше, чем сюда.
+ */
+function AccountSettingsPage({ email, context, onSignOut, onReloadContext }) {
   return (
     <>
       <PageHeader title="Settings" />
@@ -642,6 +571,7 @@ function AccountSettingsPage({ email, onSignOut }) {
         </div>
         <button className="secondary-button" onClick={onSignOut}><LogOut /> Sign out</button>
       </section>
+      <ProductsCard context={context} onReloadContext={onReloadContext} />
     </>
   )
 }
@@ -863,12 +793,7 @@ function Dashboard({ session, context, onReloadContext }) {
         {view === 'overview' && (noProducts
           ? <ActivationHome context={context} onReloadContext={onReloadContext} />
           : (
-            <Overview
-              context={context}
-              locationId={locationId}
-              onNavigate={navigate}
-              onReloadContext={onReloadContext}
-            />
+            <Overview context={context} locationId={locationId} onNavigate={navigate} />
           ))}
         {/* Вкладка и отбор заказов живут в адресе — как у броней. Дня в
             адресе у раздела нет: «сегодня» ему задаёт сервер по часам
@@ -907,7 +832,14 @@ function Dashboard({ session, context, onReloadContext }) {
         )}
         {view === 'devices' && <DevicesManager context={context} />}
         {view === 'guests' && <GuestsManager context={context} {...tabProps} />}
-        {view === 'settings' && <AccountSettingsPage email={session.user.email} onSignOut={signOut} />}
+        {view === 'settings' && (
+          <AccountSettingsPage
+            email={session.user.email}
+            context={context}
+            onSignOut={signOut}
+            onReloadContext={onReloadContext}
+          />
+        )}
         {PLANNED_SECTIONS[view] && <SectionPage section={view} context={context} onNavigate={navigate} />}
       </ViewErrorBoundary>
       {help && (

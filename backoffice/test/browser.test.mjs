@@ -110,8 +110,22 @@ const SUPABASE_STUB = `
   ]
   const LOCATION = { id: 'loc-1', name: 'Пинскер 29', timezone: 'Asia/Jerusalem', currency: 'ILS',
     settings: { online_orders: { enabled: true }, reservations: { enabled: false } } }
+  // Отчёт за сутки. Дашборд просит два: сегодня и вчера — сравнение по
+  // часам обязано считаться от РАЗНЫХ дней, поэтому день различаем по
+  // p_from, а не отдаём один и тот же ряд дважды.
+  const salesDay = (args) => {
+    const midnight = new Date(); midnight.setHours(0, 0, 0, 0)
+    const yesterday = args?.p_from && new Date(args.p_from).getTime() < midnight.getTime()
+    const hour = new Date().getHours()
+    const at = (h) => Math.max(0, Math.min(23, h))
+    return yesterday
+      ? { summary: { gross_sales: 100000, refunds: 0, orders_count: 10, avg_check: 10000 },
+          by_hour: [{ hour: at(hour - 2), amount: 60000, count: 6 }] }
+      : { summary: { gross_sales: 128000, refunds: 0, orders_count: 12, avg_check: 10667 },
+          by_hour: [{ hour: at(hour - 2), amount: 90000, count: 9 }, { hour, amount: 38000, count: 3 }] }
+  }
   const RPC = {
-    sales_report: () => ({ summary: { gross_sales: 128000, refunds: 0, orders_count: 12, avg_check: 10667 } }),
+    sales_report: salesDay,
     get_backoffice_fleet: () => FLEET,
     // Длинные подписи нарочно: строка обязана сжиматься, а не растягивать
     // страницу (регресс Phase 0 — горизонтальная прокрутка на 390px).
@@ -139,7 +153,7 @@ const SUPABASE_STUB = `
         window.__REORDERED__ = (window.__REORDERED__ || []).concat([args?.p_ids])
         return { data: 2, error: null }
       }
-      return { data: RPC[name] ? RPC[name]() : null, error: null }
+      return { data: RPC[name] ? RPC[name](args) : null, error: null }
     },
     from: (table) => {
       const rows = table === 'waitlist_entries' ? WAITLIST
@@ -328,6 +342,7 @@ before(async () => {
   await bundle('dashboard', `
     import { createRoot } from 'react-dom/client'
     import HomeDashboard from './HomeDashboard'
+    import { ActivityCard } from './ActivityManager'
 
     const POS = ['pos_operate', 'pos_reports', 'orders_desk', 'reservations_desk',
       'online_orders', 'public_reservations', 'public_menu']
@@ -339,9 +354,14 @@ before(async () => {
     }
     createRoot(document.getElementById('root')).render(
       <main className="content">
+        {/* Как на главной: журнал приходит в children — «что только что
+            произошло» стоит последним, под сводкой дня, и только у
+            аккаунта с кассой. */}
         <HomeDashboard context={context} locationId="loc-1" onNavigate={(view, loc, tab) => {
           window.__NAV__ = { view, tab }
-        }} />
+        }}>
+          {context.capabilities.includes('pos_operate') && <ActivityCard onNavigate={() => {}} />}
+        </HomeDashboard>
       </main>
     )
   `, { stubSupabase: true })
@@ -554,30 +574,51 @@ describe('dashboard', { skip }, () => {
     await page.setViewport({ width: 1440, height: 900 })
     await page.evaluateOnNewDocument((c) => { window.__CAPS__ = c }, caps)
     await page.goto(`${appOrigin}/dashboard`, { waitUntil: 'networkidle0' })
-    await page.waitForSelector('.dashboard-metrics')
+    // Сетка появляется вместе с данными: до неё виджетов не существует
+    await page.waitForSelector('.dash-grid')
     return page
   }
 
-  it('показывает день, проблемы и ведёт в нужный раздел', async () => {
-    const page = await open()
-    const state = await page.evaluate(() => ({
-      metrics: [...document.querySelectorAll('.metric-label')].map((e) => e.textContent),
-      attention: [...document.querySelectorAll('.attention-text strong')].map((e) => e.textContent),
-      shift: [...document.querySelectorAll('.metric')]
-        .find((m) => m.textContent.includes('Shift'))?.textContent,
-    }))
+  const read = () => ({
+    hero: document.querySelector('.dash-today-label')?.textContent ?? null,
+    value: document.querySelector('.dash-today-value')?.textContent ?? null,
+    strip: document.querySelector('.dash-today-strip')?.textContent ?? null,
+    bars: document.querySelectorAll('.dash-curve-bar').length,
+    compare: document.querySelector('.dash-curve-line .stat-delta')?.textContent?.trim() ?? null,
+    hour: new Date().getHours(),
+    attention: [...document.querySelectorAll('.dash-attention-text strong')].map((e) => e.textContent),
+    panels: [...document.querySelectorAll('.panel-heading h2')].map((e) => e.textContent),
+    partial: document.querySelector('.dash-partial')?.textContent ?? null,
+    money: /₪/.test(document.body.textContent),
+  })
 
-    assert.deepEqual(state.metrics, ['Net sales today', 'Online orders', 'Bookings today', 'Shift'])
+  it('день открывается выручкой, кривой и тем, что требует решения', async () => {
+    const page = await open()
+    const state = await page.evaluate(read)
+
+    assert.equal(state.hero, 'Net sales')
+    assert.match(state.value, /1,280/, 'чистая выручка = продажи минус возвраты')
+    assert.match(state.strip, /12 orders/)
+    assert.match(state.strip, /shift closed/, 'открытых смен в фикстуре нет')
+    assert.ok(state.bars > 0, 'день показан кривой, а не одним числом')
+    // Сравнение считается по ПОЛНЫМ часам, поэтому до первого закрытого
+    // часа его нет — и это единственный случай, когда строки нет.
+    if (state.hour > 0) {
+      assert.equal(state.compare, '+50%', 'сегодня 900 против 600 вчера на тот же час')
+    }
+
     // Порядок «требует внимания» — по стоимости бездействия
     assert.match(state.attention[0], /Стойка 2 is not reporting/)
     assert.match(state.attention[1], /order is waiting/)
     assert.ok(state.attention.some((t) => /booking request is waiting/.test(t)))
     assert.ok(state.attention.some((t) => /Table booking is off/.test(t)))
-    assert.match(state.shift, /Closed/, 'открытых смен в фикстуре нет')
+
+    // Панели живой работы — без описаний под заголовком, журнал последним
+    assert.deepEqual(state.panels, ['Orders', 'Reservations', 'Devices', 'Online channels', 'Recent activity'])
 
     // Кнопка пункта ведёт в свой раздел, а выключенный канал — в свою вкладку
     await page.evaluate(() => {
-      const row = [...document.querySelectorAll('.attention-row')]
+      const row = [...document.querySelectorAll('.dash-attention-row')]
         .find((r) => /Table booking is off/.test(r.textContent))
       row.querySelector('button').click()
     })
@@ -585,17 +626,23 @@ describe('dashboard', { skip }, () => {
     await page.close()
   })
 
-  it('reserve-клиенту не показывают выручку, кассы и заказы', async () => {
+  it('reserve-клиенту не показывают ни выручки, ни касс, ни заказов', async () => {
     const page = await open(['reservations_desk', 'public_reservations'])
-    const state = await page.evaluate(() => ({
-      metrics: [...document.querySelectorAll('.metric-label')].map((e) => e.textContent),
-      panels: [...document.querySelectorAll('.panel-heading h2')].map((e) => e.textContent),
-      attention: [...document.querySelectorAll('.attention-text strong')].map((e) => e.textContent),
-    }))
-    assert.deepEqual(state.metrics, ['Bookings today'])
+    const state = await page.evaluate(read)
+    assert.equal(state.hero, 'Bookings today')
+    assert.equal(state.bars, 0, 'кривая продаж — только там, где есть продажи')
+    assert.ok(!state.money, 'ни одной денежной суммы на экране без кассы')
     assert.ok(!state.panels.includes('Orders'))
     assert.ok(!state.panels.includes('Devices'))
     assert.ok(!state.attention.some((t) => /reporting|order is waiting/.test(t)))
+    await page.close()
+  })
+
+  it('menu-клиенту не показывают блок дня: мерить ему нечем', async () => {
+    const page = await open(['public_menu'])
+    const state = await page.evaluate(read)
+    assert.equal(state.hero, null, 'выдуманный ноль хуже отсутствующего блока')
+    assert.ok(state.panels.includes('Online channels'))
     await page.close()
   })
 
@@ -607,18 +654,17 @@ describe('dashboard', { skip }, () => {
       window.__BREAK_SALES__ = true
     })
     await page.goto(`${appOrigin}/dashboard`, { waitUntil: 'networkidle0' })
-    await page.waitForSelector('.dashboard-metrics')
-    const state = await page.evaluate(() => ({
-      metrics: [...document.querySelectorAll('.metric-label')].map((e) => e.textContent),
-      sales: [...document.querySelectorAll('.metric')]
-        .find((m) => m.textContent.includes('Net sales'))?.textContent,
-      partial: document.querySelector('.dashboard-partial')?.textContent ?? null,
-      attention: document.querySelectorAll('.attention-row').length,
-    }))
-    assert.ok(state.metrics.includes('Bookings today'), 'остальные виджеты обязаны остаться')
-    assert.match(state.sales, /—/, 'упавший показатель честно пуст, а не нулевой')
+    await page.waitForSelector('.dash-grid')
+    const state = await page.evaluate(read)
+    assert.ok(state.panels.includes('Reservations'), 'остальные виджеты обязаны остаться')
+    assert.match(state.value, /—/, 'упавший показатель честно пуст, а не нулевой')
+    assert.equal(state.bars, 0)
+    assert.ok(
+      !/No sales yet today/.test(await page.evaluate(() => document.body.textContent)),
+      'про упавший отчёт нельзя говорить «продаж не было»'
+    )
     assert.match(state.partial, /could not be loaded/, 'отказ назван, а не спрятан')
-    assert.ok(state.attention > 0, 'список внимания продолжает работать')
+    assert.ok(state.attention.length > 0, 'список внимания продолжает работать')
     await page.close()
   })
 })

@@ -1,7 +1,8 @@
 import assert from 'node:assert/strict'
 import { describe, it } from 'node:test'
 import {
-  attentionItems, fleetSummary, ordersSummary, reservationsSummary,
+  attentionItems, chartSummary, currentHour, fleetSummary, heroKind, hourlyComparison,
+  ordersSummary, reservationsSummary, todayBars,
 } from './dashboard.js'
 
 /**
@@ -92,6 +93,82 @@ describe('сводка парка касс', () => {
   })
 })
 
+describe('кривая дня', () => {
+  const report = {
+    by_hour: [
+      { hour: 8, amount: 100_00, count: 3 },
+      { hour: 10, amount: 50_00, count: 1 },
+    ],
+  }
+
+  it('ось идёт до текущего часа, а тихие часы — нули, а не пропуски', () => {
+    const bars = todayBars(report, NOW, TZ)
+    assert.equal(currentHour(NOW, TZ), 12)
+    assert.deepEqual(bars.map((b) => b.label), ['08', '09', '10', '11', '12'])
+    assert.deepEqual(bars.map((b) => b.amount), [100_00, 0, 50_00, 0, 0])
+  })
+
+  it('чек в часе, которого по часам браузера ещё нет, не отрезается', () => {
+    const bars = todayBars({ by_hour: [{ hour: 14, amount: 30_00, count: 1 }] }, NOW, TZ)
+    assert.deepEqual(bars.map((b) => b.label), ['14'])
+  })
+
+  it('без продаж оси нет вовсе — рисовать плоский день значит соврать', () => {
+    assert.deepEqual(todayBars({ by_hour: [] }, NOW, TZ), [])
+    assert.deepEqual(todayBars(null, NOW, TZ), [])
+  })
+
+  it('кривая рассказана словами: окно и самый занятый час', () => {
+    const text = chartSummary(todayBars(report, NOW, TZ), (v) => `₪${v / 100}`)
+    assert.match(text, /Sales by hour, 08:00 to 13:00\./)
+    assert.match(text, /Busiest 08:00–09:00, ₪100\./)
+  })
+})
+
+describe('сравнение с вчера', () => {
+  const today = { by_hour: [{ hour: 8, amount: 100_00 }, { hour: 12, amount: 999_00 }] }
+  const before = { by_hour: [{ hour: 8, amount: 80_00 }, { hour: 12, amount: 500_00 }] }
+
+  it('текущий час не считается: у вчера он прожит целиком, у сегодня — нет', () => {
+    const c = hourlyComparison(today, before, NOW, TZ)
+    assert.equal(c.current, 100_00, 'идущий час в сумму не входит')
+    assert.equal(c.previous, 80_00)
+    assert.equal(c.text, '+25%')
+    assert.equal(c.direction, 'up')
+    assert.equal(c.at, '12:00', 'подпись называет границу сравнения')
+  })
+
+  it('вчера в это время не было продаж — «было пусто», а не бесконечный рост', () => {
+    const c = hourlyComparison(today, { by_hour: [] }, NOW, TZ)
+    assert.equal(c.text, 'was none')
+  })
+
+  it('обе стороны пусты — сравнивать нечего, и это честный ответ', () => {
+    assert.equal(hourlyComparison({ by_hour: [] }, { by_hour: [] }, NOW, TZ), null)
+  })
+
+  it('до первого закрытого часа сравнения нет', () => {
+    const midnight = new Date('2026-08-02T00:20:00+03:00').getTime()
+    assert.equal(hourlyComparison(today, before, midnight, TZ), null)
+  })
+
+  it('вчера не приехало — блок живёт без сравнения', () => {
+    assert.equal(hourlyComparison(today, null, NOW, TZ), null)
+  })
+})
+
+describe('чем открывается день', () => {
+  it('касса меряет день деньгами, standalone-заказы — очередью, Reserve — визитами', () => {
+    assert.equal(heroKind(posContext), 'sales')
+    assert.equal(heroKind({ capabilities: ['orders_desk', 'public_menu'] }), 'orders')
+    assert.equal(heroKind(reserveOnly), 'bookings')
+  })
+
+  it('Menu-клиенту мерить нечем — блока нет вовсе', () => {
+    assert.equal(heroKind({ capabilities: ['public_menu'] }), null)
+  })
+})
+
 describe('«требует внимания»', () => {
   const base = {
     context: posContext, locations, nowMs: NOW, tz: TZ,
@@ -159,6 +236,25 @@ describe('«требует внимания»', () => {
     })
     const rsv = items.find((i) => i.id === 'channel-reservations')
     assert.equal(rsv.action.tab, 'reservations')
+  })
+
+  it('заявка на активацию видна здесь — карточка продуктов уехала в аккаунт', () => {
+    const items = attentionItems({
+      ...base,
+      context: { ...posContext, products: ['pos'], product_requests: ['reservations'] },
+    })
+    const pending = items.find((i) => i.id === 'products-pending')
+    assert.match(pending.title, /ANGLE Reserve/)
+    assert.equal(pending.action.view, 'settings')
+    assert.equal(items[items.length - 1].id, 'products-pending', 'ждать оператора — последнее по срочности')
+  })
+
+  it('активный продукт заявкой не считается', () => {
+    const items = attentionItems({
+      ...base,
+      context: { ...posContext, products: ['pos', 'reservations'], product_requests: [] },
+    })
+    assert.ok(!items.some((i) => i.id === 'products-pending'))
   })
 
   it('reserve-клиенту не показывают ни смену, ни кассы, ни заказы', () => {

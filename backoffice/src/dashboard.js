@@ -5,7 +5,8 @@ import { fetchFleet, deviceStatus, deviceAdvice, isArchived } from './devices'
 import { fetchSalesReport } from './sales'
 import { fetchLocation, fetchLocationSlug } from './settings'
 import { onlineEnabled, reservationsEnabled } from './online'
-import { hasCapability } from './navigation'
+import { PRODUCT_META, hasCapability, productState } from './navigation'
+import { delta } from './reporting'
 
 /**
  * Дашборд владельца.
@@ -73,6 +74,35 @@ export async function fetchChannels(locationId) {
   }
 }
 
+/** Зона отчёта: точки, если она известна, иначе браузера */
+function salesZone(tz) {
+  return tz || Intl.DateTimeFormat().resolvedOptions().timeZone || 'Asia/Jerusalem'
+}
+
+/**
+ * Сутки со сдвигом от сегодня: [начало, начало следующих суток).
+ * Границы считаются от полуночи БРАУЗЕРА — ровно как считались всегда и
+ * как их считает Sales. Переезд на полночь точки менял бы аргументы
+ * отчёта, а не вёрстку, и разводил бы два экрана по разным числам.
+ */
+function dayRange(offsetDays = 0) {
+  const from = new Date()
+  from.setHours(0, 0, 0, 0)
+  from.setDate(from.getDate() + offsetDays)
+  const to = new Date(from)
+  to.setDate(to.getDate() + 1)
+  return { from, to }
+}
+
+/** Отчёт за сутки в том же охвате, в котором работает дашборд */
+export function fetchDaySales(locationId, { tz, offsetDays = 0 } = {}) {
+  const { from, to } = dayRange(offsetDays)
+  return fetchSalesReport(from, to, {
+    locationIds: locationId ? [locationId] : [],
+    tz: salesZone(tz),
+  })
+}
+
 /**
  * Всё, что нужно дашборду, одним заходом.
  *
@@ -84,17 +114,7 @@ export async function loadDashboard(context, locationId, { tz } = {}) {
   const can = (capability) => hasCapability(context, capability)
   const jobs = {}
 
-  if (can('pos_reports')) {
-    const zone = tz || Intl.DateTimeFormat().resolvedOptions().timeZone || 'Asia/Jerusalem'
-    const from = new Date()
-    from.setHours(0, 0, 0, 0)
-    const to = new Date(from)
-    to.setDate(to.getDate() + 1)
-    jobs.sales = fetchSalesReport(from, to, {
-      locationIds: locationId ? [locationId] : [],
-      tz: zone,
-    })
-  }
+  if (can('pos_reports')) jobs.sales = fetchDaySales(locationId, { tz })
   if (can('pos_operate')) {
     jobs.shifts = fetchOpenShifts()
     jobs.fleet = fetchFleet()
@@ -170,6 +190,124 @@ export function fleetSummary(devices) {
     problems: problems.length,
     worst: problems[0] ?? null,
   }
+}
+
+// ── День: кривая по часам и сравнение с вчера ───────────────
+
+/**
+ * Текущий час в зоне точки.
+ *
+ * `hourCycle: 'h23'` обязателен: en-GB с `hour12: false` возвращает для
+ * полуночи «24», и час дня уехал бы на сутки вперёд.
+ */
+export function currentHour(nowMs = Date.now(), tz) {
+  const text = new Intl.DateTimeFormat('en-GB', {
+    hour: '2-digit', hourCycle: 'h23', timeZone: tz || undefined,
+  }).format(new Date(nowMs))
+  return Number(text)
+}
+
+/** Дата в зоне точки, «2026-08-02»: ключ «за какой день данные» */
+export function dayStamp(nowMs = Date.now(), tz) {
+  return new Intl.DateTimeFormat('en-CA', {
+    year: 'numeric', month: '2-digit', day: '2-digit', timeZone: tz || undefined,
+  }).format(new Date(nowMs))
+}
+
+/**
+ * Ось дня: от первого часа с продажами до текущего включительно.
+ *
+ * Тихие часы обязаны быть нулями, а не отсутствовать: иначе кривая
+ * заканчивается на последней продаже и день выглядит закончившимся.
+ * Правый край берётся с запасом по данным — если чек пробит в час,
+ * которого по часам браузера ещё нет (расхождение зоны или времени
+ * терминала), ось не должна его отрезать.
+ */
+export function todayBars(report, nowMs = Date.now(), tz) {
+  const rows = report?.by_hour || []
+  if (rows.length === 0) return []
+  const byHour = new Map(rows.map((h) => [h.hour, h]))
+  const hours = rows.map((h) => h.hour)
+  const start = Math.min(...hours)
+  const end = Math.max(currentHour(nowMs, tz), ...hours)
+  const bars = []
+  for (let hour = start; hour <= end; hour++) {
+    const row = byHour.get(hour)
+    bars.push({
+      key: String(hour),
+      label: String(hour).padStart(2, '0'),
+      full: `${String(hour).padStart(2, '0')}:00–${String(hour + 1).padStart(2, '0')}:00`,
+      amount: row?.amount ?? 0,
+      count: row?.count ?? 0,
+    })
+  }
+  return bars
+}
+
+/** Накоплено с начала дня по указанный час включительно */
+export function cumulativeThrough(report, hour) {
+  return (report?.by_hour || []).reduce(
+    (sum, row) => (row.hour <= hour ? sum + (row.amount || 0) : sum), 0
+  )
+}
+
+/**
+ * Сравнение с вчера.
+ *
+ * Считается по ПОЛНЫМ часам: сегодняшний час ещё идёт, а вчерашний тот
+ * же час прожит целиком — включив его, мы бы каждый раз показывали
+ * владельцу падение, которого нет. Поэтому обе стороны обрезаются по
+ * последнему завершённому часу, и подпись называет его прямо.
+ *
+ * Мера — `by_hour.amount`, то есть оплаченные продажи по часам (тот же
+ * ряд, что рисует график Sales). Возвраты в нём не сидят, поэтому
+ * процент нельзя подписывать чистой выручкой: он про другое число.
+ */
+export function hourlyComparison(today, yesterday, nowMs = Date.now(), tz) {
+  if (!today || !yesterday) return null
+  const hour = currentHour(nowMs, tz)
+  // До первого закрытого часа сравнивать нечего — и это честный ответ
+  if (hour === 0) return null
+  const through = hour - 1
+  const now = cumulativeThrough(today, through)
+  const before = cumulativeThrough(yesterday, through)
+  if (now === 0 && before === 0) return null
+  return {
+    ...delta(now, before),
+    at: `${String(hour).padStart(2, '0')}:00`,
+    current: now,
+    previous: before,
+  }
+}
+
+/**
+ * Что рассказать о кривой тому, кто её не видит. Столбики для читалки —
+ * пустое место, поэтому блок несёт то же самое словами.
+ */
+export function chartSummary(bars, format = (v) => String(v)) {
+  if (bars.length === 0) return ''
+  const first = bars[0]
+  const last = bars[bars.length - 1]
+  const top = bars.reduce((best, bar) => (bar.amount > best.amount ? bar : best), bars[0])
+  const end = String(Number(last.label) + 1).padStart(2, '0')
+  const window = `Sales by hour, ${first.label}:00 to ${end}:00.`
+  if (top.amount === 0) return `${window} No sales yet.`
+  return `${window} Busiest ${top.full}, ${format(top.amount)}.`
+}
+
+/**
+ * Чем открывается день у этого аккаунта.
+ *
+ * Порядок — по тому, чем аккаунт живёт: касса меряет день деньгами,
+ * standalone-заказы — очередью, Reserve — визитами. Menu-клиенту мерить
+ * нечем: у него нет ни продаж, ни очереди, и выдуманный ноль здесь хуже
+ * отсутствующего блока.
+ */
+export function heroKind(context) {
+  if (hasCapability(context, 'pos_reports')) return 'sales'
+  if (hasCapability(context, 'orders_desk')) return 'orders'
+  if (hasCapability(context, 'reservations_desk')) return 'bookings'
+  return null
 }
 
 // ── «Требует внимания» ──────────────────────────────────────
@@ -272,6 +410,23 @@ export function attentionItems({
       title: 'Table booking is off',
       detail: 'The booking page tells guests that bookings are paused.',
       action: { label: 'Open channels', view: 'online', tab: 'reservations' },
+    })
+  }
+
+  // Заявка на активацию продукта (100/104). Это состояние несла карточка
+  // продуктов на главной; карточка уехала в аккаунт, а сигнал остался
+  // здесь — иначе владелец, отправивший заявку, больше нигде не увидит,
+  // что она в работе. Пункт последний: ждать всё равно придётся оператора.
+  const pending = PRODUCT_META.filter((product) => productState(context, product.id) === 'pending')
+  if (pending.length > 0) {
+    items.push({
+      id: 'products-pending',
+      tone: 'info',
+      title: pending.length === 1
+        ? `${pending[0].label} is waiting for activation`
+        : `${pending.length} products are waiting for activation`,
+      detail: 'The ANGLE team switches it on — usually within a business day.',
+      action: { label: 'Open account', view: 'settings' },
     })
   }
 

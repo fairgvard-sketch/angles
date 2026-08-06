@@ -278,46 +278,104 @@ a { color: inherit; }
 /*
  * ── Дашборд ──────────────────────────────────────────────────
  *
- * Плитки показателей ниже прежних карточек-счётчиков (150px): владельцу
- * нужно увидеть день целиком, а не три крупные цифры на первом экране.
- * Иерархия задаётся размером числа, а не рамкой и не цветом.
+ * Порядок экрана: что требует решения → как идёт день → где стоит живая
+ * работа. Прежние четыре плитки-счётчика и копия сайдбара «Quick access»
+ * убраны: они занимали первый экран, ничего к нему не добавляя.
+ *
+ * Префикс `dash-`, а не правка общих `metric*`/`attention-*`: обе группы
+ * назывались как общие, но жили только здесь, и под этими именами их
+ * рано или поздно взяли бы в другой раздел с другой семантикой. Общее
+ * остаётся общим — `panel`, `data-row`, `status`, `stat-delta` не
+ * переопределяются.
  */
-.dashboard-toolbar { justify-content: flex-end; }
-/* День и точка стоят слева, всё остальное в полосе — справа */
-.dashboard-day { margin-inline-end: auto; color: var(--c-text-subtle); font-size: 13px; }
-.dashboard-partial {
+
+/* Строка данных под названием раздела: день, время последнего успешного
+   обновления и, если он случился, частичный отказ. Точка отсюда ушла в
+   шапку кабинета, где её можно переключить. */
+.dash-day { display: flex; flex-wrap: wrap; align-items: center; gap: var(--sp-2); color: var(--c-text-subtle); font-size: 13px; }
+.dash-updated { color: var(--c-text-faint); }
+.dash-updated::before { content: '·'; margin-inline-end: var(--sp-2); }
+.dash-partial {
   display: inline-flex; align-items: center; gap: var(--sp-2);
   color: var(--c-danger); font-size: 12px; font-weight: 650;
 }
-.dashboard-partial svg { width: 15px; height: 15px; }
+.dash-partial svg { width: 15px; height: 15px; }
 
-.dashboard-metrics {
-  display: grid; grid-template-columns: repeat(auto-fit, minmax(190px, 1fr));
-  gap: var(--sp-3); margin-top: var(--sp-3);
+/* Требует внимания: строки решений одним блоком, без заголовка панели и
+   без описания. Пустой список — одна тихая строка: сообщать, что
+   новостей нет, панелью на пол-экрана незачем. */
+.dash-attention {
+  margin-bottom: var(--sp-3); border: 1px solid var(--c-border-panel);
+  border-radius: var(--r-md); background: var(--c-surface);
 }
-.metric {
-  display: grid; gap: var(--sp-1); padding: var(--sp-4) var(--sp-4) var(--sp-3);
-  border: 1px solid var(--c-border-panel); border-radius: var(--r-md);
-  background: var(--c-surface);
+.dash-attention-row {
+  display: flex; align-items: flex-start; gap: var(--sp-3);
+  min-height: var(--h-touch); padding: var(--sp-3) 22px;
 }
-.metric-label { color: var(--c-text-subtle); font-size: 12px; font-weight: 700; }
-.metric-value { font-size: 26px; line-height: 1.1; font-weight: 780; font-variant-numeric: tabular-nums; }
-.metric-detail { color: var(--c-text-faint); font-size: 12px; }
-/* Требующий внимания показатель подписан словом в detail; цвет — усиление */
-.metric.is-alert .metric-detail { color: var(--c-danger); font-weight: 650; }
+.dash-attention-row + .dash-attention-row { border-top: 1px solid var(--c-border-hair); }
+.dash-attention-icon { flex: none; display: grid; place-items: center; width: 20px; height: 20px; margin-top: 2px; color: var(--c-text-faint); }
+.dash-attention-icon svg { width: 18px; height: 18px; }
+.dash-attention-row.is-alert .dash-attention-icon { color: var(--c-danger); }
+.dash-attention-row.is-warn .dash-attention-icon { color: #b4720e; }
+.dash-attention-text { display: grid; gap: 2px; min-width: 0; margin-inline-end: auto; }
+.dash-attention-text strong { font-size: 14px; font-weight: 700; }
+.dash-attention-text small { color: var(--c-text-subtle); font-size: 12px; }
+.dash-attention-row .secondary-button { flex: none; }
+.dash-clear {
+  display: flex; align-items: center; gap: var(--sp-2);
+  margin: 0 0 var(--sp-3); color: var(--c-text-subtle); font-size: 13px;
+}
+.dash-clear svg { width: 16px; height: 16px; flex: none; color: var(--c-text-faint); }
 
-/* Строка «требует внимания»: иконка, текст, одно действие.
-   Селектор составной: базовое `.data-row` объявлено НИЖЕ по файлу, и при
-   равной специфичности побеждало бы оно. */
-.data-row.attention-row { align-items: flex-start; gap: var(--sp-3); padding: var(--sp-3) 22px; }
-.attention-icon { flex: none; display: grid; place-items: center; width: 20px; height: 20px; color: var(--c-text-faint); }
-.attention-icon svg { width: 18px; height: 18px; }
-.attention-row.is-alert .attention-icon { color: var(--c-danger); }
-.attention-row.is-warn .attention-icon { color: #b4720e; }
-.attention-text { display: grid; gap: 2px; margin-inline-end: auto; }
-.attention-text strong { font-size: 14px; font-weight: 700; white-space: normal; }
-.attention-text small { color: var(--c-text-subtle); font-size: 12px; }
-.attention-row .secondary-button { flex: none; }
+/* Как идёт день. Главное число набрано той же шкалой, что чистая выручка
+   в Sales: это одна и та же величина, и разный размер разводил бы два
+   экрана по важности. */
+.dash-today {
+  margin-bottom: var(--sp-3); border: 1px solid var(--c-border-panel);
+  border-radius: var(--r-md); background: var(--c-surface);
+}
+.dash-today-top { display: grid; grid-template-columns: minmax(200px, .75fr) minmax(0, 2.25fr); }
+.dash-today-top.is-solo { grid-template-columns: minmax(0, 1fr); }
+.dash-today-head {
+  align-content: start; padding: var(--sp-5);
+  border-inline-end: 1px solid var(--c-border-soft);
+}
+.dash-today-top.is-solo .dash-today-head { border-inline-end: 0; }
+.dash-today-label { margin: 0; color: var(--c-text-subtle); font-size: 13px; font-weight: 700; }
+.dash-today-value {
+  margin: 2px 0 0; font-size: clamp(30px, 3.2vw, 42px); line-height: 1.05;
+  font-weight: 780; letter-spacing: -.02em; font-variant-numeric: tabular-nums;
+}
+.dash-today-empty { padding: var(--sp-5); }
+
+/* Кривая дня. Не интерактивна: разбирать день по часам умеет Sales, а
+   здесь нужен силуэт. Направление ленты — как у графика отчёта: время
+   идёт слева направо и в RTL тоже, иначе два экрана рассказывали бы про
+   один день в разные стороны. */
+.dash-curve { min-width: 0; padding: var(--sp-4) var(--sp-5); }
+.dash-curve-bars { display: flex; align-items: flex-end; gap: 2px; height: 84px; direction: ltr; }
+.dash-curve-bar {
+  flex: 1 1 0; min-width: 0; max-width: 76px; height: var(--h);
+  border-radius: 3px 3px 0 0; background: var(--c-chart-bar);
+}
+/* Текущий час — тем же тёмным, каким Sales помечает названный интервал */
+.dash-curve-bar.is-now { background: var(--c-chart-bar-active); }
+.dash-curve-line {
+  display: flex; flex-wrap: wrap; align-items: center; gap: var(--sp-2);
+  margin: var(--sp-3) 0 0; font-size: 12px;
+}
+.dash-curve-title { color: var(--c-text-subtle); font-weight: 650; }
+.dash-curve-vs { color: var(--c-text-faint); }
+
+/* Тихая полоса: числа, которые раньше стояли отдельными карточками и
+   спорили с главным за внимание */
+.dash-today-strip {
+  display: flex; flex-wrap: wrap; gap: var(--sp-2);
+  margin: 0; padding: var(--sp-3) var(--sp-5);
+  border-top: 1px solid var(--c-border-soft);
+  color: var(--c-text-muted); font-size: 13px; font-variant-numeric: tabular-nums;
+}
+.dash-today-strip i { margin-inline-end: var(--sp-2); font-style: normal; color: var(--c-text-faint); }
 
 /* Канал включён/выключен — словом, точка только помогает */
 .status.is-on { color: var(--c-success); }
@@ -328,15 +386,34 @@ a { color: inherit; }
   /* На узком экране строка ложится сеткой: иконка и текст всегда рядом,
      действие — под ними. С flex-wrap длинный заголовок выталкивал иконку
      на отдельную строку, и пункты выглядели по-разному. */
-  .data-row.attention-row {
+  .dash-attention-row {
     display: grid; grid-template-columns: 20px minmax(0, 1fr);
     gap: var(--sp-2) var(--sp-3);
   }
-  .data-row.attention-row .secondary-button { grid-column: 2; justify-self: start; }
-  .metric-value { font-size: 24px; }
+  .dash-attention-row .secondary-button { grid-column: 2; justify-self: start; }
+  .dash-today-top { grid-template-columns: minmax(0, 1fr); }
+  .dash-today-head {
+    padding: var(--sp-4) var(--sp-4) 0;
+    border-inline-end: 0;
+  }
+  .dash-curve { padding: var(--sp-3) var(--sp-4); }
+  .dash-curve-bars { height: 62px; }
+  .dash-today-empty { padding: var(--sp-3) var(--sp-4) var(--sp-4); }
+  .dash-today-strip { padding: var(--sp-3) var(--sp-4); }
 }
 
-.overview-grid { display: grid; grid-template-columns: minmax(0, 1.55fr) minmax(280px, .85fr); gap: 14px; margin-top: 14px; }
+/* Две равные колонки: прежние 1.55fr/0.85fr делали правую остатком */
+.dash-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: var(--sp-3); align-items: start; }
+/* Шапка панели дашборда несёт название и одно действие — описания в ней
+   больше нет, и 88px высоты под одну строку тоже не нужны. Правило
+   локальное: `.panel-heading` носят все разделы кабинета. */
+.dash-grid .panel-heading,
+.activity-panel .panel-heading { min-height: 0; padding: var(--sp-4) 22px; }
+/* Состояние кассы не переносится на две строки внутри узкой панели */
+.dash-grid .device-status { flex: none; white-space: nowrap; }
+/* Итог дня под списком визитов: это сводка, а не ещё одна строка списка */
+.data-row.dash-row-total { border-top: 1px solid var(--c-border-hair); }
+.data-row.dash-row-total span { color: var(--c-text-subtle); }
 .panel { min-width: 0; border: 1px solid var(--c-border-panel); border-radius: var(--r-md); background: var(--c-surface); }
 .panel-heading { min-height: 88px; display: flex; align-items: center; justify-content: space-between; gap: 16px; padding: 20px 22px; border-bottom: 1px solid var(--c-border-soft); }
 .panel-heading h2 { margin: 0; font-size: 17px; }
@@ -355,14 +432,6 @@ a { color: inherit; }
 .location-row > svg { width: 17px; color: var(--c-text-faint); }
 .status { display: inline-flex; align-items: center; gap: 6px; color: var(--c-success); font-size: 11px; font-weight: 750; }
 .status i { width: 7px; height: 7px; border-radius: 50%; background: #3ba464; }
-.quick-list { display: grid; padding: 6px 0; }
-.quick-list button { min-height: 68px; display: grid; grid-template-columns: 34px minmax(0, 1fr) 18px; align-items: center; gap: 11px; padding: 11px 18px; border: 0; background: var(--c-surface); color: #25282d; text-align: left; }
-.quick-list button:hover { background: var(--c-surface-muted); }
-.quick-list button > svg:first-child { width: 19px; }
-.quick-list button > svg:last-child { width: 16px; color: var(--c-text-faint); }
-.quick-list strong, .quick-list small { display: block; }
-.quick-list strong { font-size: 13px; }
-.quick-list small { margin-top: 4px; color: var(--c-text-subtle); font-size: 11px; }
 .empty-state { margin: 0; padding: 30px 22px; color: var(--c-text-subtle); font-size: 13px; }
 .section-placeholder { min-height: 260px; display: flex; align-items: center; gap: 20px; padding: 28px; }
 .section-placeholder h2 { margin: 0; font-size: 20px; }
@@ -944,7 +1013,7 @@ a { color: inherit; }
   .stat-value { font-size: 25px; }
   .stat-label { margin-top: 3px; font-size: 11px; }
   .stat-detail { display: none; }
-  .overview-grid { grid-template-columns: 1fr; }
+  .dash-grid { grid-template-columns: minmax(0, 1fr); }
   .content { padding: 24px 16px 48px; }
   .page-heading,
   .ord-header,

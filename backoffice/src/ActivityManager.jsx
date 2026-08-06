@@ -80,8 +80,10 @@ export function ActivityCard({ onNavigate }) {
 
   return (
     <section className="panel activity-panel">
+      {/* Без описания под названием: карточка стоит на дашборде рядом с
+          панелями, у которых его тоже нет — строки журнала говорят за себя */}
       <div className="panel-heading">
-        <div><h2>Recent activity</h2><p>Shifts and refunds across your registers.</p></div>
+        <div><h2>Recent activity</h2></div>
         <button className="text-button" onClick={() => onNavigate('activity')}>View all</button>
       </div>
       {error ? <p className="empty-state">{error}</p>

@@ -143,12 +143,14 @@ test('Разделы одной точки помечены — для них п
   assert.equal(isLocationScoped('orders'), true)
   assert.equal(isLocationScoped('online'), true)
   assert.equal(isLocationScoped('locations'), true)
+  // Дашборд читает продажи, заказы, брони и каналы одной точки: без
+  // переключателя у сети молча выигрывала первая точка в списке
+  assert.equal(isLocationScoped('overview'), true)
   // Организационные: каталог, Team, Customers, Activity, Devices, Sales
   assert.equal(isLocationScoped('menu'), false)
   assert.equal(isLocationScoped('team'), false)
   assert.equal(isLocationScoped('guests'), false)
   assert.equal(isLocationScoped('sales'), false)
-  assert.equal(isLocationScoped('overview'), false)
 })
 
 test('Состояние карточки продукта: active / developer / included / pending / addon', () => {
