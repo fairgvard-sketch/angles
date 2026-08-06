@@ -109,7 +109,7 @@ export async function fetchTimelineReservations(locationId, fromMs, toMs) {
       // Путь заведения (136) и канал привода (124) — разные вещи, и в
       // карточке визита нужны обе: «кто нажал кнопку» и «откуда гость
       // узнал». Время создания объясняет странные визиты.
-      + 'created_via, source, created_at, '
+      + 'created_via, source, created_at, rules_ack, '
       + 'tables_link:reservation_tables ( table_id, is_primary )'
     )
     .eq('location_id', locationId)
@@ -139,7 +139,7 @@ export async function fetchReservationRange(locationId, fromMs, toMs, limit = 50
     .select(
       'id, status, customer_name, customer_phone, party_size, reserved_at, '
       + 'duration_min, note, reject_reason, order_id, arrived_at, table_id, '
-      + 'hold_table_ids, zone_id, is_test, created_via, source, created_at, '
+      + 'hold_table_ids, zone_id, is_test, created_via, source, created_at, rules_ack, '
       + 'tables_link:reservation_tables ( table_id, is_primary )'
     )
     .eq('location_id', locationId)

@@ -11,6 +11,7 @@ import {
 import { supabase } from './supabase'
 import Drawer from './ui/Drawer'
 import ConfirmDialog from './ui/ConfirmDialog'
+import PartyCount from './ui/PartyCount'
 import { Button } from './ui/Button'
 
 /**
@@ -448,8 +449,12 @@ function QueueSheet({
     <Drawer
       labelledBy="waitlist-sheet-title"
       title={entry.customer_name}
-      subtitle={`${entry.party_size} guests · waiting ${formatWait(waited)}${
-        entry.quoted_min != null ? ` of ${formatWait(entry.quoted_min)} quoted` : ''}`}
+      subtitle={(
+        <>
+          <PartyCount n={entry.party_size} /> · waiting {formatWait(waited)}
+          {entry.quoted_min != null ? ` of ${formatWait(entry.quoted_min)} quoted` : ''}
+        </>
+      )}
       onClose={onClose}
       footer={<Button onClick={onClose}>Close</Button>}
     >

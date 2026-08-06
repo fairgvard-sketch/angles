@@ -15,6 +15,7 @@ import {
 } from './reservations'
 import { isConflict } from './desk-availability'
 import { supabase } from './supabase'
+import PartyCount from './ui/PartyCount'
 import BookingSheet from './BookingSheet'
 
 /**
@@ -408,7 +409,7 @@ export default function TimelineDesk({ locationId, date, query = '' }) {
                             </strong>
                             {showsMeta(detailLevel) && (
                               <small>
-                                {block.booking.partySize}
+                                <PartyCount n={block.booking.partySize} />
                                 {block.combined ? ' · combined' : ''}
                                 {` · ${statusLabel(block.booking.state)}`}
                               </small>

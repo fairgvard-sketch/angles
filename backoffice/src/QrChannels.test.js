@@ -204,11 +204,11 @@ describe('Брони: настройки на месте', () => {
     const html = renderReserve()
     for (const title of [
       'Booking hours', 'Slots &amp; booking window', 'Cancellation &amp; changes',
-      'Confirmation', 'Look of the booking page',
+      'What the guest must know', 'Confirmation', 'Look of the booking page',
     ]) {
       assert.match(html, new RegExp(title), title)
     }
-    assert.equal((html.match(/aria-expanded="false"/g) || []).length, 5)
+    assert.equal((html.match(/aria-expanded="false"/g) || []).length, 6)
     assert.match(html, /30 min slots · up to 12 guests · 60 days ahead/)
     assert.match(html, /2 hours before · waitlist on/)
     assert.match(html, /Instant/)
@@ -220,6 +220,32 @@ describe('Брони: настройки на месте', () => {
     assert.match(html, /Guests can move the booking/)
     assert.match(html, /Keep a waitlist/)
     assert.match(html, /Cancellation policy shown to the guest/)
+  })
+
+  it('правила брони: сводка в свёрнутой строке, список — внутри (Kassa 145)', () => {
+    const withRules = {
+      reservations: {
+        ...reserveSettings.reservations,
+        rules: [
+          { id: 'a', text: 'Стоимость 289 ₪ с человека', level: 'important' },
+          { id: 'b', text: 'Посадка общая', ack: true },
+        ],
+      },
+    }
+    const collapsed = renderReserve({ settings: withRules })
+    assert.match(collapsed, /2 rules · 1 to confirm/)
+
+    const open = renderReserve({ settings: withRules, openGroup: 'rules' })
+    assert.match(open, /Стоимость 289 ₪ с человека/)
+    assert.match(open, /Посадка общая/)
+    assert.match(open, /Requires a tick/)
+    assert.match(open, /Add rule/)
+  })
+
+  it('без правил шаг гостю не показывается, и об этом сказано прямо', () => {
+    const html = renderReserve({ openGroup: 'rules' })
+    assert.match(html, /No rules/)
+    assert.match(html, /straight from the time to the contact form/)
   })
 
   it('мгновенное подтверждение открывает свои условия', () => {
@@ -244,7 +270,7 @@ describe('Брони: настройки на месте', () => {
   })
 
   it('депозита и оплаты в интерфейсе нет', () => {
-    for (const group of ['hours', 'window', 'cutoff', 'confirm', 'page']) {
+    for (const group of ['hours', 'window', 'cutoff', 'rules', 'confirm', 'page']) {
       const html = renderReserve({ openGroup: group })
       assert.doesNotMatch(html, /[Dd]eposit/, group)
       assert.doesNotMatch(html, /card|payment/i, group)

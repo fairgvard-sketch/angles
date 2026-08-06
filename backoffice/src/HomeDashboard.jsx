@@ -15,6 +15,7 @@ import { hasCapability } from './navigation'
 import { PUBLIC_MENU_ORIGIN } from './online'
 import { Button, IconButton } from './ui/Button'
 import { EmptyState, PageHeader, Panel, StatusBadge } from './ui/Layout'
+import PartyCount from './ui/PartyCount'
 
 /**
  * Главная кабинета: как идёт день и что требует решения.
@@ -384,7 +385,7 @@ export default function HomeDashboard({ context, locationId, onNavigate, childre
                           <strong>{timeLabel(visit.reserved_at, tz)}</strong> · {visit.customer_name || 'Guest'}
                         </span>
                         <span>
-                          {visit.party_size} guests
+                          <PartyCount n={visit.party_size} />
                           {visit.status === 'new' && <small> · to confirm</small>}
                         </span>
                       </div>

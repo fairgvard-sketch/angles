@@ -1135,6 +1135,40 @@ a { color: inherit; }
 .slug-input input { height: 42px; border: 0; padding: 0 14px 0 0; background: transparent; flex: 1; min-width: 0; }
 .slug-input input:focus { outline: none; }
 
+/* Размер компании: фигурка и число вместо слова «guests» (Kassa 145).
+   Цифры табличные — в строках визитов они стоят колонкой. */
+.party-count { display: inline-flex; align-items: center; gap: 4px; font-variant-numeric: tabular-nums; white-space: nowrap; }
+.party-count svg { flex: none; opacity: .75; }
+
+/* Правила брони (Kassa 145): карточка на пункт — текст сверху, свойства
+   строкой под ним. Порядок пунктов задаёт владелец, поэтому стрелки
+   стоят рядом с удалением, а не прячутся в меню. */
+.rsv-rules { display: grid; gap: 12px; margin-top: 16px; }
+.rsv-rule {
+  display: grid; gap: 10px; padding: 12px;
+  border: 1px solid var(--c-border); border-radius: var(--r-md); background: var(--c-surface);
+}
+.rsv-rule textarea {
+  width: 100%; padding: 10px 12px; border: 1px solid var(--c-border);
+  border-radius: var(--r-sm); font: inherit; font-size: 15px;
+  background: var(--c-surface); resize: vertical;
+}
+.rsv-rule textarea:focus, .rsv-rule select:focus, .rsv-rule input[type="url"]:focus {
+  outline: none; border-color: var(--c-ink);
+}
+.rsv-rule-controls { display: flex; flex-wrap: wrap; align-items: end; gap: 12px; }
+.rsv-rule-level, .rsv-rule-url { display: grid; gap: 5px; min-width: 0; }
+.rsv-rule-url { flex: 1 1 220px; }
+.rsv-rule-level > span, .rsv-rule-url > span { font-size: 12px; font-weight: 700; color: var(--c-text-2); }
+.rsv-rule select, .rsv-rule input[type="url"] {
+  height: 38px; padding: 0 12px; border: 1px solid var(--c-border);
+  border-radius: var(--r-sm); font-size: 14px; background: var(--c-surface); min-width: 0;
+}
+.rsv-rule-ack { display: flex; align-items: center; gap: 8px; height: 38px; font-size: 14px; }
+.rsv-rule-ack input { width: 18px; height: 18px; accent-color: var(--c-ink); }
+.rsv-rule-actions { display: flex; gap: 4px; margin-inline-start: auto; }
+.rsv-rule-actions .icon-button[disabled] { opacity: .35; cursor: default; }
+
 .form-hint { margin: 14px 0 0; color: var(--c-text-subtle); font-size: 12px; }
 .save-ok.inline { margin: 0 0 4px; }
 

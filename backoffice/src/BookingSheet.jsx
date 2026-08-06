@@ -5,6 +5,7 @@ import { conflictAlternatives } from './desk-availability'
 import { toLocalInput, fromLocalInput } from './reservations'
 import Drawer from './ui/Drawer'
 import ConfirmDialog from './ui/ConfirmDialog'
+import PartyCount from './ui/PartyCount'
 import { Button } from './ui/Button'
 
 /**
@@ -133,6 +134,17 @@ export default function BookingSheet({
   const sourceLabel = VIA_LABEL[reservation.created_via] ?? null
   const channel = reservation.source || null
 
+  // Правила, которые гость отметил при заявке (Kassa 145). Показываем
+  // только подтверждённые: остальные пункты он читал, но обещания не
+  // давал, и ставить их в один ряд значило бы преувеличить согласие.
+  const ack = reservation.rules_ack
+  const acceptedRules = Array.isArray(ack?.rules)
+    ? ack.rules.filter((r) => r?.accepted).map((r) => r.text)
+    : []
+  const acceptedAt = ack?.accepted_at
+    ? new Date(ack.accepted_at).toLocaleDateString([], { day: 'numeric', month: 'short' })
+    : ''
+
   return (
     <Drawer
       labelledBy="booking-sheet-title"
@@ -144,7 +156,7 @@ export default function BookingSheet({
           {reservation.is_test && <span className="guest-fav is-warn"> Test</span>}
         </>
       )}
-      subtitle={`${reservation.party_size} guests · ${when}, ${span}`}
+      subtitle={<><PartyCount n={reservation.party_size} /> · {when}, {span}</>}
       onClose={onClose}
       footer={<Button onClick={onClose}>Close</Button>}
     >
@@ -173,6 +185,18 @@ export default function BookingSheet({
             <div>
               <dt>Phone</dt>
               <dd><a href={`tel:${reservation.customer_phone}`}>{reservation.customer_phone}</a></dd>
+            </div>
+          )}
+          {/* Согласие с правилами (Kassa 145). Хранится снимком текста:
+              спор «мне этого не говорили» разрешается тем, что видел
+              гость в тот день, а не текущими настройками. */}
+          {acceptedRules.length > 0 && (
+            <div>
+              <dt>Rules</dt>
+              <dd>
+                Accepted {acceptedAt}
+                <span className="sheet-fact-muted"> · {acceptedRules.join(' · ')}</span>
+              </dd>
             </div>
           )}
         </dl>

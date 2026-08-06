@@ -1,8 +1,8 @@
 import { useEffect, useRef, useState } from 'react'
 import {
-  AlertTriangle, Check, Clock, Copy, Download, ExternalLink, Image, LayoutGrid,
-  QrCode, RefreshCw, ShoppingBag, Table, Code2, ListTree,
-  CalendarClock, Contact, Ban,
+  AlertTriangle, ArrowDown, ArrowUp, Check, Clock, Copy, Download, ExternalLink,
+  Image, LayoutGrid, ListChecks, QrCode, RefreshCw, ShoppingBag, Table, Code2,
+  ListTree, CalendarClock, Contact, Ban, Trash2,
 } from 'lucide-react'
 import { fetchLocation, fetchLocationSlug, fetchTables, saveLocationSlug } from './settings'
 import {
@@ -25,6 +25,10 @@ import {
   Field, LinkBlock, NumberSelect, QrCanvas, SettingGroup, SettingLink, SnippetBlock,
   Toggle, downloadQr, useCopy,
 } from './qr-blocks'
+import {
+  RULE_LEVELS, RULE_TEXT_MAX, RULES_MAX,
+  addRule, moveRule, removeRule, ruleList, rulesSummary, toSettings, updateRule,
+} from './reservation-rules'
 import { hasCapability } from './navigation'
 import { PageHeader } from './ui/Layout'
 import Tabs from './ui/Tabs'
@@ -963,6 +967,122 @@ function cutoffLabel(value) {
   return found ? found.label : `${value} min before`
 }
 
+/**
+ * Правила брони (Kassa 145).
+ *
+ * Список, а не абзац: у пункта есть важность и признак «требует
+ * отметки», и от них зависит, как гость его увидит и пропустит ли
+ * сервер заявку. Абзацем это выразить нельзя.
+ *
+ * Правки уходят целым списком по каждому действию — так же, как
+ * расписание рядом: частично сохранённый набор правил хуже
+ * несохранённого, потому что выглядит настроенным.
+ */
+function ReservationRules({ rules, onChange }) {
+  const full = rules.length >= RULES_MAX
+
+  return (
+    <div className="rsv-rules">
+      <p className="form-hint">
+        The guest reads these before leaving contacts. Items marked
+        “Requires a tick” get a checkbox — the booking is refused by the server
+        until every one of them is confirmed, so a tick here is a record, not a
+        decoration. Bookings taken by phone or at the register are not affected.
+      </p>
+
+      {rules.length === 0 && (
+        <p className="form-hint">
+          No rules yet — the guest goes straight from the time to the contact form.
+        </p>
+      )}
+
+      {rules.map((rule, i) => (
+        <div className="rsv-rule" key={rule.id}>
+          <textarea
+            rows={2}
+            maxLength={RULE_TEXT_MAX}
+            defaultValue={rule.text}
+            placeholder="Seating in the restaurant is shared — you may be seated next to other guests."
+            aria-label={`Rule ${i + 1}`}
+            onBlur={(e) => onChange(updateRule(rules, rule.id, { text: e.target.value }))}
+          />
+          <div className="rsv-rule-controls">
+            <label className="rsv-rule-level">
+              <span>Style</span>
+              <select
+                value={rule.level}
+                onChange={(e) => onChange(updateRule(rules, rule.id, { level: e.target.value }))}
+              >
+                {RULE_LEVELS.map((l) => (
+                  <option key={l.value} value={l.value}>{l.label}</option>
+                ))}
+              </select>
+            </label>
+            <label className="rsv-rule-ack">
+              <input
+                type="checkbox"
+                checked={rule.ack}
+                onChange={(e) => onChange(updateRule(rules, rule.id, { ack: e.target.checked }))}
+              />
+              <span>Requires a tick</span>
+            </label>
+            <label className="rsv-rule-url">
+              <span>Link (optional)</span>
+              <input
+                type="url"
+                inputMode="url"
+                defaultValue={rule.url || ''}
+                placeholder="https://…/terms"
+                onBlur={(e) => onChange(updateRule(rules, rule.id, {
+                  url: e.target.value.trim() || null,
+                }))}
+              />
+            </label>
+            <div className="rsv-rule-actions">
+              <button
+                type="button"
+                className="icon-button"
+                aria-label="Move up"
+                disabled={i === 0}
+                onClick={() => onChange(moveRule(rules, rule.id, -1))}
+              >
+                <ArrowUp size={16} />
+              </button>
+              <button
+                type="button"
+                className="icon-button"
+                aria-label="Move down"
+                disabled={i === rules.length - 1}
+                onClick={() => onChange(moveRule(rules, rule.id, 1))}
+              >
+                <ArrowDown size={16} />
+              </button>
+              <button
+                type="button"
+                className="icon-button"
+                aria-label="Remove rule"
+                onClick={() => onChange(removeRule(rules, rule.id))}
+              >
+                <Trash2 size={16} />
+              </button>
+            </div>
+          </div>
+        </div>
+      ))}
+
+      <button
+        type="button"
+        className="secondary-button"
+        disabled={full}
+        onClick={() => onChange(addRule(rules))}
+      >
+        Add rule
+      </button>
+      {full && <p className="form-hint">The list is capped at {RULES_MAX} rules.</p>}
+    </div>
+  )
+}
+
 function ReservationSchedule({ schedule, tz, onChange }) {
   const [error, setError] = useState('')
   const [newDate, setNewDate] = useState('')
@@ -1201,6 +1321,9 @@ export function ReserveTab({ locationId, settings, patch, slug, tz, businessAddr
   // Расписание (Kassa 117). Точка без ключа schedule разворачивается из
   // legacy open/close, поэтому редактор всегда открывается заполненным.
   const schedule = normalizeSchedule(rsv)
+  // Правила брони (Kassa 145): список читается из настроек, порядок и
+  // важность задаёт владелец
+  const rules = ruleList(rsv)
 
   const group = (key) => ({
     open: openGroup === key,
@@ -1321,7 +1444,10 @@ export function ReserveTab({ locationId, settings, patch, slug, tz, businessAddr
                 checked={rsv.waitlist === true}
                 onChange={(v) => patch({ waitlist: v })}
               />
-              <Field label="Cancellation policy shown to the guest">
+              <Field
+                label="Cancellation policy shown to the guest"
+                hint="Shown to the guest on their own booking page, after the request is sent. Conditions of the visit itself belong in “What the guest must know” below — those are shown before it."
+              >
                 <textarea
                   rows={3}
                   defaultValue={rsv.policy || ''}
@@ -1333,6 +1459,25 @@ export function ReserveTab({ locationId, settings, patch, slug, tz, businessAddr
           ) : (
             <p className="form-hint" style={{ marginTop: 12 }}>
               Turn reservations on above to set cancellation rules.
+            </p>
+          )}
+        </SettingGroup>
+
+        <SettingGroup
+          {...group('rules')}
+          icon={ListChecks}
+          title="What the guest must know"
+          hint="Conditions of the visit, shown as a separate step before the guest leaves contacts."
+          value={rulesSummary(rules)}
+        >
+          {enabled ? (
+            <ReservationRules
+              rules={rules}
+              onChange={(next) => patch({ rules: toSettings(next) })}
+            />
+          ) : (
+            <p className="form-hint" style={{ marginTop: 12 }}>
+              Turn reservations on above to write booking rules.
             </p>
           )}
         </SettingGroup>
