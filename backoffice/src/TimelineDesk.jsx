@@ -359,7 +359,7 @@ export default function TimelineDesk({ locationId, date, query = '' }) {
                   <div key={row.table.id} className="timeline-row">
                     <div className="timeline-label">
                       <strong>{row.table.label}</strong>
-                      <small>{row.table.seats} seats</small>
+                      <small><PartyCount n={row.table.seats} /></small>
                     </div>
                     <div
                       className={`timeline-track${row.table.blocked ? ' is-blocked' : ''}`}

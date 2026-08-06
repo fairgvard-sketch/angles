@@ -19,9 +19,13 @@ export const LAUNCH_STEPS = {
     title: 'Set booking hours',
     hint: 'The one schedule guests see and book by.',
   },
+  // Шаг закрывают ДВА поля (Kassa 145/146): правила визита, которые
+  // гость читает до заявки, и текст отмены на его странице брони.
+  // Подпись называет оба — иначе владелец, написавший правила, идёт
+  // искать несуществующее «поле отмены», чтобы снять галочку.
   policy: {
-    title: 'Write the cancellation rules',
-    hint: 'Shown to the guest on their booking page.',
+    title: 'Write the rules of the visit',
+    hint: 'What the guest must know before booking, or the cancellation text on their booking page.',
   },
   branding: {
     title: 'Name and contacts',

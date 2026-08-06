@@ -12,6 +12,7 @@ import {
 } from './reservation-list'
 import { zonedToUtc } from './timeline'
 import { supabase } from './supabase'
+import PartyCount from './ui/PartyCount'
 import BookingSheet from './BookingSheet'
 
 /**
@@ -310,7 +311,7 @@ export default function ReservationList({ locationId, date, query = '', filters,
                             {r.customer_phone && <small>{r.customer_phone}</small>}
                           </button>
                         </td>
-                        <td className="rsv-cell-party">{r.party_size}</td>
+                        <td className="rsv-cell-party"><PartyCount n={r.party_size} /></td>
                         <td className="rsv-col-table">{tablesOf(r)}</td>
                         <td>
                           <span className={`rsv-status ${statusClass(state)}`}>{statusLabel(state)}</span>

@@ -221,7 +221,7 @@ export default function WaitlistPanel({ locationId, date, query = '' }) {
                           {entry.customer_phone && <small>{entry.customer_phone}</small>}
                         </button>
                       </td>
-                      <td className="rsv-cell-party">{entry.party_size}</td>
+                      <td className="rsv-cell-party"><PartyCount n={entry.party_size} /></td>
                       <td className={`rsv-cell-wait${overdue ? ' is-overdue' : ''}`}>
                         {formatWait(waited)}
                         {/* Перебор обещанного — то место, где очередь
