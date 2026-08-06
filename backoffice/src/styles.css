@@ -1006,20 +1006,16 @@ a { color: inherit; }
 @media (max-width: 420px) {
 }
 
-/* ── Команда ──────────────────────────────────────────────── */
+/* ── Действия в конце строки ───────────────────────────────── */
 /*
- * Строка сотрудника — три ЯВНЫЕ колонки: имя, роль, действия. Правило
- * .menu-row:has(.icon-button) (три колонки под меню, где иконка — прямой
- * ребёнок) здесь ложно срабатывало из-за кнопки внутри .team-row-actions:
- * появлялась лишняя пустая колонка, и роль наезжала на ключ. Переопределяем
- * сетку явно, чтобы структура строки не зависела от вложенности иконок.
+ * Пара иконок, прижатая к концу строки списка. Осталась от прежней
+ * «Команды», сейчас этим живёт план зала; правила «Команды» переехали в
+ * блок `tm-` в конце файла.
  */
-.menu-row.team-row { grid-template-columns: minmax(0, 1fr) auto auto; }
 .team-row-actions { display: inline-flex; align-items: center; gap: 2px; justify-self: end; }
-/* Ключ и Edit — единая высота, ключ не съезжает относительно текста кнопки */
+/* Единая высота: иконка не съезжает относительно текста соседней кнопки */
 .team-row-actions .icon-button { width: 34px; height: 34px; }
 .team-row-actions .icon-button svg { width: 17px; height: 17px; }
-.team-row .menu-price { color: var(--c-text-muted); font-weight: 650; }
 /* Уровень права — компактный сегмент, как .period-switch на «Обзоре» */
 .perm-switch { display: inline-flex; gap: 3px; padding: 3px; border-radius: var(--r-md); background: var(--c-border-soft); }
 .perm-switch button { min-height: 32px; padding: 0 12px; border: 0; border-radius: var(--r-sm); background: transparent; color: var(--c-text-muted); font-size: 12px; font-weight: 750; white-space: nowrap; }
@@ -3882,4 +3878,247 @@ a { color: inherit; }
   .hrs-print td { padding: 3pt 0; border-bottom: 1px solid #ddd; font-variant-numeric: tabular-nums; }
   .hrs-print td:last-child { text-align: end; font-weight: 700; }
   .hrs-print-total { margin-top: 10pt; font-weight: 700; }
+}
+
+/* ============================================================
+ * TEAM — люди, доступ и часы (093/094, редизайн).
+ *
+ * Отдельный префикс `tm-`: прежний раздел жил на `menu-row` из старой
+ * витрины каталога, а каталог с тех пор стал таблицей. Тянуть за собой
+ * чужие правила значило бы менять их вместе с ним.
+ *
+ * Геометрия та же, что у клиентской базы и часов: колонки объявлены
+ * переменной один раз, шапка и строка обязаны совпадать — иначе таблица
+ * врёт подписями. Строка целиком кнопка: у неё одно назначение —
+ * открыть карточку, и действий внутри неё не живёт.
+ * ============================================================ */
+
+.tm-toolbar {
+  display: flex; flex-wrap: wrap; align-items: center; gap: var(--sp-2);
+  margin-bottom: var(--sp-3);
+}
+.tm-toolbar .tm-search { flex: 1 1 220px; max-width: 320px; min-height: var(--h-control); }
+.tm-toolbar .secondary-button, .tm-toolbar .primary-button { min-height: var(--h-control); }
+.tm-toolbar .primary-button { gap: var(--sp-2); }
+.tm-toolbar .primary-button svg { width: 16px; height: 16px; }
+.tm-select select {
+  min-height: var(--h-control); padding: 0 30px 0 10px;
+  border: 1px solid var(--c-border); border-radius: var(--r-md);
+  background: var(--c-surface); font: inherit; font-size: 13px;
+}
+/* Счётчик — сколько человек сейчас на экране, поэтому стоит тихо у конца
+   строки отбора, а не заголовком над списком */
+.tm-count {
+  margin: 0; margin-inline-start: auto;
+  color: var(--c-text-muted); font-size: 13px;
+  font-variant-numeric: tabular-nums; white-space: nowrap;
+}
+
+/* ── Список людей ──────────────────────────────────────────── */
+.tm-panel { padding: 0; overflow: hidden; }
+.tm-panel .empty-state { padding: var(--sp-6) var(--sp-4); }
+
+/* Имя не забирает всю ширину: между ним и состоянием висела бы пустая
+   треть страницы. Слабину отдаём роли — она текстовая и стоит рядом. */
+.tm-list { --tm-cols: minmax(160px, 300px) minmax(120px, 1fr) 96px 110px 96px; min-width: 0; }
+.tm-list.has-location { --tm-cols: minmax(150px, 260px) minmax(110px, 1fr) minmax(100px, 0.8fr) 96px 110px 96px; }
+.tm-head, .tm-row {
+  display: grid; grid-template-columns: var(--tm-cols);
+  align-items: center; gap: var(--sp-3); padding-inline: var(--sp-4);
+}
+.tm-head {
+  min-height: 44px; border-bottom: 1px solid var(--c-border-panel);
+  color: var(--c-text-muted); font-size: 12px; font-weight: 650;
+  text-transform: uppercase; letter-spacing: 0.02em;
+}
+.tm-row {
+  width: 100%; min-height: 64px; padding-block: var(--sp-3);
+  border: 0; border-bottom: 1px solid var(--c-border-hair);
+  background: transparent; font: inherit; text-align: start; cursor: pointer;
+}
+.tm-row:last-child { border-bottom: 0; }
+.tm-row:hover { background: var(--c-surface-hover); }
+/* Открытая карточка: бледный кобальт и полоса у начала строки — цвет тут
+   не единственный сигнал, состояние объявлено ещё и aria-expanded */
+.tm-row.is-selected { background: var(--st-accent-soft); box-shadow: inset 3px 0 0 var(--st-accent); }
+.tm-row:focus-visible { outline: 2px solid var(--st-accent); outline-offset: -3px; }
+/* Уволенный не прячется в отдельную панель, но и не спорит с работающими */
+.tm-row.is-off .tm-cell-name strong, .tm-row.is-off .tm-cell-role { color: var(--c-text-muted); }
+
+.tm-cell-name { min-width: 0; display: grid; gap: 2px; }
+.tm-cell-name strong {
+  color: var(--c-text-strong); font-size: 14px; font-weight: 650;
+  overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+}
+/* Базовый уровень под именем роли: по нему человека ищут глазами
+   («кто у меня менеджеры»), и кастомная роль его не отменяет */
+.tm-cell-name small { color: var(--c-text-subtle); font-size: 12px; }
+.tm-cell-role, .tm-cell-muted {
+  min-width: 0; font-size: 13px;
+  overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+}
+.tm-cell-role { color: var(--c-text-2); font-weight: 650; }
+.tm-cell-muted { color: var(--c-text-muted); }
+/* «7 of 9» сравнивают глазом между строками — значит, моноширинные цифры
+   и выравнивание по одному краю */
+.tm-cell-access {
+  color: var(--c-text-2); font-size: 13px; font-weight: 650;
+  font-variant-numeric: tabular-nums; white-space: nowrap;
+}
+.tm-cell-status { justify-self: start; }
+
+/* Состояние человека. Зелёная точка занята одним смыслом — «сейчас за
+   терминалом»; просто активный сотрудник состоянием не кричит. */
+.tm-status { font-size: 11px; font-weight: 750; }
+.tm-status.is-on { color: var(--c-success); }
+.tm-status.is-on i { background: #3ba464; }
+.tm-status.is-idle { color: var(--c-text-muted); }
+.tm-status.is-idle i { background: var(--c-text-faint); }
+.tm-status.is-off { color: var(--c-text-subtle); }
+.tm-status.is-off i { background: var(--c-border); }
+
+/* ── Карточка человека ─────────────────────────────────────── */
+.tm-fields { display: grid; gap: var(--sp-3); margin: 0; padding: 0; border: 0; }
+.tm-fields:disabled { opacity: .7; }
+.tm-card-actions {
+  display: flex; flex-wrap: wrap; align-items: center; gap: var(--sp-3);
+  margin-top: var(--sp-3);
+}
+.tm-block { margin-top: var(--sp-5); padding-top: var(--sp-4); border-top: 1px solid var(--c-border-hair); }
+.tm-block h4 { margin: 0 0 var(--sp-2); font-size: 13px; font-weight: 700; }
+.tm-block h5 { margin: var(--sp-3) 0 var(--sp-1); color: var(--c-text-muted); font-size: 12px; font-weight: 700; }
+.tm-block-danger { border-top-color: var(--c-border-panel); }
+.tm-hint { margin: var(--sp-2) 0 0; color: var(--c-text-muted); font-size: 12px; }
+/* Откуда взялся ответ — над списком действий: право меняется в трёх
+   разных местах, и человек должен знать, в каком именно */
+.tm-source { margin: 0 0 var(--sp-2); color: var(--c-text-muted); font-size: 12px; }
+.tm-scope + .tm-scope { margin-top: var(--sp-3); }
+.tm-remove { color: var(--c-danger); }
+.tm-pin { display: grid; gap: var(--sp-2); justify-items: start; }
+.tm-pin .qr-field { width: 100%; max-width: 220px; }
+.tm-saved { display: inline-flex; align-items: center; gap: 6px; color: var(--c-success); font-size: 12px; font-weight: 650; }
+.tm-saved svg { width: 14px; height: 14px; }
+
+/* Девять действий с ответом «можно / нельзя». Ответ несёт не только
+   цвет: знак стоит перед названием, а читалке он назван словом. */
+.tm-access { display: grid; gap: 2px; margin: 0; padding: 0; list-style: none; }
+.tm-access li {
+  display: grid; grid-template-columns: 20px minmax(0, 1fr);
+  align-items: start; gap: var(--sp-2); padding: 5px 0;
+}
+.tm-access-mark { display: flex; justify-content: center; padding-top: 1px; }
+.tm-access-mark svg { width: 15px; height: 15px; }
+.tm-access li.is-on .tm-access-mark { color: var(--c-success); }
+.tm-access li.is-off .tm-access-mark { color: var(--c-text-faint); }
+.tm-access-name { min-width: 0; font-size: 13px; }
+.tm-access li.is-off .tm-access-name { color: var(--c-text-muted); }
+.tm-access-name small { display: block; color: var(--c-text-subtle); font-size: 11px; }
+
+/* ── Роль ──────────────────────────────────────────────────── */
+.tm-checks { display: grid; gap: 2px; margin: 0; padding: 0; list-style: none; }
+.tm-checks .check-field { align-items: start; padding: 6px 0; }
+.tm-checks .check-field span { font-size: 13px; }
+.tm-checks .check-field small { display: block; color: var(--c-text-subtle); font-size: 11px; font-weight: 500; }
+
+/* ── Доступ: правило точки и исключения из него ────────────── */
+/* Две колонки, а не две вкладки: правило и роль, которая его обходит,
+   должны быть видны одновременно — иначе матрицу держат в голове */
+.tm-access-grid { display: grid; gap: var(--sp-3); align-items: start; }
+@media (min-width: 1180px) {
+  .tm-access-grid { grid-template-columns: minmax(0, 1fr) 320px; }
+}
+.tm-matrix-panel, .tm-roles-panel { padding-bottom: var(--sp-2); }
+
+.tm-matrix { display: grid; }
+/* Отступ по краям равняется на шапку панели (22px): колонка «Action»
+   обязана начинаться под её заголовком, а не у самого края */
+.tm-matrix-head, .tm-matrix-row {
+  display: grid; grid-template-columns: minmax(0, 1fr) 176px minmax(120px, 210px);
+  align-items: center; gap: var(--sp-3); padding-inline: var(--sp-5);
+}
+.tm-matrix-head {
+  min-height: 34px; margin-bottom: var(--sp-1);
+  border-bottom: 1px solid var(--c-border-panel);
+  color: var(--c-text-muted); font-size: 11px; font-weight: 650;
+  text-transform: uppercase; letter-spacing: .02em;
+}
+.tm-matrix-row { min-height: 56px; border-bottom: 1px solid var(--c-border-hair); }
+.tm-matrix-row:last-child { border-bottom: 0; }
+.tm-matrix-name { min-width: 0; font-size: 13px; font-weight: 650; }
+.tm-matrix-name small { display: block; color: var(--c-text-subtle); font-size: 11px; font-weight: 500; }
+.tm-matrix-roles { display: flex; flex-wrap: wrap; gap: 4px; }
+/* Роль-исключение открывается прямо отсюда: увидев её в строке права,
+   владелец идёт менять именно её */
+.tm-role-chip {
+  max-width: 100%; padding: 3px 9px; border: 0; border-radius: var(--r-pill);
+  background: var(--tag-0-bg); color: var(--tag-0-fg);
+  font: inherit; font-size: 11px; font-weight: 700; cursor: pointer;
+  overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+}
+.tm-role-chip:hover { box-shadow: inset 0 0 0 1px currentcolor; }
+.tm-none { color: var(--c-text-faint); font-size: 13px; }
+
+.tm-roles { display: grid; }
+.tm-role-row {
+  display: grid; grid-template-columns: minmax(0, 1fr) auto;
+  align-items: center; gap: 2px var(--sp-3);
+  width: 100%; min-height: 56px; padding: var(--sp-2) var(--sp-5);
+  border: 0; border-bottom: 1px solid var(--c-border-hair);
+  background: transparent; font: inherit; text-align: start; cursor: pointer;
+}
+.tm-role-row:last-child { border-bottom: 0; }
+.tm-role-row:hover { background: var(--c-surface-hover); }
+.tm-role-row:focus-visible { outline: 2px solid var(--st-accent); outline-offset: -3px; }
+.tm-role-name { min-width: 0; font-size: 14px; font-weight: 650; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.tm-role-count { color: var(--c-text-2); font-size: 12px; font-variant-numeric: tabular-nums; text-align: end; }
+.tm-role-holders { grid-column: 1 / -1; color: var(--c-text-subtle); font-size: 12px; }
+
+/* ── Планшет ───────────────────────────────────────────────── */
+@media (max-width: 1024px) {
+  .tm-toolbar .tm-search, .tm-select select { min-height: var(--h-touch); }
+  .tm-toolbar .primary-button, .tm-toolbar .secondary-button { min-height: var(--h-touch); }
+  /* Колонки сужаются, а не исчезают: людей сравнивают по доступу и
+     последней смене, и первой уступает роль, а не они */
+  .tm-list { --tm-cols: minmax(140px, 1fr) minmax(100px, 0.8fr) 84px 96px 92px; }
+  .tm-list.has-location { --tm-cols: minmax(130px, 1fr) minmax(90px, 0.7fr) minmax(90px, 0.7fr) 84px 96px 92px; }
+  .tm-matrix-head, .tm-matrix-row { grid-template-columns: minmax(0, 1fr) 168px minmax(100px, 160px); }
+}
+
+/* ── Телефон: сводка вместо сжатой таблицы ─────────────────── */
+@media (max-width: 720px) {
+  .tm-toolbar .tm-search { flex-basis: 100%; max-width: none; }
+  /* Ввод меньше 16px на iOS заставляет браузер приближать страницу */
+  .tm-toolbar input, .tm-select select { font-size: 16px; }
+  .tm-select { flex: 1 1 140px; min-width: 0; }
+  .tm-select select { width: 100%; }
+  .tm-count { flex: 1 1 auto; margin-inline-start: 0; }
+
+  /* Шесть колонок на 390 px — не таблица, а нечитаемая сетка: строка
+     становится сводкой в два столбца, шапка теряет смысл */
+  .tm-head { display: none; }
+  .tm-row, .tm-list.has-location .tm-row {
+    grid-template-columns: minmax(0, 1fr) auto;
+    gap: 2px var(--sp-3); padding: var(--sp-3) var(--sp-4);
+  }
+  .tm-cell-name { grid-area: 1 / 1; }
+  .tm-cell-status { grid-area: 1 / 2; justify-self: end; }
+  .tm-cell-role { grid-area: 2 / 1; }
+  .tm-cell-access { grid-area: 2 / 2; text-align: end; }
+  .tm-list.has-location .tm-cell-muted[data-label='Location'] { grid-area: 3 / 1; }
+  .tm-cell-muted[data-label='Last shift'] { grid-area: 3 / 2; text-align: end; }
+  /* Без шапки значение само себя не объясняет: «7 of 9» — это что? */
+  .tm-cell-access::before, .tm-cell-muted[data-label='Last shift']::before {
+    content: attr(data-label) ': ';
+    color: var(--c-text-subtle); font-weight: 500;
+  }
+
+  /* Право и его исключения — столбиком: переключатель шириной в экран
+     нажимается пальцем, ужатый в треть — нет */
+  .tm-matrix-head { display: none; }
+  .tm-matrix-row {
+    grid-template-columns: minmax(0, 1fr);
+    align-items: start; gap: var(--sp-2); padding: var(--sp-3) var(--sp-4);
+  }
+  .tm-matrix-row .perm-switch { justify-self: start; }
+  .tm-matrix-row .perm-switch button { min-height: var(--h-touch); }
 }

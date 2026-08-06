@@ -58,9 +58,17 @@ describe('вкладка приходит из адреса', () => {
   })
 
   it('команда и настройки точки тоже адресуемы', () => {
-    const roles = renderToStaticMarkup(h(TeamManager, { context, tab: 'roles', onTabChange: noop }))
-    assert.match(roles, /aria-selected="true"/)
-    assert.notEqual(selectedTab(roles), 'Staff')
+    const access = renderToStaticMarkup(h(TeamManager, { context, tab: 'access', onTabChange: noop }))
+    assert.equal(selectedTab(access), 'Access')
+
+    // Роли и права съехались в одну вкладку — присланная вчера ссылка
+    // обязана открыть её, а не первую попавшуюся
+    for (const legacy of ['roles', 'perms']) {
+      const html = renderToStaticMarkup(h(TeamManager, { context, tab: legacy, onTabChange: noop }))
+      assert.equal(selectedTab(html), 'Access', `tab=${legacy}`)
+    }
+    const staff = renderToStaticMarkup(h(TeamManager, { context, tab: 'staff', onTabChange: noop }))
+    assert.equal(selectedTab(staff), 'People')
 
     const receipt = renderToStaticMarkup(
       h(LocationSettings, { context, locationId: 'loc-1', tab: 'receipt', onTabChange: noop })

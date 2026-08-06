@@ -329,7 +329,7 @@ function download(csv, filename) {
   URL.revokeObjectURL(link.href)
 }
 
-export default function HoursManager({ context }) {
+export default function HoursManager({ context, initialStaffId = null }) {
   const locations = context.locations || []
   const now = new Date()
   const [cursor, setCursor] = useState({ year: now.getFullYear(), month: now.getMonth() })
@@ -337,7 +337,12 @@ export default function HoursManager({ context }) {
   const [report, setReport] = useState(null)
   const [roster, setRoster] = useState([])
   const [error, setError] = useState('')
-  const [selected, setSelected] = useState(null)
+  /*
+   * Кого открыть сразу — приходит из карточки человека («Open hours»).
+   * Дальше выбором распоряжается сам экран: закрыв карточку, владелец не
+   * должен получать её обратно при первой же смене месяца.
+   */
+  const [selected, setSelected] = useState(initialStaffId)
 
   const { from, to } = useMemo(() => monthRange(cursor.year, cursor.month), [cursor])
 

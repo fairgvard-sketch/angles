@@ -1,213 +1,600 @@
-import { useEffect, useMemo, useState } from 'react'
-import { Check, KeyRound, Plus, Trash2, X } from 'lucide-react'
+import { useCallback, useEffect, useMemo, useState } from 'react'
+import { Check, Clock, Plus, UserPlus, Users, X } from 'lucide-react'
 import {
   ROLES, ROLE_LABELS, isValidPin,
   fetchStaff, createStaff, updateStaff, setStaffPin, deleteStaff,
-  PERM_KEYS, PERM_LABELS, permLevel,
   fetchRoles, saveRole, deleteRole,
+  PERM_KEYS, PERM_LABELS, PERM_HINTS, permLevel,
+  roleOf, accessRows, accessSource, accessScope, accessSummary,
+  rolesAllowing, roleHolders, locationLabel, roleTitle,
+  lastShiftLabel, SHIFT_WINDOW_DAYS, shiftIndex, statusOf, personRowLabel,
+  sortRoster, filterRoster, TABS, resolveTab, staffErrorText, hasRecords,
 } from './team'
 import { fetchLocation, patchLocationSettings } from './settings'
-import { PageHeader } from './ui/Layout'
+import { fetchHours } from './timesheet'
+import {
+  PageHeader, Panel, SearchField, EmptyPanel, EmptyState, ErrorText, StatusBadge,
+} from './ui/Layout'
+import { Button } from './ui/Button'
+import Tabs from './ui/Tabs'
+import Drawer from './ui/Drawer'
+import FormDialog from './ui/FormDialog'
+import ConfirmDialog from './ui/ConfirmDialog'
 import HoursManager from './HoursManager'
 
 /**
- * Команда в бэкофисе — паритет с кассовым разделом «Сотрудники»: список,
- * добавление, правка имени/роли, смена PIN, деактивация, удаление и права
- * доступа по действиям.
+ * Команда — три вкладки вместо четырёх: People, Access, Hours.
+ *
+ * Почему роли и права съехались в одну вкладку. Они отвечают на ОДИН
+ * вопрос — что человеку можно, — и переопределяют друг друга по
+ * действиям. Разложенные по двум вкладкам, они заставляли владельца
+ * держать матрицу в голове: там уровень точки, здесь галочки роли, а
+ * какая из них победит — написано абзацем текста. Теперь право читается
+ * одной строкой: «Refunds — только менеджер, плюс Senior barista».
+ *
+ * Заодно исправлено обещание, которого система не выполняла. Прежний
+ * редактор роли говорил «базовый уровень применяется ко всему, что не
+ * перечислено ниже»; на деле набор роли ИСЧЕРПЫВАЮЩИЙ — `require_staff_perm`
+ * (094) и `can()` кассы в этой ветке настройки точки не смотрят вовсе.
  *
  * Роль владельца защищена сервером (Kassa 093), клиент лишь не показывает
  * недоступное: менеджер не редактирует owner-строки и не выдаёт роль owner.
  */
 
-const TABS = [
-  { key: 'staff', label: 'Staff' },
-  { key: 'hours', label: 'Hours' },
-  { key: 'roles', label: 'Roles' },
-  { key: 'perms', label: 'Permissions' },
-]
+// ── Люди ─────────────────────────────────────────────────────
 
-/** Строка сотрудника: имя, роль, статус. */
-function StaffRow({ member, onEdit, onChangePin, editable, roleName }) {
+/**
+ * Строка человека.
+ *
+ * Вся строка — одна кнопка, как в клиентской базе: у строки ровно одно
+ * назначение — открыть карточку, и действий в ней не живёт. Прежняя
+ * строка держала иконку ключа «сменить PIN», которая открывала ту же
+ * форму, что и «Edit», — обещание быстрого действия, которого не было.
+ */
+function PersonRow({ member, role, locations, access, shift, selected, onOpen }) {
+  const status = statusOf(member, shift)
   return (
-    <div className={`menu-row team-row${member.is_active ? '' : ' is-off'}`}>
-      <span className="menu-name">
-        {member.name}
-        {!member.is_active && <small> · inactive</small>}
+    <button
+      type="button"
+      className={`tm-row${selected ? ' is-selected' : ''}${member.is_active ? '' : ' is-off'}`}
+      aria-label={personRowLabel(member, { role, locations, access, shift })}
+      aria-expanded={selected}
+      onClick={() => onOpen(member)}
+    >
+      <span className="tm-cell-name">
+        <strong>{member.name}</strong>
+        {role && <small>{ROLE_LABELS[member.role]} level</small>}
       </span>
-      <span className="menu-price">{roleName || ROLE_LABELS[member.role] || member.role}</span>
-      <span className="team-row-actions">
-        {editable && (
-          <>
-            <button className="icon-button" onClick={() => onChangePin(member)} title="Change PIN" aria-label={`Change PIN for ${member.name}`}>
-              <KeyRound />
-            </button>
-            <button
-              className="text-button"
-              aria-label={`Edit ${member.name}`}
-              onClick={() => onEdit(member)}
-            >
-              Edit
-            </button>
-          </>
-        )}
+      <span className="tm-cell-role">{roleTitle(member, role)}</span>
+      {locations.length > 1 && (
+        <span className="tm-cell-muted" data-label="Location">{locationLabel(member, locations)}</span>
+      )}
+      <span className="tm-cell-access" data-label="Access">{access.label}</span>
+      <span className="tm-cell-muted" data-label="Last shift">
+        {shift?.open ? 'Now' : lastShiftLabel(shift?.lastDay)}
       </span>
-    </div>
+      <span className="tm-cell-status">
+        <StatusBadge className="tm-status" tone={status.tone} label={status.label} />
+      </span>
+    </button>
   )
 }
 
-/** Модальный редактор: и создание, и правка (как ItemEditor в меню). */
-function StaffEditor({ member, locations, roles, canAssignOwner, canDelete, onClose, onSaved }) {
-  const isNew = !member.id
-  const [name, setName] = useState(member.name || '')
-  const [role, setRole] = useState(member.role || 'barista')
-  const [roleId, setRoleId] = useState(member.role_id || '')
-  const [locationId, setLocationId] = useState(member.location_id || locations[0]?.id || '')
+/** Заведение человека: имя, уровень, точка и PIN — всё, что просит сервер */
+function AddPersonDialog({ locations, roles, canAssignOwner, onClose, onSaved }) {
+  const [name, setName] = useState('')
+  const [role, setRole] = useState('barista')
+  const [roleId, setRoleId] = useState('')
+  const [locationId, setLocationId] = useState(locations[0]?.id || '')
   const [pin, setPin] = useState('')
-  const [active, setActive] = useState(member.is_active ?? true)
   const [busy, setBusy] = useState(false)
   const [error, setError] = useState('')
 
-  // Базовые уровни (owner/manager/barista) — НЕ путать с кастомными ролями
-  // из пропа `roles`: раньше локальная константа называлась так же и затеняла его.
   const baseRoles = canAssignOwner ? ROLES : ROLES.filter((r) => r !== 'owner')
-  // При создании PIN обязателен, при правке — пустое поле значит «не менять»
-  const pinOk = isNew ? isValidPin(pin) : pin === '' || isValidPin(pin)
-  const canSave = name.trim() && pinOk && (!isNew || locationId) && !busy
+  const ready = name.trim() && isValidPin(pin) && locationId && !busy
+
+  async function submit() {
+    if (!ready) {
+      setError(isValidPin(pin) ? 'Give the person a name.' : 'A PIN is 4 to 8 digits.')
+      return
+    }
+    setBusy(true)
+    setError('')
+    try {
+      const id = await createStaff({ name, role, pin, locationId })
+      // create_staff роль не принимает — проставляем вторым вызовом.
+      // Сбой здесь не теряет человека: он уже создан с базовым уровнем.
+      if (roleId) await updateStaff(id, { role_id: roleId })
+      onSaved()
+    } catch (saveError) {
+      setError(staffErrorText(saveError.message))
+      setBusy(false)
+    }
+  }
+
+  return (
+    <FormDialog
+      title="Add person"
+      description="They sign in on the register with a PIN."
+      submitLabel="Add"
+      error={error}
+      busy={busy}
+      onSubmit={submit}
+      onCancel={onClose}
+    >
+      <label className="qr-field">
+        <span>Name</span>
+        <input value={name} maxLength={60} onChange={(e) => setName(e.target.value)} required />
+      </label>
+
+      <div className="field-row">
+        <label className="qr-field">
+          <span>Level</span>
+          <select value={role} onChange={(e) => setRole(e.target.value)}>
+            {baseRoles.map((r) => <option key={r} value={r}>{ROLE_LABELS[r]}</option>)}
+          </select>
+        </label>
+        {locations.length > 1 && (
+          <label className="qr-field">
+            <span>Location</span>
+            <select value={locationId} onChange={(e) => setLocationId(e.target.value)}>
+              {locations.map((l) => <option key={l.id} value={l.id}>{l.name}</option>)}
+            </select>
+          </label>
+        )}
+      </div>
+
+      {roles.length > 0 && role !== 'owner' && (
+        <label className="qr-field">
+          <span>Role</span>
+          <select value={roleId} onChange={(e) => setRoleId(e.target.value)}>
+            <option value="">None — follow the location rules</option>
+            {roles.map((r) => <option key={r.id} value={r.id}>{r.name}</option>)}
+          </select>
+        </label>
+      )}
+
+      <label className="qr-field">
+        <span>PIN (4–8 digits)</span>
+        <input
+          inputMode="numeric"
+          autoComplete="off"
+          value={pin}
+          onChange={(e) => setPin(e.target.value.replace(/\D/g, '').slice(0, 8))}
+          required
+        />
+      </label>
+      {/* Точка названа рядом с полем, а не в справке: сменить её потом
+          нечем — allow-лист update_staff (093/094) её не принимает */}
+      <p className="tm-hint">
+        The PIN is stored encrypted and can only be replaced, never read.
+        {locations.length > 1 && ' The location cannot be changed later.'}
+      </p>
+    </FormDialog>
+  )
+}
+
+/** Смена PIN — отдельный блок карточки: это отдельный RPC и отдельный риск */
+function PinBlock({ member }) {
+  const [pin, setPin] = useState('')
+  const [busy, setBusy] = useState(false)
+  const [error, setError] = useState('')
+  const [saved, setSaved] = useState(false)
 
   async function save() {
     setBusy(true)
     setError('')
     try {
-      if (isNew) {
-        const newId = await createStaff({ name, role, pin, locationId })
-        // create_staff роль не принимает — проставляем вторым вызовом.
-        // Сбой здесь не теряет сотрудника: он уже создан с базовой ролью.
-        if (roleId) await updateStaff(newId, { role_id: roleId })
-      } else {
-        await updateStaff(member.id, {
-          name: name.trim(), role, is_active: active,
-          role_id: roleId || null,
-        })
-        if (pin) await setStaffPin(member.id, pin)
-      }
-      onSaved()
+      await setStaffPin(member.id, pin)
+      setPin('')
+      setSaved(true)
     } catch (saveError) {
-      setError(saveError.message)
-      setBusy(false)
-    }
-  }
-
-  async function remove() {
-    if (!confirm(`Delete ${member.name}? This cannot be undone.`)) return
-    setBusy(true)
-    setError('')
-    try {
-      await deleteStaff(member.id)
-      onSaved()
-    } catch (deleteError) {
-      // Сотрудник с историей не удаляется — аудит неприкосновенен
-      setError(deleteError.hasRecords
-        ? 'This person already has sales history and cannot be deleted. Deactivate them instead.'
-        : deleteError.message)
+      setError(staffErrorText(saveError.message))
+    } finally {
       setBusy(false)
     }
   }
 
   return (
-    <div className="modal-scrim" role="dialog" aria-modal="true">
-      <div className="modal">
-        <div className="modal-head">
-          <h2>{isNew ? 'Add person' : name || 'Edit person'}</h2>
-          <button className="icon-button" onClick={onClose} aria-label="Close"><X /></button>
-        </div>
+    <div className="tm-pin">
+      <label className="qr-field">
+        <span>New PIN</span>
+        <input
+          inputMode="numeric"
+          autoComplete="off"
+          placeholder="4–8 digits"
+          value={pin}
+          onChange={(e) => { setPin(e.target.value.replace(/\D/g, '').slice(0, 8)); setSaved(false) }}
+        />
+      </label>
+      <Button size="compact" disabled={!isValidPin(pin)} busy={busy} busyLabel="Saving…" onClick={save}>
+        Replace PIN
+      </Button>
+      {saved && <span className="tm-saved"><Check aria-hidden /> PIN replaced</span>}
+      {error && <ErrorText>{error}</ErrorText>}
+    </div>
+  )
+}
 
-        <div className="modal-body">
-          <label>
+/**
+ * Карточка человека рядом со списком.
+ *
+ * Панель, а не модалка: щелчок по соседней строке обязан открыть её, а не
+ * закрыть карточку — сравнивают людей, а не изучают по одному.
+ */
+function PersonCard({
+  member, roles, locations, settingsByLocation, shift,
+  editable, canAssignOwner, onChanged, onClose, onOpenHours,
+}) {
+  const role = roleOf(member, roles)
+  const [name, setName] = useState(member.name || '')
+  const [base, setBase] = useState(member.role || 'barista')
+  const [roleId, setRoleId] = useState(member.role_id || '')
+  const [active, setActive] = useState(member.is_active ?? true)
+  const [busy, setBusy] = useState(false)
+  const [error, setError] = useState('')
+  // 'delete' | 'deactivate' — второе состояние того же диалога
+  const [removing, setRemoving] = useState(null)
+  const [removeError, setRemoveError] = useState('')
+
+  const baseRoles = canAssignOwner ? ROLES : ROLES.filter((r) => r !== 'owner')
+  const dirty = name.trim() !== (member.name || '')
+    || base !== member.role
+    || (roleId || null) !== (member.role_id || null)
+    || active !== member.is_active
+
+  // Карточка показывает права ПОСЛЕ правки, а не до: владелец меняет
+  // роль, чтобы посмотреть, что из этого выйдет.
+  const draft = { ...member, role: base, role_id: roleId || null }
+  const draftRole = roleId ? (roles.find((r) => r.id === roleId) ?? null) : null
+  const scope = accessScope(draft, draftRole, locations)
+
+  async function save() {
+    setBusy(true)
+    setError('')
+    try {
+      await updateStaff(member.id, {
+        name: name.trim(), role: base, is_active: active, role_id: roleId || null,
+      })
+      onChanged()
+    } catch (saveError) {
+      setError(staffErrorText(saveError.message))
+    } finally {
+      setBusy(false)
+    }
+  }
+
+  /**
+   * Удаление и деактивация — один диалог в двух состояниях.
+   *
+   * Есть ли у человека история, знает только сервер: на клиенте нет ни
+   * продаж, ни смен. Поэтому сначала пробуем удалить, и ровно на код
+   * 'staff has records' диалог превращается в предложение деактивировать.
+   * Любая другая ошибка остаётся ошибкой — сетевой сбой не повод
+   * подсовывать владельцу другое действие.
+   */
+  async function confirmRemove() {
+    setBusy(true)
+    setRemoveError('')
+    try {
+      if (removing === 'deactivate') await updateStaff(member.id, { is_active: false })
+      else await deleteStaff(member.id)
+      setRemoving(null)
+      onChanged()
+    } catch (deleteError) {
+      setRemoveError(staffErrorText(deleteError.message))
+      if (hasRecords(deleteError.message)) setRemoving('deactivate')
+    } finally {
+      setBusy(false)
+    }
+  }
+
+  return (
+    <>
+      <Drawer
+        labelledBy="tm-person-title"
+        title={member.name}
+        subtitle={[
+          roleTitle(member, role),
+          locations.length > 1 ? locationLabel(member, locations) : null,
+          statusOf(member, shift).label,
+        ].filter(Boolean).join(' · ')}
+        onClose={onClose}
+        modal={false}
+      >
+        {!editable && (
+          <p className="tm-hint">Only an owner can change another owner.</p>
+        )}
+
+        <fieldset className="tm-fields" disabled={!editable}>
+          <label className="qr-field">
             <span>Name</span>
-            <input value={name} onChange={(e) => setName(e.target.value)} />
+            <input value={name} maxLength={60} onChange={(e) => setName(e.target.value)} />
           </label>
 
-          <div className="field-row">
-            <label>
+          {/* Уровень и роль стоят строками, а не парой в ряд: в панели 440 px
+              «None — follow the location rules» обрезалось на середине, и
+              выбор «без роли» переставал читаться */}
+          <label className="qr-field">
+            <span>Level</span>
+            <select value={base} onChange={(e) => setBase(e.target.value)}>
+              {baseRoles.map((r) => <option key={r} value={r}>{ROLE_LABELS[r]}</option>)}
+            </select>
+          </label>
+
+          {roles.length > 0 && base !== 'owner' && (
+            <label className="qr-field">
               <span>Role</span>
-              <select value={role} onChange={(e) => setRole(e.target.value)}>
-                {baseRoles.map((r) => <option key={r} value={r}>{ROLE_LABELS[r]}</option>)}
-              </select>
-            </label>
-
-            {isNew && locations.length > 1 && (
-              <label>
-                <span>Location</span>
-                <select value={locationId} onChange={(e) => setLocationId(e.target.value)}>
-                  {locations.map((l) => <option key={l.id} value={l.id}>{l.name}</option>)}
-                </select>
-              </label>
-            )}
-          </div>
-
-          {roles.length > 0 && role !== 'owner' && (
-            <label>
-              <span>Custom role</span>
               <select value={roleId} onChange={(e) => setRoleId(e.target.value)}>
-                <option value="">None — use base role and location settings</option>
+                <option value="">None — follow the location rules</option>
                 {roles.map((r) => <option key={r.id} value={r.id}>{r.name}</option>)}
               </select>
             </label>
           )}
 
-          <label>
-            <span>{isNew ? 'PIN (4–8 digits)' : 'New PIN (leave blank to keep current)'}</span>
-            <input
-              inputMode="numeric"
-              autoComplete="off"
-              value={pin}
-              onChange={(e) => setPin(e.target.value.replace(/\D/g, '').slice(0, 8))}
-            />
+          <label className="check-field">
+            <input type="checkbox" checked={active} onChange={(e) => setActive(e.target.checked)} />
+            <span>Can sign in on the register</span>
           </label>
-          <p className="hint">The PIN is used to sign in on the register. It is stored encrypted and can only be replaced, never read.</p>
+        </fieldset>
 
-          {!isNew && (
-            <label className="check-field">
-              <input type="checkbox" checked={active} onChange={(e) => setActive(e.target.checked)} />
-              <span>Active — can sign in on the register</span>
-            </label>
-          )}
+        {error && <ErrorText>{error}</ErrorText>}
 
-          {error && <p className="form-error" role="alert">{error}</p>}
-        </div>
-
-        <div className="modal-foot">
-          {!isNew && canDelete && (
-            <button className="danger-button" onClick={remove} disabled={busy}>
-              <Trash2 /><span className="btn-label">Delete</span>
-            </button>
-          )}
-          <div className="modal-foot-right">
-            <button className="secondary-button" onClick={onClose} disabled={busy}>Cancel</button>
-            <button className="primary-button" onClick={save} disabled={!canSave}>
-              {busy ? 'Saving…' : 'Save'}
-            </button>
+        {editable && (
+          <div className="tm-card-actions">
+            <Button variant="primary" size="compact" disabled={!dirty || !name.trim()} busy={busy} busyLabel="Saving…" onClick={save}>
+              Save changes
+            </Button>
           </div>
-        </div>
-      </div>
-    </div>
+        )}
+
+        {/* ── Что человеку можно ── */}
+        <section className="tm-block">
+          <h4>What this person can do</h4>
+          {scope.length === 0 ? (
+            <>
+              <p className="tm-source">{accessSource(draft, draftRole, null)}</p>
+              <AccessList member={draft} settings={null} role={draftRole} />
+            </>
+          ) : (
+            scope.map((location) => (
+              <div className="tm-scope" key={location.id}>
+                {scope.length > 1 && <h5>{location.name}</h5>}
+                <p className="tm-source">{accessSource(draft, draftRole, location.name)}</p>
+                <AccessList member={draft} settings={settingsByLocation[location.id]} role={draftRole} />
+              </div>
+            ))
+          )}
+        </section>
+
+        {/* ── Смены и PIN ── */}
+        <section className="tm-block">
+          <h4>Shifts</h4>
+          <p className="tm-source">
+            {shift?.open
+              ? 'On shift right now.'
+              : `Last shift: ${lastShiftLabel(shift?.lastDay)} (last ${SHIFT_WINDOW_DAYS} days).`}
+          </p>
+          <Button size="compact" onClick={() => onOpenHours(member.id)}>
+            <Clock aria-hidden /> Open hours
+          </Button>
+        </section>
+
+        {editable && (
+          <section className="tm-block">
+            <h4>PIN</h4>
+            <PinBlock member={member} />
+          </section>
+        )}
+
+        {editable && (
+          <section className="tm-block tm-block-danger">
+            <button
+              type="button"
+              className="text-button tm-remove"
+              onClick={() => { setRemoveError(''); setRemoving('delete') }}
+            >
+              Remove from the team
+            </button>
+          </section>
+        )}
+      </Drawer>
+
+      {removing && (
+        <ConfirmDialog
+          title={removing === 'deactivate' ? 'This person cannot be deleted' : `Remove ${member.name}?`}
+          description={removing === 'deactivate'
+            ? 'Deactivating keeps their sales and shifts in the reports, and stops them signing in on the register.'
+            : 'If they have ever made a sale or clocked in, they cannot be deleted — you will be offered to deactivate instead.'}
+          confirmLabel={removing === 'deactivate' ? 'Deactivate' : 'Remove'}
+          tone="danger"
+          error={removeError}
+          busy={busy}
+          onConfirm={confirmRemove}
+          onCancel={() => { setRemoving(null); setRemoveError('') }}
+        />
+      )}
+    </>
   )
 }
 
-// ── Роли (094) ───────────────────────────────────────────────
-/** Модальный редактор роли: имя, базовый уровень и галочки прав. */
-function RoleEditor({ role, onClose, onSaved }) {
+/** Девять действий с ответом «можно / нельзя» */
+function AccessList({ member, settings, role }) {
+  return (
+    <ul className="tm-access">
+      {accessRows(member, settings, role).map((row) => (
+        <li className={row.allowed ? 'is-on' : 'is-off'} key={row.key}>
+          <span className="tm-access-mark" aria-hidden>{row.allowed ? <Check /> : <X />}</span>
+          <span className="tm-access-name">
+            {row.label}
+            <small>{row.hint}</small>
+          </span>
+          <span className="visually-hidden">{row.allowed ? 'allowed' : 'not allowed'}</span>
+        </li>
+      ))}
+    </ul>
+  )
+}
+
+function PeopleTab({
+  staff, roles, locations, settingsByLocation, shifts, loading,
+  iAmOwner, onChanged, onOpenHours,
+}) {
+  const [search, setSearch] = useState('')
+  const [locationId, setLocationId] = useState('')
+  const [selectedId, setSelectedId] = useState(null)
+  const [adding, setAdding] = useState(false)
+
+  const rows = useMemo(
+    () => sortRoster(filterRoster(staff, { search, locationId })),
+    [staff, search, locationId],
+  )
+
+  const selected = (staff ?? []).find((s) => s.id === selectedId) || null
+  const filtered = search.trim() !== '' || locationId !== ''
+
+  /** Строку владельца правит только владелец — сервер это тоже проверяет */
+  function editable(member) {
+    return member.role !== 'owner' || iAmOwner
+  }
+
+  return (
+    <>
+      <div className="tm-toolbar">
+        <SearchField
+          label="Search the team"
+          value={search}
+          onChange={setSearch}
+          placeholder="Name"
+          className="order-search tm-search"
+        />
+
+        {locations.length > 1 && (
+          <label className="tm-select">
+            <span className="visually-hidden">Location</span>
+            <select value={locationId} onChange={(e) => setLocationId(e.target.value)}>
+              <option value="">All locations</option>
+              {locations.map((l) => <option key={l.id} value={l.id}>{l.name}</option>)}
+            </select>
+          </label>
+        )}
+
+        <Button
+          variant="primary"
+          size="compact"
+          disabled={locations.length === 0}
+          onClick={() => setAdding(true)}
+        >
+          <UserPlus aria-hidden /> Add person
+        </Button>
+
+        <p className="tm-count" role="status">
+          {loading && !staff ? 'Loading…' : `${rows.length} ${rows.length === 1 ? 'person' : 'people'}`}
+        </p>
+      </div>
+
+      {staff === null ? (
+        <Panel className="tm-panel"><EmptyState>Loading…</EmptyState></Panel>
+      ) : rows.length === 0 ? (
+        <EmptyPanel
+          icon={<Users />}
+          title={filtered ? 'Nobody found' : 'No one on the team yet'}
+          description={filtered
+            ? 'No one matches this search. Try another name or clear the filter.'
+            : 'Add the people who work the register. Each of them signs in with their own PIN.'}
+          action={!filtered && locations.length > 0 && (
+            <Button variant="primary" size="compact" onClick={() => setAdding(true)}>
+              <UserPlus aria-hidden /> Add person
+            </Button>
+          )}
+        />
+      ) : (
+        <Panel className="tm-panel">
+          <div className={`tm-list${locations.length > 1 ? ' has-location' : ''}`}>
+            {/* Шапка скрыта от читалки: имя строки уже называет все
+                значения, и второй раз перечислять их незачем */}
+            <div className="tm-head" aria-hidden="true">
+              <span>Person</span>
+              <span>Role</span>
+              {locations.length > 1 && <span>Location</span>}
+              <span>Access</span>
+              <span>Last shift</span>
+              <span>Status</span>
+            </div>
+            {rows.map((member) => {
+              const role = roleOf(member, roles)
+              return (
+                <PersonRow
+                  key={member.id}
+                  member={member}
+                  role={role}
+                  locations={locations}
+                  access={accessSummary(member, role, settingsByLocation, locations)}
+                  shift={shifts?.get(member.id)}
+                  selected={member.id === selectedId}
+                  onOpen={(m) => setSelectedId(m.id === selectedId ? null : m.id)}
+                />
+              )
+            })}
+          </div>
+        </Panel>
+      )}
+
+      {selected && (
+        <PersonCard
+          /* Ключ по человеку: панель немодальна, соседнюю строку открывают
+             щелчком, и поля прошлой карточки не должны в ней досидеть */
+          key={selected.id}
+          member={selected}
+          roles={roles ?? []}
+          locations={locations}
+          settingsByLocation={settingsByLocation}
+          shift={shifts?.get(selected.id)}
+          editable={editable(selected)}
+          canAssignOwner={iAmOwner}
+          onChanged={onChanged}
+          onClose={() => setSelectedId(null)}
+          onOpenHours={onOpenHours}
+        />
+      )}
+
+      {adding && (
+        <AddPersonDialog
+          locations={locations}
+          roles={roles ?? []}
+          canAssignOwner={iAmOwner}
+          onClose={() => setAdding(false)}
+          onSaved={() => { setAdding(false); onChanged() }}
+        />
+      )}
+    </>
+  )
+}
+
+// ── Доступ ───────────────────────────────────────────────────
+
+/**
+ * Редактор роли.
+ *
+ * Про базовый уровень здесь сказана правда: он НЕ добавляет прав. Ни
+ * `require_staff_perm` (094), ни `can()` кассы его при разрешении не
+ * читают — набор галочек исчерпывающий. Поле осталось потому, что его
+ * требует `save_role`, и потому, что оно описывает роль словом.
+ */
+function RoleCard({ role, holders, onClose, onSaved }) {
   const isNew = !role.id
   const [name, setName] = useState(role.name || '')
   const [base, setBase] = useState(role.base || 'barista')
   const [perms, setPerms] = useState(() => new Set(role.perms || []))
   const [busy, setBusy] = useState(false)
   const [error, setError] = useState('')
+  const [removing, setRemoving] = useState(false)
 
   function toggle(key) {
     setPerms((prev) => {
       const next = new Set(prev)
-      next.has(key) ? next.delete(key) : next.add(key)
+      if (next.has(key)) next.delete(key)
+      else next.add(key)
       return next
     })
   }
@@ -219,413 +606,397 @@ function RoleEditor({ role, onClose, onSaved }) {
       await saveRole({ id: role.id, name, base, perms: [...perms] })
       onSaved()
     } catch (saveError) {
-      setError(saveError.message)
+      setError(staffErrorText(saveError.message))
       setBusy(false)
     }
   }
 
-  async function remove() {
-    if (!confirm(`Delete role “${name}”? People with this role go back to their base level.`)) return
+  async function confirmRemove() {
     setBusy(true)
     setError('')
     try {
       await deleteRole(role.id)
       onSaved()
     } catch (deleteError) {
-      setError(deleteError.message)
+      setError(staffErrorText(deleteError.message))
       setBusy(false)
+      setRemoving(false)
     }
   }
 
   return (
-    <div className="modal-scrim" role="dialog" aria-modal="true">
-      <div className="modal">
-        <div className="modal-head">
-          <h2>{isNew ? 'New role' : name || 'Edit role'}</h2>
-          <button className="icon-button" onClick={onClose} aria-label="Close"><X /></button>
-        </div>
+    <>
+      <Drawer
+        labelledBy="tm-role-title"
+        title={isNew ? 'New role' : role.name}
+        subtitle={isNew
+          ? 'A named set of actions you can hand to a person'
+          : `${perms.size} of ${PERM_KEYS.length} actions · ${holders} ${holders === 1 ? 'person' : 'people'}`}
+        onClose={onClose}
+        modal={false}
+      >
+        <label className="qr-field">
+          <span>Role name</span>
+          <input value={name} maxLength={40} placeholder="Senior barista" onChange={(e) => setName(e.target.value)} />
+        </label>
 
-        <div className="modal-body">
-          <label>
-            <span>Role name</span>
-            <input value={name} onChange={(e) => setName(e.target.value)} placeholder="Senior barista" />
-          </label>
+        <label className="qr-field">
+          <span>Comparable level</span>
+          <select value={base} onChange={(e) => setBase(e.target.value)}>
+            <option value="barista">Barista</option>
+            <option value="manager">Manager</option>
+          </select>
+        </label>
+        <p className="tm-hint">
+          A label only — it grants nothing. A person with this role can do
+          exactly what is ticked below and nothing else, whatever the
+          location rules say. Managing the team, roles and settings always
+          stays with owners and managers.
+        </p>
 
-          <label>
-            <span>Base level</span>
-            <select value={base} onChange={(e) => setBase(e.target.value)}>
-              <option value="barista">Barista</option>
-              <option value="manager">Manager</option>
-            </select>
-          </label>
-          <p className="hint">The base level applies to anything not listed below. Owner access cannot be granted by a role.</p>
-
-          <div className="editor-block">
-            <div className="editor-block-head"><span>Allowed actions</span></div>
-            <div className="group-checks">
-              {PERM_KEYS.map((key) => (
-                <label className="check-field small" key={key}>
-                  <input
-                    type="checkbox"
-                    checked={perms.has(key)}
-                    aria-label={`${PERM_LABELS[key]} — allowed for role ${name || 'new role'}`}
-                    onChange={() => toggle(key)}
-                  />
-                  <span>{PERM_LABELS[key]}</span>
+        <section className="tm-block">
+          <h4>Allowed actions</h4>
+          <ul className="tm-checks">
+            {PERM_KEYS.map((key) => (
+              <li key={key}>
+                <label className="check-field">
+                  <input type="checkbox" checked={perms.has(key)} onChange={() => toggle(key)} />
+                  <span>
+                    {PERM_LABELS[key]}
+                    <small>{PERM_HINTS[key]}</small>
+                  </span>
                 </label>
-              ))}
-            </div>
-          </div>
-          <p className="hint">Managing team, roles and settings always stays with owners and managers.</p>
+              </li>
+            ))}
+          </ul>
+        </section>
 
-          {error && <p className="form-error" role="alert">{error}</p>}
-        </div>
+        {error && <ErrorText>{error}</ErrorText>}
 
-        <div className="modal-foot">
+        <div className="tm-card-actions">
+          <Button variant="primary" size="compact" disabled={!name.trim()} busy={busy} busyLabel="Saving…" onClick={save}>
+            {isNew ? 'Create role' : 'Save role'}
+          </Button>
           {!isNew && (
-            <button className="danger-button" onClick={remove} disabled={busy}>
-              <Trash2 /><span className="btn-label">Delete</span>
+            <button type="button" className="text-button tm-remove" onClick={() => setRemoving(true)}>
+              Delete role
             </button>
           )}
-          <div className="modal-foot-right">
-            <button className="secondary-button" onClick={onClose} disabled={busy}>Cancel</button>
-            <button className="primary-button" onClick={save} disabled={!name.trim() || busy}>
-              {busy ? 'Saving…' : 'Save'}
-            </button>
-          </div>
         </div>
-      </div>
-    </div>
-  )
-}
+      </Drawer>
 
-function RolesTab({ roles, staff, reload }) {
-  const [editing, setEditing] = useState(null)
-
-  /** Сколько человек носит роль — чтобы удаление не было вслепую */
-  function holders(roleId) {
-    return (staff || []).filter((s) => s.role_id === roleId).length
-  }
-
-  return (
-    <>
-      <div className="menu-toolbar">
-        <button className="secondary-button" onClick={() => setEditing({})}>
-          <Plus /> New role
-        </button>
-      </div>
-
-      {roles === null ? (
-        <p className="empty-state">Loading…</p>
-      ) : roles.length === 0 ? (
-        <section className="panel">
-          <div className="panel-heading">
-            <div>
-              <h2>No custom roles yet</h2>
-              <p>Create one to allow specific actions — like refunds for a senior barista — without making someone a manager.</p>
-            </div>
-          </div>
-        </section>
-      ) : (
-        <section className="panel">
-          <div className="menu-list">
-            {roles.map((role) => {
-              const count = holders(role.id)
-              return (
-                <button className="menu-row team-row as-button" key={role.id} onClick={() => setEditing(role)}>
-                  <span className="menu-name">
-                    {role.name}
-                    <small> · {ROLE_LABELS[role.base]} base</small>
-                  </span>
-                  <span className="menu-price">
-                    {role.perms?.length || 0} allowed
-                  </span>
-                  <span className="team-row-actions">
-                    {count > 0 ? `${count} ${count === 1 ? 'person' : 'people'}` : 'unused'}
-                  </span>
-                </button>
-              )
-            })}
-          </div>
-        </section>
-      )}
-
-      {editing && (
-        <RoleEditor
-          role={editing}
-          onClose={() => setEditing(null)}
-          onSaved={() => { setEditing(null); reload() }}
+      {removing && (
+        <ConfirmDialog
+          title={`Delete “${role.name}”?`}
+          description={holders > 0
+            ? `${holders} ${holders === 1 ? 'person goes' : 'people go'} back to the location rules for their level. Nobody loses access to the register.`
+            : 'Nobody is using this role.'}
+          confirmLabel="Delete role"
+          tone="danger"
+          error={error}
+          busy={busy}
+          onConfirm={confirmRemove}
+          onCancel={() => setRemoving(false)}
         />
       )}
     </>
   )
 }
 
-// ── Вкладка «Права доступа» ──────────────────────────────────
 /**
- * Права живут в locations.settings.perms и задаются на точку: 'all' — действие
- * доступно всем, 'manager' — только менеджеру и владельцу.
+ * Одна поверхность «кто что может»: правило точки и исключения из него —
+ * в одной строке, роли — рядом.
  */
-function PermsTab({ locations }) {
-  const [activeId, setActiveId] = useState(locations[0]?.id || null)
-  const [settings, setSettings] = useState(null)
-  const [saving, setSaving] = useState(false)
-  const [saved, setSaved] = useState(false)
+function AccessTab({ locations, roles, staff, settingsByLocation, onSettingsChanged, onRolesChanged }) {
+  const [locationId, setLocationId] = useState(locations[0]?.id || '')
+  const [saving, setSaving] = useState('')
   const [error, setError] = useState('')
+  const [editing, setEditing] = useState(null)
 
-  useEffect(() => {
-    if (!activeId) return undefined
-    let cancelled = false
-    setSettings(null)
-    setSaved(false)
-    fetchLocation(activeId)
-      .then((data) => { if (!cancelled) setSettings(data.settings || {}) })
-      .catch((loadError) => { if (!cancelled) setError(loadError.message) })
-    return () => { cancelled = true }
-  }, [activeId])
+  const settings = settingsByLocation[locationId]
 
-  async function toggle(key, level) {
-    setSaving(true)
+  async function setLevel(key, level) {
+    setSaving(key)
     setError('')
-    setSaved(false)
-    // Оптимистично: переключатель отзывается сразу, ошибку откатываем
-    const previous = settings
-    setSettings({ ...settings, perms: { ...(settings.perms || {}), [key]: level } })
     try {
-      await patchLocationSettings(activeId, { perms: { [key]: level } })
-      setSaved(true)
+      await patchLocationSettings(locationId, { perms: { [key]: level } })
+      onSettingsChanged(locationId, { [key]: level })
     } catch (saveError) {
-      setSettings(previous)
-      setError(saveError.message)
+      setError(staffErrorText(saveError.message))
     } finally {
-      setSaving(false)
+      setSaving('')
     }
+  }
+
+  if (locations.length === 0) {
+    return <EmptyState>No locations are linked to this account.</EmptyState>
   }
 
   return (
     <>
-      {locations.length > 1 && (
-        <div className="location-tabs" role="tablist" aria-label="Location">
-          {locations.map((loc) => (
-            <button
-              key={loc.id}
-              role="tab"
-              aria-selected={loc.id === activeId}
-              className={loc.id === activeId ? 'is-active' : ''}
-              onClick={() => setActiveId(loc.id)}
-            >
-              {loc.name}
-            </button>
-          ))}
-        </div>
-      )}
-
-      <section className="panel">
-        <div className="panel-heading">
-          <div>
-            <h2>What baristas can do</h2>
-            <p>
-              This is the base level of the location: it applies to everyone
-              without a custom role. A custom role assigned to a person wins
-              over it, action by action. Restricted actions ask for a manager
-              or owner PIN on the register.
-            </p>
-          </div>
-          {saved && !saving && <span className="save-ok"><Check /> Saved</span>}
-        </div>
-
-        {!settings ? (
-          <p className="empty-state">Loading…</p>
-        ) : (
-          <div className="menu-list">
-            {PERM_KEYS.map((key) => {
-              const level = permLevel(settings, key)
-              return (
-                /* Это выбор одного из двух, а не две независимые кнопки:
-                   роль radiogroup и aria-checked говорят это скринридеру,
-                   а подпись называет действие — иначе он читает подряд
-                   «Everyone, Manager, Everyone, Manager». */
-                <div className="menu-row" key={key}>
-                  <span className="menu-name" id={`perm-${key}`}>{PERM_LABELS[key]}</span>
-                  <span className="perm-switch" role="radiogroup" aria-labelledby={`perm-${key}`}>
-                    <button
-                      type="button"
-                      role="radio"
-                      aria-checked={level === 'all'}
-                      aria-label={`${PERM_LABELS[key]}: everyone`}
-                      className={level === 'all' ? 'is-active' : ''}
-                      onClick={() => toggle(key, 'all')}
-                      disabled={saving}
-                    >
-                      Everyone
-                    </button>
-                    <button
-                      type="button"
-                      role="radio"
-                      aria-checked={level === 'manager'}
-                      aria-label={`${PERM_LABELS[key]}: manager and owner only`}
-                      className={level === 'manager' ? 'is-active' : ''}
-                      onClick={() => toggle(key, 'manager')}
-                      disabled={saving}
-                    >
-                      Manager
-                    </button>
-                  </span>
-                </div>
-              )
-            })}
-          </div>
+      <div className="tm-toolbar">
+        {locations.length > 1 && (
+          <label className="tm-select">
+            <span className="visually-hidden">Location</span>
+            <select value={locationId} onChange={(e) => setLocationId(e.target.value)}>
+              {locations.map((l) => <option key={l.id} value={l.id}>{l.name}</option>)}
+            </select>
+          </label>
         )}
+        <Button size="compact" onClick={() => setEditing({})}>
+          <Plus aria-hidden /> New role
+        </Button>
+      </div>
 
-        {error && <p className="form-error" role="alert">{error}</p>}
-      </section>
+      {error && <ErrorText>{error}</ErrorText>}
+
+      <div className="tm-access-grid">
+        <Panel
+          className="tm-matrix-panel"
+          title="What the team can do"
+          description="Everyone follows these rules, except people who have a role — a role replaces them entirely."
+        >
+          {!settings ? (
+            <EmptyState>Loading…</EmptyState>
+          ) : (
+            <div className="tm-matrix">
+              <div className="tm-matrix-head" aria-hidden="true">
+                <span>Action</span>
+                <span>Allowed for</span>
+                <span>Roles that allow it</span>
+              </div>
+              {PERM_KEYS.map((key) => {
+                const level = permLevel(settings, key)
+                const exceptions = rolesAllowing(roles ?? [], key)
+                return (
+                  <div className="tm-matrix-row" key={key}>
+                    <span className="tm-matrix-name" id={`tm-perm-${key}`}>
+                      {PERM_LABELS[key]}
+                      <small>{PERM_HINTS[key]}</small>
+                    </span>
+                    {/* Выбор одного из двух, а не две независимые кнопки:
+                        radiogroup говорит это читалке, а подпись называет
+                        действие — иначе она читает подряд «Everyone,
+                        Manager, Everyone, Manager». */}
+                    <span className="perm-switch" role="radiogroup" aria-labelledby={`tm-perm-${key}`}>
+                      <button
+                        type="button"
+                        role="radio"
+                        aria-checked={level === 'all'}
+                        aria-label={`${PERM_LABELS[key]}: everyone`}
+                        className={level === 'all' ? 'is-active' : ''}
+                        disabled={saving === key}
+                        onClick={() => setLevel(key, 'all')}
+                      >
+                        Everyone
+                      </button>
+                      <button
+                        type="button"
+                        role="radio"
+                        aria-checked={level === 'manager'}
+                        aria-label={`${PERM_LABELS[key]}: manager and owner only`}
+                        className={level === 'manager' ? 'is-active' : ''}
+                        disabled={saving === key}
+                        onClick={() => setLevel(key, 'manager')}
+                      >
+                        Manager
+                      </button>
+                    </span>
+                    <span className="tm-matrix-roles">
+                      {exceptions.length === 0
+                        ? <span className="tm-none">—</span>
+                        : exceptions.map((r) => (
+                          <button
+                            type="button"
+                            className="tm-role-chip"
+                            key={r.id}
+                            onClick={() => setEditing(r)}
+                          >
+                            {r.name}
+                          </button>
+                        ))}
+                    </span>
+                  </div>
+                )
+              })}
+            </div>
+          )}
+        </Panel>
+
+        <Panel
+          className="tm-roles-panel"
+          title="Roles"
+          description="A role is a fixed set of actions for one person — it ignores the rules on the left."
+        >
+          {roles === null ? (
+            <EmptyState>Loading…</EmptyState>
+          ) : roles.length === 0 ? (
+            <EmptyState>
+              No roles yet. Create one to allow a single action — refunds for a
+              senior barista — without making someone a manager.
+            </EmptyState>
+          ) : (
+            <div className="tm-roles">
+              {roles.map((role) => {
+                const holders = roleHolders(staff, role.id)
+                return (
+                  <button
+                    type="button"
+                    className="tm-role-row"
+                    key={role.id}
+                    onClick={() => setEditing(role)}
+                    aria-label={`Open role ${role.name} · ${(role.perms ?? []).length} of ${PERM_KEYS.length} actions · ${holders} people`}
+                  >
+                    <span className="tm-role-name">{role.name}</span>
+                    <span className="tm-role-count">
+                      {(role.perms ?? []).length} of {PERM_KEYS.length}
+                    </span>
+                    <span className="tm-role-holders">
+                      {holders > 0 ? `${holders} ${holders === 1 ? 'person' : 'people'}` : 'unused'}
+                    </span>
+                  </button>
+                )
+              })}
+            </div>
+          )}
+        </Panel>
+      </div>
+
+      {editing && (
+        <RoleCard
+          key={editing.id || 'new'}
+          role={editing}
+          holders={editing.id ? roleHolders(staff, editing.id) : 0}
+          onClose={() => setEditing(null)}
+          onSaved={() => { setEditing(null); onRolesChanged() }}
+        />
+      )}
     </>
   )
 }
 
-export default function TeamManager({ context, tab: tabFromUrl, onTabChange }) {
-  const locations = context.locations || []
-  const myRole = context.member?.role
-  const iAmOwner = myRole === 'owner'
+// ── Раздел ───────────────────────────────────────────────────
 
-  const tab = TABS.some((t) => t.key === tabFromUrl) ? tabFromUrl : 'staff'
-  const setTab = onTabChange
+export default function TeamManager({ context, tab: tabFromUrl, onTabChange }) {
+  const locations = useMemo(() => context.locations || [], [context.locations])
+  const iAmOwner = context.member?.role === 'owner'
+  const tab = resolveTab(tabFromUrl)
+
   const [staff, setStaff] = useState(null)
   const [roles, setRoles] = useState(null)
-  const [editing, setEditing] = useState(null) // {} = новый, {id...} = правка
+  const [settingsByLocation, setSettings] = useState({})
+  const [shifts, setShifts] = useState(null)
+  const [loading, setLoading] = useState(true)
   const [error, setError] = useState('')
+  const [hoursStaffId, setHoursStaffId] = useState(null)
 
-  async function reload() {
+  const load = useCallback(async () => {
+    setLoading(true)
     setError('')
     try {
       const [nextStaff, nextRoles] = await Promise.all([fetchStaff(), fetchRoles()])
       setStaff(nextStaff)
       setRoles(nextRoles)
     } catch (loadError) {
-      setError(loadError.message)
+      setError(staffErrorText(loadError.message))
+    } finally {
+      setLoading(false)
     }
+  }, [])
+
+  useEffect(() => { load() }, [load])
+
+  /*
+   * Настройки всех точек, а не выбранной: колонка «Access» считается для
+   * точки КАЖДОГО человека, и одной локацией её не собрать. Точек у
+   * организации единицы — это не выборка, а справочник.
+   */
+  useEffect(() => {
+    let alive = true
+    Promise.all(locations.map((l) => fetchLocation(l.id).then(
+      (data) => [l.id, data.settings || {}],
+      // Настройки одной точки не должны ронять раздел: без них
+      // применяются дефолты, те же, что на сервере
+      () => [l.id, {}],
+    )))
+      .then((pairs) => { if (alive) setSettings(Object.fromEntries(pairs)) })
+    return () => { alive = false }
+  }, [locations])
+
+  /*
+   * Последняя смена и «на смене сейчас» — из отчёта часов за месяц. Это
+   * подсказка, а не содержимое раздела: не приехала — колонка молчит
+   * прочерком, список работает.
+   */
+  useEffect(() => {
+    let alive = true
+    const to = new Date()
+    const from = new Date()
+    from.setDate(from.getDate() - SHIFT_WINDOW_DAYS)
+    fetchHours({ from, to })
+      .then((report) => { if (alive) setShifts(shiftIndex(report)) })
+      .catch(() => { if (alive) setShifts(new Map()) })
+    return () => { alive = false }
+  }, [])
+
+  /** Оптимистично: переключатель права отзывается сразу, ошибку показываем */
+  function applySettings(locationId, permPatch) {
+    setSettings((prev) => ({
+      ...prev,
+      [locationId]: {
+        ...(prev[locationId] || {}),
+        perms: { ...(prev[locationId]?.perms || {}), ...permPatch },
+      },
+    }))
   }
 
-  useEffect(() => { reload() }, [])
-
-  const { active, inactive } = useMemo(() => {
-    const list = staff || []
-    return {
-      active: list.filter((s) => s.is_active),
-      inactive: list.filter((s) => !s.is_active),
-    }
-  }, [staff])
-
-  /** Строку владельца правит только владелец — сервер это тоже проверяет. */
-  function canEdit(member) {
-    return member.role !== 'owner' || iAmOwner
-  }
-
-  /** Имя кастомной роли для строки списка (пусто — покажется базовая) */
-  function roleNameFor(member) {
-    if (!member.role_id) return null
-    return (roles || []).find((r) => r.id === member.role_id)?.name || null
+  function openHours(staffId) {
+    setHoursStaffId(staffId)
+    onTabChange('hours')
   }
 
   return (
     <>
       <PageHeader title="Team" />
 
-      <div className="menu-tabs location-tabs" role="tablist" aria-label="Team section">
-        {TABS.map((t) => (
-          <button
-            key={t.key}
-            role="tab"
-            aria-selected={tab === t.key}
-            className={tab === t.key ? 'is-active' : ''}
-            onClick={() => setTab(t.key)}
-          >
-            {t.label}
-          </button>
-        ))}
-      </div>
+      <Tabs
+        label="Team section"
+        className="menu-tabs location-tabs"
+        items={TABS}
+        value={tab}
+        onChange={onTabChange}
+      />
 
-      {tab === 'staff' && (
-        <>
-          <div className="menu-toolbar">
-            <button className="secondary-button" onClick={() => setEditing({})} disabled={locations.length === 0}>
-              <Plus /> Add person
-            </button>
-          </div>
+      {error && <ErrorText>{error}</ErrorText>}
 
-          {error && <p className="form-error" role="alert">{error}</p>}
+      {tab === 'people' && (
+        <PeopleTab
+          staff={staff}
+          roles={roles}
+          locations={locations}
+          settingsByLocation={settingsByLocation}
+          shifts={shifts}
+          loading={loading}
+          iAmOwner={iAmOwner}
+          onChanged={load}
+          onOpenHours={openHours}
+        />
+      )}
 
-          {staff === null ? (
-            <p className="empty-state">Loading…</p>
-          ) : staff.length === 0 ? (
-            <p className="empty-state">Nobody has been added yet.</p>
-          ) : (
-            <div className="menu-groups">
-              <section className="panel">
-                <div className="panel-heading">
-                  <div><h2>Active</h2><p>{active.length} on the register</p></div>
-                </div>
-                <div className="menu-list">
-                  {active.map((member) => (
-                    <StaffRow
-                      key={member.id}
-                      member={member}
-                        roleName={roleNameFor(member)}
-                      editable={canEdit(member)}
-                      onEdit={setEditing}
-                      onChangePin={setEditing}
-                    />
-                  ))}
-                </div>
-              </section>
-
-              {inactive.length > 0 && (
-                <section className="panel">
-                  <div className="panel-heading">
-                    <div><h2>Inactive</h2><p>Kept for sales history, cannot sign in</p></div>
-                  </div>
-                  <div className="menu-list">
-                    {inactive.map((member) => (
-                      <StaffRow
-                        key={member.id}
-                        member={member}
-                          roleName={roleNameFor(member)}
-                        editable={canEdit(member)}
-                        onEdit={setEditing}
-                        onChangePin={setEditing}
-                      />
-                    ))}
-                  </div>
-                </section>
-              )}
-            </div>
-          )}
-        </>
+      {tab === 'access' && (
+        <AccessTab
+          locations={locations}
+          roles={roles}
+          staff={staff}
+          settingsByLocation={settingsByLocation}
+          onSettingsChanged={applySettings}
+          onRolesChanged={load}
+        />
       )}
 
       {/* Часы стоят в «Команде», а не отдельным разделом: их открывают о
           том же человеке, что и карточку сотрудника, и в один клик от неё */}
-      {tab === 'hours' && <HoursManager context={context} />}
-
-      {tab === 'roles' && <RolesTab roles={roles} staff={staff} reload={reload} />}
-
-      {tab === 'perms' && (
-        locations.length === 0
-          ? <p className="empty-state">No locations are linked to this account.</p>
-          : <PermsTab locations={locations} />
-      )}
-
-      {editing && (
-        <StaffEditor
-          member={editing}
-          locations={locations}
-          roles={roles || []}
-          canAssignOwner={iAmOwner}
-          canDelete={iAmOwner || editing.role !== 'owner'}
-          onClose={() => setEditing(null)}
-          onSaved={() => { setEditing(null); reload() }}
-        />
-      )}
+      {tab === 'hours' && <HoursManager context={context} initialStaffId={hoursStaffId} />}
     </>
   )
 }

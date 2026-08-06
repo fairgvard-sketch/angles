@@ -1,4 +1,15 @@
 import { supabase } from './supabase'
+// Чистые правила команды и доступа — в отдельном модуле под тесты
+export {
+  ROLES, ROLE_LABELS, isValidPin,
+  PERM_KEYS, PERM_DEFAULTS, PERM_LABELS, PERM_HINTS, permLevel,
+  can, roleOf, accessRows, accessSource, accessScope, accessSummary,
+  rolesAllowing, roleHolders,
+  locationLabel, roleTitle, lastShiftLabel, daysBetween,
+  SHIFT_WINDOW_DAYS, shiftIndex, statusOf, personRowLabel,
+  sortRoster, filterRoster,
+  TABS, resolveTab, staffErrorText, hasRecords,
+} from './roster'
 
 /**
  * Команда в бэкофисе — паритет с кассовым разделом «Сотрудники».
@@ -13,19 +24,6 @@ import { supabase } from './supabase'
  * Права доступа (perms) живут в locations.settings и пишутся отдельным
  * patch_location_settings_web — см. settings.js.
  */
-
-export const ROLES = ['barista', 'manager', 'owner']
-
-export const ROLE_LABELS = {
-  owner: 'Owner',
-  manager: 'Manager',
-  barista: 'Barista',
-}
-
-/** Правила PIN совпадают с серверными (create_staff/set_staff_pin). */
-export function isValidPin(pin) {
-  return /^\d{4,8}$/.test(pin)
-}
 
 // ── Чтение ───────────────────────────────────────────────────
 
@@ -60,7 +58,10 @@ export async function createStaff({ name, role, pin, locationId }) {
   return data
 }
 
-/** Патч карточки: имя, роль, is_active. Шлём только изменённые поля. */
+/**
+ * Патч карточки: имя, роль, is_active, role_id. Шлём только изменённые
+ * поля — allow-лист сервера (093/094) ровно этот, точку он не принимает.
+ */
 export async function updateStaff(staffId, patch) {
   const { error } = await supabase.rpc('update_staff', {
     p_staff_id: staffId,
@@ -80,67 +81,24 @@ export async function setStaffPin(staffId, pin) {
 }
 
 /**
- * Удаление доступно только сотруднику без истории — аудит-трейл неприкосновенен.
- * Сервер отвечает 'staff has records'; помечаем ошибку флагом, чтобы UI
- * предложил деактивацию вместо удаления (как в кассе).
+ * Удаление доступно только сотруднику без истории — аудит-трейл
+ * неприкосновенен. Сервер отвечает 'staff has records'; разбор кода и
+ * текст для человека — в `roster.js`.
  */
 export async function deleteStaff(staffId) {
   const { error } = await supabase.rpc('delete_staff', {
     p_staff_id: staffId,
     p_staff_session: null,
   })
-  if (error) {
-    const failure = new Error(error.message)
-    failure.hasRecords = /staff has records/i.test(error.message)
-    throw failure
-  }
-}
-
-// ── Права доступа (locations.settings.perms) ─────────────────
-
-/**
- * Ключи и дефолты повторяют src/lib/perms.ts кассы. Дефолты — поведение до
- * миграции 036; при расхождении источник истины там.
- */
-export const PERM_KEYS = [
-  'discount', 'price_edit', 'refund', 'void_order', 'close_shift',
-  'cash_movement', 'online_pause', 'stock_receive', 'stock_take',
-]
-
-export const PERM_DEFAULTS = {
-  discount: 'all',
-  price_edit: 'all',
-  refund: 'manager',
-  void_order: 'all',
-  close_shift: 'all',
-  cash_movement: 'all',
-  online_pause: 'all',
-  stock_receive: 'all',
-  stock_take: 'manager',
-}
-
-export const PERM_LABELS = {
-  discount: 'Discounts',
-  price_edit: 'Price override',
-  refund: 'Refunds',
-  void_order: 'Void order',
-  close_shift: 'Close shift',
-  cash_movement: 'Cash in / cash out',
-  online_pause: 'Pause online orders',
-  stock_receive: 'Receive stock',
-  stock_take: 'Stock take',
-}
-
-export function permLevel(settings, key) {
-  return settings?.perms?.[key] ?? PERM_DEFAULTS[key]
+  if (error) throw new Error(error.message)
 }
 
 // ── Кастомные роли (094) ─────────────────────────────────────
 
 /**
- * Роль — именованный набор прав поверх базового уровня, а не замена
- * owner/manager/barista. У сотрудника без роли (`role_id: null`) права
- * считаются по-старому: настройки точки + базовая роль.
+ * Роль — именованный набор прав. Для своего носителя набор
+ * ИСЧЕРПЫВАЮЩИЙ: не отмеченное в роли запрещено, даже если точка
+ * разрешает это всем (`can` в roster.js, `require_staff_perm` на сервере).
  *
  * 'manage' (управление командой) в набор не входит — сервер его вырезает,
  * иначе носитель роли выдал бы себе любые права.

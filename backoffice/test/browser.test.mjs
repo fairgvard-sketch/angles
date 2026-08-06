@@ -791,7 +791,13 @@ describe('mobile navigation drawer', { skip }, () => {
     await page.setViewport({ width: 390, height: 844 })
     await page.goto(`${appOrigin}/shell`, { waitUntil: 'networkidle0' })
     await page.click('.mobile-menu')
-    await new Promise((resolve) => setTimeout(resolve, 400))
+    // Ждём открытое состояние, а не отмеренную паузу: под нагрузкой
+    // фиксированные 400 мс истекали раньше, чем шторка успевала открыться
+    // и забрать фокус, и проверка падала на ровном месте
+    await page.waitForFunction(() => (
+      document.querySelector('.sidebar')?.classList.contains('is-open')
+      && document.activeElement?.getAttribute('aria-label') === 'Close navigation'
+    ))
     return page
   }
 
