@@ -320,7 +320,11 @@ a { color: inherit; }
 .dash-attention-text { display: grid; gap: 2px; min-width: 0; margin-inline-end: auto; }
 .dash-attention-text strong { font-size: 14px; font-weight: 700; }
 .dash-attention-text small { color: var(--c-text-subtle); font-size: 12px; }
-.dash-attention-row .secondary-button { flex: none; }
+/* Действия стоят колонкой, и у колонки один край: кнопки по ширине своей
+   надписи («Open devices» против «Review them») превращали её в лесенку */
+.dash-attention-row .secondary-button {
+  flex: none; min-width: 152px; justify-content: center;
+}
 .dash-clear {
   display: flex; align-items: center; gap: var(--sp-2);
   margin: 0 0 var(--sp-3); color: var(--c-text-subtle); font-size: 13px;

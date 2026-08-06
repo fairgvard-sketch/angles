@@ -55,6 +55,23 @@ test('незакрытый заказ прошлого дня уходит в о
   assert.equal(buckets.progress.length, 0)
 })
 
+test('вчерашняя заявка, принятая на кассе, долгом не считается (142)', () => {
+  const buckets = bucketOrders([
+    order('web', { status: 'accepted', created_at: at(0, 20) }),
+    order('pos', { status: 'accepted', created_at: at(0, 19), order_id: 'ord-1' }),
+  ], DAY_START)
+  assert.deepEqual(buckets.stale.map((o) => o.id), ['web'], 'долг — только то, что кабинет может закрыть')
+  assert.deepEqual(buckets.settled.map((o) => o.id), ['pos'], 'принятая на кассе не пропадает, но и не висит долгом')
+})
+
+test('сегодняшняя заявка с кассы остаётся сегодняшней работой', () => {
+  const buckets = bucketOrders([
+    order('pos', { status: 'accepted', created_at: at(1, 10), order_id: 'ord-1' }),
+  ], DAY_START)
+  assert.deepEqual(buckets.progress.map((o) => o.id), ['pos'])
+  assert.equal(buckets.settled.length, 0)
+})
+
 test('сегодняшние заказы разложены по стадиям', () => {
   const buckets = bucketOrders([
     order('a', { status: 'new', created_at: at(1, 11) }),

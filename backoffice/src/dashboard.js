@@ -1,7 +1,7 @@
 import { supabase } from './supabase'
 import { fetchOnlineOrders } from './orders'
 import { bucketOrders, dayStartMs } from './orders-inbox'
-import { fetchFleet, deviceStatus, deviceAdvice, isArchived } from './devices'
+import { fetchFleet, deviceStatus, deviceAdvice, isArchived, lastSeenLabel } from './devices'
 import { fetchSalesReport } from './sales'
 import { fetchLocation, fetchLocationSlug } from './settings'
 import { onlineEnabled, reservationsEnabled } from './online'
@@ -179,17 +179,47 @@ export function reservationsSummary(list, nowMs) {
   }
 }
 
-/** Парк касс: сколько на связи и сколько требует внимания */
+/**
+ * Парк касс: сколько на связи и сколько требует внимания.
+ *
+ * «Худший» — тот, о ком дашборд говорит вслух, поэтому он выбирается, а
+ * не берётся первым попавшимся из ответа сервера: сначала застрявшая
+ * очередь (сделанные продажи не дошли), потом ни разу не вышедший на
+ * связь, потом самый долгий молчун.
+ */
+const PROBLEM_RANK = { error: 3, never: 2, offline: 1 }
+
 export function fleetSummary(devices) {
   if (!devices) return null
   const live = devices.filter((d) => !isArchived(d))
   const problems = live.filter((d) => ['offline', 'error', 'never'].includes(deviceStatus(d)))
+  const worst = [...problems].sort((a, b) => (
+    (PROBLEM_RANK[deviceStatus(b)] ?? 0) - (PROBLEM_RANK[deviceStatus(a)] ?? 0)
+    || (b.silence_seconds ?? 0) - (a.silence_seconds ?? 0)
+  ))[0] ?? null
   return {
     total: live.length,
     online: live.filter((d) => deviceStatus(d) === 'online').length,
     problems: problems.length,
-    worst: problems[0] ?? null,
+    worst,
   }
+}
+
+/**
+ * Строка про худшую кассу, когда их несколько.
+ *
+ * Совет `deviceAdvice` написан про КОНКРЕТНЫЙ терминал: под заголовком
+ * «3 registers are not reporting» он читался как утверждение обо всех
+ * трёх и заодно врал о сроке — «не выходит на связь больше часа» стояло
+ * и над кассой, молчащей неделю.
+ */
+export function worstDeviceLine(device) {
+  if (!device) return null
+  const name = device.name || 'A register'
+  const status = deviceStatus(device)
+  if (status === 'error') return `${name} has sales stuck in its queue.`
+  if (status === 'never') return `${name} has never reported in.`
+  return `Silent the longest: ${name}, last seen ${lastSeenLabel(device).toLowerCase()}.`
 }
 
 // ── День: кривая по часам и сравнение с вчера ───────────────
@@ -335,7 +365,11 @@ export function attentionItems({
       title: fleetInfo.problems === 1
         ? `${fleetInfo.worst.name || 'A register'} is not reporting`
         : `${fleetInfo.problems} registers are not reporting`,
-      detail: fleetInfo.worst ? deviceAdvice(fleetInfo.worst) : null,
+      // Про одну кассу — что с ней делать; про несколько — какая из них
+      // хуже всех, потому что совет для одной над списком из трёх врёт
+      detail: fleetInfo.problems === 1
+        ? deviceAdvice(fleetInfo.worst)
+        : worstDeviceLine(fleetInfo.worst),
       action: { label: 'Open devices', view: 'devices' },
     })
   }

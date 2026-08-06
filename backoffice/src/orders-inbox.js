@@ -310,13 +310,25 @@ export function dayStartMs(nowMs, tz) {
  * дня не должна лежать рядом со свежими и выглядеть текущей работой.
  * Возраст считается по началу дня точки, а не по «минус 24 часа»: смена
  * ориентируется на календарный день, а не на скользящее окно.
+ *
+ * `settled` — вчерашние заявки, принятые на кассе. Долгом они не
+ * являются, но и в сегодняшнюю работу не попадают: корзина существует,
+ * чтобы они никуда не пропали молча.
  */
 export function bucketOrders(orders, startOfDayMs) {
-  const buckets = { fresh: [], progress: [], ready: [], stale: [] }
+  const buckets = { fresh: [], progress: [], ready: [], stale: [], settled: [] }
   for (const order of orders ?? []) {
     const created = new Date(order.created_at).getTime()
     if (Number.isFinite(startOfDayMs) && created < startOfDayMs) {
-      buckets.stale.push(order)
+      // Заявка с `order_id` принята на кассе: дальше жизнь идёт в
+      // `orders` — оплата, выдача, смена, — а строка `online_orders`
+      // навсегда остаётся `accepted`, двигать её больше нечем и незачем.
+      // Долгом кабинета она не является, и сервер разреза `older` считает
+      // ровно так же (миграция 142). Без этого правила дашборд звал
+      // «разобрать» туда, где раздел заказов показывает пусто, и счётчик
+      // рос с каждой принятой заявкой, никогда не уменьшаясь.
+      if (order.order_id) buckets.settled.push(order)
+      else buckets.stale.push(order)
       continue
     }
     if (order.status === 'new') buckets.fresh.push(order)
@@ -330,6 +342,7 @@ export function bucketOrders(orders, startOfDayMs) {
   buckets.progress.sort(byOldest)
   buckets.ready.sort(byOldest)
   buckets.stale.sort((a, b) => new Date(b.created_at) - new Date(a.created_at))
+  buckets.settled.sort((a, b) => new Date(b.created_at) - new Date(a.created_at))
   return buckets
 }
 

@@ -65,17 +65,26 @@ export function ActivityList({ events }) {
   )
 }
 
-/** Компактная лента для Home: последние N, кнопка «View all» ведёт в раздел */
+/**
+ * Компактная лента для Home: последние N, кнопка «View all» ведёт в раздел.
+ *
+ * Обновляется на той же минуте, что и весь дашборд. Раньше карточка
+ * читала журнал один раз при открытии и больше никогда: остальной экран
+ * тикал, а «что только что произошло» показывало момент, когда владелец
+ * зашёл, — и чем дольше вкладка открыта, тем неправдивее.
+ */
 export function ActivityCard({ onNavigate }) {
   const [events, setEvents] = useState(null)
   const [error, setError] = useState('')
 
   useEffect(() => {
     let alive = true
-    fetchActivity({ limit: 6 })
-      .then((d) => alive && setEvents(d))
-      .catch((e) => alive && setError(e.message))
-    return () => { alive = false }
+    const load = () => fetchActivity({ limit: 6 })
+      .then((d) => { if (alive) { setEvents(d); setError('') } })
+      .catch((e) => { if (alive) setError(e.message) })
+    load()
+    const timer = setInterval(load, 60_000)
+    return () => { alive = false; clearInterval(timer) }
   }, [])
 
   return (
@@ -86,9 +95,11 @@ export function ActivityCard({ onNavigate }) {
         <div><h2>Recent activity</h2></div>
         <button className="text-button" onClick={() => onNavigate('activity')}>View all</button>
       </div>
-      {error ? <p className="empty-state">{error}</p>
-        : events === null ? <p className="empty-state">Loading…</p>
-        : <ActivityList events={events} />}
+      {/* Сорванное обновление не стирает уже показанный журнал: отказ
+          занимает место списка, только когда показывать нечего */}
+      {events !== null ? <ActivityList events={events} />
+        : error ? <p className="empty-state">{error}</p>
+        : <p className="empty-state">Loading…</p>}
     </section>
   )
 }

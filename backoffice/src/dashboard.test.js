@@ -2,7 +2,7 @@ import assert from 'node:assert/strict'
 import { describe, it } from 'node:test'
 import {
   attentionItems, chartSummary, currentHour, fleetSummary, heroKind, hourlyComparison,
-  ordersSummary, reservationsSummary, todayBars,
+  ordersSummary, reservationsSummary, todayBars, worstDeviceLine,
 } from './dashboard.js'
 
 /**
@@ -48,6 +48,16 @@ describe('сводка заказов', () => {
   it('без данных возвращает null, а не выдуманные нули', () => {
     assert.equal(ordersSummary(undefined, NOW, TZ), null)
   })
+
+  it('вчерашняя заявка, принятая на кассе, в незакрытые не попадает (142)', () => {
+    // Иначе главная звала «разобрать» туда, где раздел заказов пуст: он
+    // это правило знает с 142, а дашборд считал по-своему
+    const s = ordersSummary([
+      ...orders,
+      { id: 'o5', status: 'accepted', created_at: yesterday(19), order_id: 'ord-1' },
+    ], NOW, TZ)
+    assert.equal(s.stale, 1, 'долгом остаётся только незакрытое кабинетом')
+  })
 })
 
 describe('сводка визитов', () => {
@@ -90,6 +100,37 @@ describe('сводка парка касс', () => {
     assert.equal(s.online, 1)
     assert.equal(s.problems, 1)
     assert.equal(s.worst.id, 'd2')
+  })
+
+  it('худшая выбирается, а не берётся первой из ответа сервера', () => {
+    const s = fleetSummary([
+      { id: 'a', name: 'Молчит день', silence_seconds: 86400, outbox_failed: 0, archived_at: null },
+      { id: 'b', name: 'Молчит неделю', silence_seconds: 604800, outbox_failed: 0, archived_at: null },
+      { id: 'c', name: 'Очередь встала', silence_seconds: 120, outbox_failed: 3, archived_at: null },
+    ])
+    assert.equal(s.problems, 3)
+    assert.equal(s.worst.id, 'c', 'непроданное в очереди дороже молчания')
+
+    const silent = fleetSummary([
+      { id: 'a', name: 'Молчит день', silence_seconds: 86400, outbox_failed: 0, archived_at: null },
+      { id: 'b', name: 'Молчит неделю', silence_seconds: 604800, outbox_failed: 0, archived_at: null },
+    ])
+    assert.equal(silent.worst.id, 'b', 'из молчунов — самый долгий')
+  })
+
+  it('о нескольких кассах говорят про худшую, а не советуют как про одну', () => {
+    assert.equal(
+      worstDeviceLine({ name: 'Стойка 2', silence_seconds: 604800, outbox_failed: 0 }),
+      'Silent the longest: Стойка 2, last seen 7d ago.'
+    )
+    assert.equal(
+      worstDeviceLine({ name: 'Стойка 3', silence_seconds: 120, outbox_failed: 2 }),
+      'Стойка 3 has sales stuck in its queue.'
+    )
+    assert.equal(
+      worstDeviceLine({ name: 'Стойка 4', silence_seconds: null, outbox_failed: 0 }),
+      'Стойка 4 has never reported in.'
+    )
   })
 })
 
