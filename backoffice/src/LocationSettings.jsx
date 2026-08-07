@@ -7,6 +7,8 @@ import { fetchCategories, updateCategory } from './menu'
 import { agorotToInput, inputToAgorot } from './online'
 import { PageHeader } from './ui/Layout'
 import ConfirmDialog from './ui/ConfirmDialog'
+import Tabs from './ui/Tabs'
+import Skeleton, { SkeletonBar, SkeletonPanel } from './ui/Skeleton'
 
 /**
  * Настройки точки в бэкофисе — теперь единственное место, где правится
@@ -130,20 +132,16 @@ export default function LocationSettings({ context, locationId, tab: tabFromUrl,
     <>
       <PageHeader title="Locations" />
 
-      <div className="location-tabs settings-topic-tabs" role="tablist" aria-label="Settings topic">
-        {TABS.map((t) => (
-          <button
-            key={t.key}
-            type="button"
-            role="tab"
-            aria-selected={tab === t.key}
-            className={tab === t.key ? 'is-active' : ''}
-            onClick={() => askTab(t.key)}
-          >
-            {t.label}
-          </button>
-        ))}
-      </div>
+      {/* Полоса тем — на общий примитив: до него все пять кнопок были
+          отдельными остановками Tab, а стрелки не двигали ничего, хотя
+          `role="tablist"` обещал читалке ровно обратное. */}
+      <Tabs
+        className="location-tabs settings-topic-tabs"
+        label="Settings topic"
+        items={TABS.map((t) => ({ key: t.key, label: t.label }))}
+        value={tab}
+        onChange={askTab}
+      />
 
       {/*
         Область действия. У сети настройки точек не общие, и владелец
@@ -172,7 +170,18 @@ export default function LocationSettings({ context, locationId, tab: tabFromUrl,
       )}
 
       {loading || !location ? (
-        <section className="panel form-panel"><p className="empty-state">Loading…</p></section>
+        /* Форма настроек: пары «подпись — поле» и кнопка сохранения. */
+        <Skeleton label="Loading the location settings…">
+          <SkeletonPanel height={430}>
+            {[0, 1, 2, 3, 4].map((i) => (
+              <div className="sk-row" key={i} style={{ height: 66, padding: 0, border: 0, display: 'grid', gap: 8 }}>
+                <SkeletonBar width="18%" height={11} />
+                <SkeletonBar width="100%" height={38} radius="var(--r-md)" />
+              </div>
+            ))}
+            <SkeletonBar width="132px" height={40} radius="var(--r-md)" />
+          </SkeletonPanel>
+        </Skeleton>
       ) : (
         <>
           {tab === 'general' && <GeneralTab key={location.id} location={location} onSaved={setLocation} onDirty={setDirty} />}
@@ -191,7 +200,10 @@ function SaveRow({ saving, saved, error }) {
   return (
     <div className="form-actions">
       {error && <p className="form-error" role="alert">{error}</p>}
-      {saved && <span className="save-ok"><Check /> Saved</span>}
+      {/* role="status" — иначе подтверждение сохранения видно только
+          глазами: читалка молчит, и владелец с ней не знает, ушли
+          правки на сервер или нет. */}
+      {saved && <span className="save-ok" role="status"><Check aria-hidden /> Saved</span>}
       <button className="primary-button narrow" type="submit" disabled={saving}>
         {saving ? 'Saving…' : 'Save changes'}
       </button>

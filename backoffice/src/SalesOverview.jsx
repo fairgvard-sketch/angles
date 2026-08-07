@@ -12,6 +12,7 @@ import {
 import { ErrorText, PageHeader } from './ui/Layout'
 import { Button, IconButton } from './ui/Button'
 import Tabs from './ui/Tabs'
+import Skeleton, { SkeletonBar, SkeletonPanel } from './ui/Skeleton'
 
 /**
  * «Sales» — выручка владельца. Данные из sales_report (089, членство вместо
@@ -431,6 +432,28 @@ export default function SalesOverview({ context }) {
 
       {!ready ? (
         <p className="empty-state">Pick a start and end date.</p>
+      ) : loading && !report ? (
+        /* Первый показ отчёта: числа, график и три разреза. Раньше здесь
+           стоял прочерк «…» в пустой поверхности, и экран подрастал на
+           884px, когда отчёт приходил. */
+        <Skeleton label="Loading the sales report…">
+          <SkeletonPanel height={300}>
+            <SkeletonBar width="14%" />
+            <SkeletonBar width="30%" height={34} />
+            <SkeletonBar width="100%" height={150} />
+            <SkeletonBar width="62%" />
+          </SkeletonPanel>
+          <div className="sk-split">
+            <SkeletonPanel height={190}>
+              <SkeletonBar width="38%" height={16} />
+              {[74, 56, 44].map((w) => <SkeletonBar key={w} width={`${w}%`} />)}
+            </SkeletonPanel>
+            <SkeletonPanel height={190}>
+              <SkeletonBar width="30%" height={16} />
+              {[68, 52, 40].map((w) => <SkeletonBar key={w} width={`${w}%`} />)}
+            </SkeletonPanel>
+          </div>
+        </Skeleton>
       ) : error && !report ? (
         // Отказ сервера — не ноль продаж: пустой отчёт здесь был бы
         // враньём, поэтому поверхность не рисуется вовсе.

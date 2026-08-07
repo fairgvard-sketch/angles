@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
+import { Suspense, lazy, useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import {
   Activity,
   BarChart3,
@@ -23,20 +23,106 @@ import {
   NAV_ITEMS, PRODUCT_META, groupedNavigation, hasCapability, isLocationScoped, productState,
 } from './navigation'
 import { DEFAULT_VIEW, parseRoute, routeToUrl, sameRoute } from './routing'
-import SalesOverview from './SalesOverview'
-import LocationSettings from './LocationSettings'
-import MenuManager from './MenuManager'
-import TeamManager from './TeamManager'
-import QrChannels from './QrChannels'
-import OrdersInbox from './OrdersInbox'
-import ReservationsDesk from './ReservationsDesk'
-import DevicesManager from './DevicesManager'
-import GuestsManager from './GuestsManager'
-import ActivityManager, { ActivityCard } from './ActivityManager'
 import ViewErrorBoundary from './ErrorBoundary'
 import AppShell, { Brand } from './ui/AppShell'
 import HomeDashboard from './HomeDashboard'
+import { ActivityCard } from './ActivityManager'
 import { PageHeader } from './ui/Layout'
+import Skeleton, { SkeletonBar, SkeletonPanel } from './ui/Skeleton'
+
+/**
+ * Разделы загружаются по требованию.
+ *
+ * До этого кабинет приезжал одним файлом на 871 kB: владелец, открывший
+ * дашборд, ждал ещё и редактор товара, план зала, генератор QR и отчёт
+ * по броням — всё, чем он сегодня не пользуется. На T2 Mini и на
+ * телефоне в зале это не «пара сотен килобайт», а секунды до первого
+ * экрана.
+ *
+ * Что осталось в первом чанке и почему: оболочка, навигация и
+ * `HomeDashboard` — их видно сразу, и делить их значило бы менять
+ * ожидание одного файла на мигание двух. `ActivityCard` тоже: она
+ * стоит на самом дашборде.
+ *
+ * Каждый `lazy` — отдельный чанк Vite. Ожидание держит тот же скелет,
+ * что и загрузка данных: подмена экрана не должна выглядеть иначе,
+ * чем подмена его содержимого.
+ */
+const VIEW_MODULES = {
+  sales: () => import('./SalesOverview'),
+  locations: () => import('./LocationSettings'),
+  menu: () => import('./MenuManager'),
+  team: () => import('./TeamManager'),
+  online: () => import('./QrChannels'),
+  orders: () => import('./OrdersInbox'),
+  reservations: () => import('./ReservationsDesk'),
+  devices: () => import('./DevicesManager'),
+  guests: () => import('./GuestsManager'),
+  activity: () => import('./ActivityManager'),
+}
+
+const SalesOverview = lazy(VIEW_MODULES.sales)
+const LocationSettings = lazy(VIEW_MODULES.locations)
+const MenuManager = lazy(VIEW_MODULES.menu)
+const TeamManager = lazy(VIEW_MODULES.team)
+const QrChannels = lazy(VIEW_MODULES.online)
+const OrdersInbox = lazy(VIEW_MODULES.orders)
+const ReservationsDesk = lazy(VIEW_MODULES.reservations)
+const DevicesManager = lazy(VIEW_MODULES.devices)
+const GuestsManager = lazy(VIEW_MODULES.guests)
+const ActivityManager = lazy(VIEW_MODULES.activity)
+
+/**
+ * Прогрев чанков в простое.
+ *
+ * Разделённый бандл платит за первый экран ожиданием при первом заходе
+ * в каждый раздел. Владелец этого ждать не должен: пока он смотрит на
+ * дашборд, браузер простаивает — там и забираем остальное.
+ *
+ * Греем только то, что этому аккаунту доступно: у Menu-only клиента
+ * чанков броней и заказов нет вовсе, и тянуть их значило бы вернуть
+ * тот же лишний вес другим путём.
+ */
+function useModulePrefetch(views) {
+  useEffect(() => {
+    let cancelled = false
+    const queue = views.filter((id) => VIEW_MODULES[id])
+    function next() {
+      if (cancelled) return
+      const id = queue.shift()
+      if (!id) return
+      // Отказ прогрева — не ошибка: раздел загрузится при открытии
+      VIEW_MODULES[id]().then(next, next)
+    }
+    const idle = window.requestIdleCallback
+      ? window.requestIdleCallback(next, { timeout: 4000 })
+      : window.setTimeout(next, 1200)
+    return () => {
+      cancelled = true
+      if (window.cancelIdleCallback && window.requestIdleCallback) window.cancelIdleCallback(idle)
+      else window.clearTimeout(idle)
+    }
+  }, [views])
+}
+
+/**
+ * Ожидание раздела. Нейтральная форма «строка заголовка + рабочая
+ * панель»: какой именно раздел приедет, здесь ещё не знают, а обещать
+ * чужую геометрию хуже, чем не обещать никакой.
+ */
+function ViewFallback() {
+  return (
+    <Skeleton label="Loading the section…">
+      <SkeletonBar width="180px" height={26} />
+      <SkeletonPanel height={360}>
+        <SkeletonBar width="30%" height={16} />
+        {[0, 1, 2, 3, 4].map((i) => (
+          <SkeletonBar key={i} width={`${72 - i * 9}%`} />
+        ))}
+      </SkeletonPanel>
+    </Skeleton>
+  )
+}
 
 /**
  * Иконки разделов. Список разделов и правила видимости живут в
@@ -617,6 +703,8 @@ function Dashboard({ session, context, onReloadContext }) {
     () => [...nav.primary, ...nav.groups.flatMap((g) => g.items)].map((i) => i.id).concat('settings'),
     [nav]
   )
+  // Чанки доступных разделов забираем в простое — см. useModulePrefetch
+  useModulePrefetch(allowedViews)
 
   // Стартовое состояние берётся из адреса: ссылка и перезагрузка
   // открывают тот же экран, что и был.
@@ -790,6 +878,10 @@ function Dashboard({ session, context, onReloadContext }) {
         view={view}
         onHome={() => navigate(DEFAULT_VIEW)}
       >
+        {/* Suspense — ВНУТРИ границы ошибки: не приехавший чанк (сеть
+            отвалилась после деплоя) обязан выглядеть как упавший
+            раздел, с кнопкой «Try again», а не как белый экран. */}
+        <Suspense fallback={<ViewFallback />}>
         {view === 'overview' && (noProducts
           ? <ActivationHome context={context} onReloadContext={onReloadContext} />
           : (
@@ -841,6 +933,7 @@ function Dashboard({ session, context, onReloadContext }) {
           />
         )}
         {PLANNED_SECTIONS[view] && <SectionPage section={view} context={context} onNavigate={navigate} />}
+        </Suspense>
       </ViewErrorBoundary>
       {help && (
         <HelpPanel

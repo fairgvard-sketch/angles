@@ -36,6 +36,7 @@ import { blockerSummary, menuBlockers, reserveBlockers } from './channel-readine
 import { PageHeader } from './ui/Layout'
 import Tabs from './ui/Tabs'
 import { Button } from './ui/Button'
+import Skeleton, { SkeletonBar, SkeletonPanel } from './ui/Skeleton'
 
 /**
  * QR-каналы гостя: онлайн-заказы и бронирование столов.
@@ -1776,11 +1777,30 @@ export default function QrChannels({ context, locationId, tab: tabFromUrl, onTab
           весь экран на строку вниз каждый раз, когда он появляется. */}
       <div className="qr-feedback">
         {error && <p className="form-error" role="alert">{error}</p>}
-        {saved && !error && <p className="save-ok inline"><Check /> Saved</p>}
+        {saved && !error && <p className="save-ok inline" role="status"><Check aria-hidden /> Saved</p>}
       </div>
 
       {settings === null ? (
-        <p className="empty-state">Loading…</p>
+        /* Канал в две колонки: слева настройки, справа телефон с
+           превью. Раньше здесь стояла строка «Loading…» и экран
+           прибавлял 741px, когда настройки приходили. */
+        <Skeleton label="Loading the channel settings…">
+          <div className="sk-split">
+            <SkeletonPanel height={420}>
+              <SkeletonBar width="34%" height={16} />
+              {[0, 1, 2, 3].map((i) => (
+                <div className="sk-row" key={i} style={{ height: 70, padding: 0, border: 0, display: 'grid', gap: 8 }}>
+                  <SkeletonBar width="22%" height={11} />
+                  <SkeletonBar width="100%" height={40} radius="var(--r-md)" />
+                </div>
+              ))}
+            </SkeletonPanel>
+            <SkeletonPanel height={420}>
+              <SkeletonBar width="46%" height={16} />
+              <SkeletonBar width="100%" height={320} radius="var(--r-lg)" />
+            </SkeletonPanel>
+          </div>
+        </Skeleton>
       ) : (
         <div className="qr-workspace">
           <div className="qr-workspace-main">

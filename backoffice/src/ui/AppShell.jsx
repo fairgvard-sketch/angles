@@ -225,6 +225,27 @@ export default function AppShell({
   const closeRef = useRef(null)
   const wasOpen = useRef(false)
 
+  /**
+   * Смена раздела — событие, которого не видно без экрана. Мышью её
+   * подтверждает сама страница, с читалкой не подтверждает ничто:
+   * содержимое подменяется молча, и фокус остаётся на пункте меню.
+   *
+   * Объявляем название нового раздела вежливой живой областью. Первый
+   * показ пропускаем: страницу читалка и так только что прочитала, и
+   * второе «Dashboard» подряд — шум.
+   */
+  const [announcement, setAnnouncement] = useState('')
+  const firstView = useRef(true)
+  const label = [...nav.primary, ...nav.groups.flatMap((g) => g.items)]
+    .find((item) => item.id === view)?.label
+  useEffect(() => {
+    if (firstView.current) {
+      firstView.current = false
+      return
+    }
+    setAnnouncement(label || '')
+  }, [view, label])
+
   // Назад/Вперёд меняют раздел мимо клика по пункту — шторку всё равно
   // закрываем, иначе она остаётся поверх нового экрана.
   useEffect(() => { setDrawer(false) }, [view])
@@ -246,6 +267,13 @@ export default function AppShell({
 
   return (
     <div className="app-shell">
+      {/*
+        Первая остановка клавиатуры во всём кабинете. До неё до рабочей
+        области доходили за 16–17 нажатий Tab: сначала логотип, потом
+        все тринадцать разделов, потом меню аккаунта — и так на КАЖДОМ
+        экране, включая возврат из формы.
+      */}
+      <a className="skip-link" href="#app-content">Skip to content</a>
       <Sidebar
         nav={nav}
         icons={icons}
@@ -279,7 +307,11 @@ export default function AppShell({
             <LocationPicker locations={locations} locationId={locationId} onChange={onLocationChange} />
           )}
         </header>
-        <main className="content">{children}</main>
+        {/* tabIndex=-1: без него переход по «Skip to content» двигает
+            только прокрутку, а фокус остаётся в шапке — следующий Tab
+            возвращает в меню. */}
+        <main className="content" id="app-content" tabIndex={-1}>{children}</main>
+        <p className="visually-hidden" role="status" aria-live="polite">{announcement}</p>
       </div>
     </div>
   )

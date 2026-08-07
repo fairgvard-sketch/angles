@@ -17,6 +17,7 @@ import Drawer from './ui/Drawer'
 import Tabs from './ui/Tabs'
 import ConfirmDialog from './ui/ConfirmDialog'
 import { Button, IconButton } from './ui/Button'
+import Skeleton, { SkeletonPanel, SkeletonRow } from './ui/Skeleton'
 
 /**
  * «Customers» — база клиентов организации (114/115/121, правки 131).
@@ -825,7 +826,14 @@ export default function GuestsManager({ context, tab: tabFromUrl, onTabChange })
           </section>
         )
       ) : loading && !guests ? (
-        <section className="panel"><p className="empty-state">Loading…</p></section>
+        /* Таблица клиентов: имя, телефон, визиты, сумма, последний раз. */
+        <Skeleton label="Loading the customer list…">
+          <SkeletonPanel>
+            {Array.from({ length: 7 }, (_, i) => (
+              <SkeletonRow key={i} height={56} columns={['24%', '16%', '8%', '12%', '14%']} />
+            ))}
+          </SkeletonPanel>
+        </Skeleton>
       ) : total === 0 ? (
         <EmptyPanel
           icon={<Users />}

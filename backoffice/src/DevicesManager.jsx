@@ -11,6 +11,7 @@ import {
 } from './devices'
 import { Button, IconButton } from './ui/Button'
 import ConfirmDialog from './ui/ConfirmDialog'
+import Skeleton, { SkeletonBar, SkeletonPanel, SkeletonRow } from './ui/Skeleton'
 import {
   EmptyPanel, EmptyState, ErrorText, PageHeader, Panel, SearchField, StatusBadge,
 } from './ui/Layout'
@@ -318,7 +319,17 @@ export default function DevicesManager({ context }) {
       )}
 
       {loading && !fleet ? (
-        <EmptyState>Loading…</EmptyState>
+        /* Парк касс группами: заголовок группы и строки терминалов. */
+        <Skeleton label="Loading the terminals…">
+          {[3, 2].map((rows, group) => (
+            <SkeletonPanel key={group}>
+              <SkeletonBar width="22%" height={16} />
+              {Array.from({ length: rows }, (_, i) => (
+                <SkeletonRow key={i} height={64} lead={34} columns={['26%', '18%', '12%']} />
+              ))}
+            </SkeletonPanel>
+          ))}
+        </Skeleton>
       ) : total === 0 && (query || showArchived) ? (
         <Panel className="form-panel">
           <EmptyState>No devices match this search.</EmptyState>

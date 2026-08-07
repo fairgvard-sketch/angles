@@ -16,6 +16,7 @@ import { PUBLIC_MENU_ORIGIN } from './online'
 import { Button, IconButton } from './ui/Button'
 import { EmptyState, PageHeader, Panel, StatusBadge } from './ui/Layout'
 import PartyCount from './ui/PartyCount'
+import Skeleton, { SkeletonBar, SkeletonPanel } from './ui/Skeleton'
 
 /**
  * Главная кабинета: как идёт день и что требует решения.
@@ -329,7 +330,34 @@ export default function HomeDashboard({ context, locationId, onNavigate, childre
       </PageHeader>
 
       {loading && !data ? (
-        <EmptyState>Loading…</EmptyState>
+        /* Форма дня: блок «сегодня» с кривой и две колонки карточек —
+           ровно то, что придёт. Со строкой «Loading…» рабочая область
+           вырастала с 427 до 1479px в момент прихода данных. */
+        <Skeleton label="Loading today’s numbers…">
+          <SkeletonPanel height={168}>
+            <SkeletonBar width="20%" />
+            <SkeletonBar width="34%" height={30} />
+            <SkeletonBar width="100%" height={54} />
+          </SkeletonPanel>
+          <div className="sk-split">
+            <SkeletonPanel height={232}>
+              <SkeletonBar width="26%" height={16} />
+              {[68, 54, 60, 46].map((w) => (
+                <div className="sk-row" key={w} style={{ height: 40, padding: 0, border: 0 }}>
+                  <SkeletonBar width={`${w}%`} />
+                </div>
+              ))}
+            </SkeletonPanel>
+            <SkeletonPanel height={232}>
+              <SkeletonBar width="40%" height={16} />
+              {[72, 58, 64].map((w) => (
+                <div className="sk-row" key={w} style={{ height: 40, padding: 0, border: 0 }}>
+                  <SkeletonBar width={`${w}%`} />
+                </div>
+              ))}
+            </SkeletonPanel>
+          </div>
+        </Skeleton>
       ) : (
         <>
           <Attention items={attention} onNavigate={onNavigate} />

@@ -478,19 +478,41 @@ describe('каталог: режим «By category»', { skip }, () => {
     await page.close()
   })
 
-  it('удаление категории предупреждает, что позиции остаются', async () => {
+  it('удаление категории спрашивает диалогом кабинета и объясняет последствие', async () => {
+    /*
+     * Раньше здесь был нативный `confirm`. Он не только выглядит чужим:
+     * браузер рисует его без ловушки фокуса и без наших кнопок, а
+     * внутри кадра его может не быть вовсе — тогда удаление уходило
+     * молча. Проверяем, что спрашивает наш диалог и что нативного
+     * окна не появляется.
+     */
     const page = await open()
+    let native = null
+    page.on('dialog', async (d) => { native = d.message(); await d.dismiss() })
+
     await byCategory(page)
     await page.waitForSelector('.cat-category-head .row-menu button')
-    page.once('dialog', async (d) => {
-      assert.match(d.message(), /Items keep existing but lose their category/)
-      await d.dismiss()
-    })
     await page.click('.cat-category-head .row-menu button')
     await page.waitForSelector('.row-menu-pop')
     await page.evaluate(() => [...document.querySelectorAll('.row-menu-pop button')]
       .find((b) => b.textContent.includes('Delete category')).click())
-    await new Promise((r) => setTimeout(r, 200))
+
+    await page.waitForSelector('[role="alertdialog"]')
+    const dialog = await page.evaluate(() => {
+      const el = document.querySelector('[role="alertdialog"]')
+      return { text: el.textContent, modal: el.getAttribute('aria-modal'), focus: document.activeElement.textContent.trim() }
+    })
+    assert.match(dialog.text, /Delete category “Hot drinks”\?/)
+    assert.match(dialog.text, /Items keep existing but lose their category/)
+    assert.equal(dialog.modal, 'true')
+    assert.equal(dialog.focus, 'Cancel', 'фокус входит в диалог, и не на опасное действие')
+    assert.equal(native, null, 'нативного окна браузера быть не должно')
+
+    // Отмена ничего не удаляет
+    await page.keyboard.press('Escape')
+    await page.waitForFunction(() => !document.querySelector('[role="alertdialog"]'))
+    const calls = await page.evaluate(() => window.__CALLS__.map((c) => c[0]))
+    assert.ok(!calls.includes('deleteCategory'), 'отмена не должна удалять')
     await page.close()
   })
 })

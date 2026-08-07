@@ -19,6 +19,7 @@ import Tabs from './ui/Tabs'
 import { Button, IconButton } from './ui/Button'
 import { RowMenu, OrderButtons } from './ui/RowMenu'
 import FormDialog from './ui/FormDialog'
+import ConfirmDialog from './ui/ConfirmDialog'
 import { SearchField } from './ui/Layout'
 import useNarrow from './ui/useNarrow'
 
@@ -437,8 +438,14 @@ export function ItemsTab({
     return { list, orphans }
   }, [data.categories, visible, filtersOn])
 
-  async function removeCategory(id, name) {
-    if (!confirm(`Delete category “${name}”? Items keep existing but lose their category.`)) return
+  /*
+   * Последний нативный `confirm` в кабинете. Он не только выглядит
+   * чужим: браузер рисует его без фокус-ловушки и без нашего текста
+   * кнопок, а внутри кадра его может не быть вовсе — тогда удаление
+   * уходило молча. Спрашиваем своим диалогом.
+   */
+  const [removing, setRemoving] = useState(null)
+  async function removeCategory(id) {
     try { await deleteCategory(id); await reload() } catch (e) { setError(bulkErrorText(e.message)) }
   }
 
@@ -644,7 +651,7 @@ export function ItemsTab({
               moving={moving}
               onMove={moveItem}
               orderOf={orderOf}
-              onDelete={() => removeCategory(cat.id, cat.name)}
+              onDelete={() => setRemoving({ id: cat.id, name: cat.name })}
             />
           ))}
           {byCat.orphans.length > 0 && (
@@ -677,6 +684,17 @@ export function ItemsTab({
           error={error}
           onCancel={() => setPending(null)}
           onApply={applyBulk}
+        />
+      )}
+
+      {removing && (
+        <ConfirmDialog
+          title={`Delete category “${removing.name}”?`}
+          description="Items keep existing but lose their category — they move to Uncategorised."
+          confirmLabel="Delete category"
+          tone="danger"
+          onCancel={() => setRemoving(null)}
+          onConfirm={async () => { const { id } = removing; setRemoving(null); await removeCategory(id) }}
         />
       )}
 

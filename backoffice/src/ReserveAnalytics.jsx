@@ -7,6 +7,7 @@ import {
   analyticsRange, fetchReserveAnalytics, analyticsErrorText,
   funnelView, pct, hours, leadTime,
 } from './reserve-analytics'
+import Tabs from './ui/Tabs'
 
 /**
  * «Analytics» — отчёт по броням (Kassa 125).
@@ -185,19 +186,15 @@ export default function ReserveAnalytics({ locations }) {
   return (
     <>
       <div className="overview-toolbar">
-        <div className="period-switch" role="tablist" aria-label="Reporting period">
-          {PERIODS.map((p) => (
-            <button
-              key={p.key}
-              role="tab"
-              aria-selected={period === p.key}
-              className={period === p.key ? 'is-active' : ''}
-              onClick={() => setPeriod(p.key)}
-            >
-              {p.label}
-            </button>
-          ))}
-        </div>
+        {/* Последняя самодельная полоса вкладок в кабинете — на общий
+            примитив: стрелки, Home/End и одна точка входа в группу. */}
+        <Tabs
+          className="period-switch"
+          label="Reporting period"
+          items={PERIODS.map((p) => ({ key: p.key, label: p.label }))}
+          value={period}
+          onChange={setPeriod}
+        />
         <button
           className="icon-button"
           onClick={() => setNonce((n) => n + 1)}

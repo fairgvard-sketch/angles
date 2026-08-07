@@ -6,6 +6,7 @@ import {
 } from './activity'
 import { ErrorText, PageHeader, SearchField } from './ui/Layout'
 import { Button, IconButton } from './ui/Button'
+import Skeleton, { SkeletonBar, SkeletonPanel, SkeletonRow } from './ui/Skeleton'
 
 /**
  * «Activity» — журнал событий кассы (открытие/закрытие смены, возврат) из
@@ -313,11 +314,20 @@ export default function ActivityManager({ context }) {
 
       {error && <ErrorText>{error}</ErrorText>}
 
-      {first || total === 0 ? (
+      {first ? (
+        /* Журнал по дням: заголовок дня и события под ним. */
+        <Skeleton label="Loading the activity journal…">
+          <SkeletonPanel>
+            <SkeletonBar width="18%" height={14} />
+            {Array.from({ length: 4 }, (_, i) => (
+              <SkeletonRow key={i} height={52} lead={28} columns={['30%', '18%']} />
+            ))}
+          </SkeletonPanel>
+        </Skeleton>
+      ) : total === 0 ? (
         <section className="panel">
           <p className="empty-state">
-            {first ? 'Loading…'
-              : filtered ? 'No events match these filters.'
+            {filtered ? 'No events match these filters.'
               : 'No activity yet. Shifts and refunds from your registers appear here.'}
           </p>
         </section>

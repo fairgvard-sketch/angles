@@ -5,6 +5,7 @@ import { describe, it } from 'node:test'
 import { Button, IconButton } from './Button.jsx'
 import Tabs from './Tabs.jsx'
 import ConfirmDialog from './ConfirmDialog.jsx'
+import Skeleton, { SkeletonBar, SkeletonPanel, SkeletonRow } from './Skeleton.jsx'
 import {
   EmptyPanel, EmptyState, ErrorText, PageHeader, Panel, SearchField, StatusBadge,
 } from './Layout.jsx'
@@ -174,5 +175,22 @@ describe('ConfirmDialog', () => {
     const html = render(h(ConfirmDialog, { ...props, tone: 'danger' }))
     assert.doesNotMatch(html, /class="primary-button compact"/)
     assert.match(html, /is-danger/)
+  })
+})
+
+describe('Skeleton', () => {
+  it('говорит читалке словами, а глазам — формой', () => {
+    const html = render(h(Skeleton, { label: 'Loading the team…' },
+      h(SkeletonPanel, null, h(SkeletonBar, { width: '30%' }))))
+    // Серые полосы читалке не нужны — ей нужно слово
+    assert.match(html, /role="status"[^>]*aria-live="polite"[^>]*>Loading the team…/)
+    assert.match(html, /class="sk" aria-hidden/)
+    assert.match(html, /class="sk-bar"/)
+  })
+
+  it('строка держит заданную высоту: скелет обязан повторять геометрию', () => {
+    const html = render(h(SkeletonRow, { height: 56, columns: ['20%'] }))
+    assert.match(html, /class="sk-row"/)
+    assert.match(html, /height:56px/)
   })
 })

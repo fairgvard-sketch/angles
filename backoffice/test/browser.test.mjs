@@ -1222,3 +1222,82 @@ describe('очередь ожидания: клавиатура', { skip }, () =
     await page.close()
   })
 })
+
+describe('клавиатура: путь до рабочей области', { skip }, () => {
+  /**
+   * Замер Phase 11: чтобы с клавиатуры дойти до содержимого, приходилось
+   * нажать Tab 16–17 раз — логотип, тринадцать разделов, меню аккаунта, —
+   * и так на КАЖДОМ экране, включая возврат из формы. Здесь проверяется,
+   * что путь стал в два нажатия и что он ведёт именно в `main`.
+   */
+  const open = async () => {
+    const page = await browser.newPage()
+    await page.setViewport({ width: 1440, height: 900 })
+    await page.goto(`${appOrigin}/shell`, { waitUntil: 'networkidle0' })
+    await page.evaluate(() => document.body.focus())
+    return page
+  }
+
+  it('первая же остановка — переход к содержимому, и он уводит фокус в main', async () => {
+    const page = await open()
+    await page.keyboard.press('Tab')
+    const first = await page.evaluate(() => {
+      const el = document.activeElement
+      return { cls: el.className, text: el.textContent.trim(), href: el.getAttribute('href') }
+    })
+    assert.equal(first.cls, 'skip-link')
+    assert.equal(first.text, 'Skip to content')
+    assert.equal(first.href, '#app-content')
+
+    await page.keyboard.press('Enter')
+    const landed = await page.evaluate(() => {
+      const el = document.activeElement
+      return { id: el.id, tag: el.tagName }
+    })
+    assert.equal(landed.id, 'app-content', 'фокус обязан уйти в рабочую область, а не только прокрутка')
+    assert.equal(landed.tag, 'MAIN')
+    await page.close()
+  })
+
+  it('спрятана, пока не понадобится, и показывается по фокусу', async () => {
+    // Видимая всегда — лишний элемент на каждом экране; невидимая
+    // всегда — ловушка: нажал и не понял куда попал.
+    const page = await open()
+    const hidden = await page.evaluate(() => {
+      const el = document.querySelector('.skip-link')
+      return el.getBoundingClientRect().right < 0
+    })
+    assert.ok(hidden, 'до фокуса ссылка за краем экрана')
+
+    await page.keyboard.press('Tab')
+    const shown = await page.evaluate(() => {
+      const r = document.querySelector('.skip-link').getBoundingClientRect()
+      return { left: Math.round(r.left), height: Math.round(r.height) }
+    })
+    assert.equal(shown.left, 0, 'по фокусу ссылка приезжает в угол')
+    assert.ok(shown.height >= 44, 'и остаётся целью под палец')
+    await page.close()
+  })
+
+  it('смена раздела объявляется читалке — и только со второго раза', async () => {
+    /*
+     * Содержимое подменяется молча: с читалкой владелец не узнаёт, что
+     * раздел сменился. Первый показ не объявляем — страницу читалка и
+     * так только что прочитала, и второе «Dashboard» подряд это шум.
+     */
+    const page = await open()
+    const atStart = await page.evaluate(() => (
+      document.querySelector('[role="status"][aria-live="polite"]').textContent
+    ))
+    assert.equal(atStart, '', 'первый показ ничего не объявляет')
+
+    await page.evaluate(() => {
+      const items = [...document.querySelectorAll('.side-nav button')]
+      items.find((b) => b.textContent.trim() === 'Catalogue').click()
+    })
+    await page.waitForFunction(() => (
+      document.querySelector('[role="status"][aria-live="polite"]').textContent === 'Catalogue'
+    ))
+    await page.close()
+  })
+})

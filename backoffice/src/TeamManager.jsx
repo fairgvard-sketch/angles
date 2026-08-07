@@ -22,6 +22,7 @@ import Drawer from './ui/Drawer'
 import FormDialog from './ui/FormDialog'
 import ConfirmDialog from './ui/ConfirmDialog'
 import HoursManager from './HoursManager'
+import Skeleton, { SkeletonPanel, SkeletonRow } from './ui/Skeleton'
 
 /**
  * Команда — три вкладки вместо четырёх: People, Access, Hours.
@@ -211,7 +212,7 @@ function PinBlock({ member }) {
       <Button size="compact" disabled={!isValidPin(pin)} busy={busy} busyLabel="Saving…" onClick={save}>
         Replace PIN
       </Button>
-      {saved && <span className="tm-saved"><Check aria-hidden /> PIN replaced</span>}
+      {saved && <span className="tm-saved" role="status"><Check aria-hidden /> PIN replaced</span>}
       {error && <ErrorText>{error}</ErrorText>}
     </div>
   )
@@ -495,7 +496,14 @@ function PeopleTab({
       </div>
 
       {staff === null ? (
-        <Panel className="tm-panel"><EmptyState>Loading…</EmptyState></Panel>
+        /* Таблица людей: имя, роль, статус, действия. */
+        <Skeleton label="Loading the team…">
+          <SkeletonPanel>
+            {Array.from({ length: 5 }, (_, i) => (
+              <SkeletonRow key={i} height={56} columns={['22%', '16%', '12%', '10%']} />
+            ))}
+          </SkeletonPanel>
+        </Skeleton>
       ) : rows.length === 0 ? (
         <EmptyPanel
           icon={<Users />}
