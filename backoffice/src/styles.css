@@ -2058,6 +2058,30 @@ a { color: inherit; }
  * откуда позиция; на телефоне колонка прячется — там важнее имя и цена.
  */
 
+/* Область действия настроек: точка, а не «весь бизнес» */
+.settings-scope { margin: 0 0 var(--sp-3); color: var(--c-text-subtle); font-size: 12px; }
+.settings-scope strong { color: var(--c-text-2); }
+
+/* Что изменило переключение права — рядом с матрицей, с отменой */
+.tm-effect-live {
+  display: flex; align-items: center; justify-content: space-between; gap: var(--sp-3);
+  margin-bottom: var(--sp-3); padding: var(--sp-2) var(--sp-3);
+  border: 1px solid var(--c-border-soft); border-radius: var(--r-md);
+  background: var(--c-surface-muted); font-size: 13px;
+}
+.tm-effect-live button { flex: none; }
+
+/* Предпросмотр эффекта роли: что люди получат и что потеряют */
+.tm-effect {
+  padding: var(--sp-3); border: 1px solid var(--c-border-soft);
+  border-radius: var(--r-md); background: var(--c-surface-muted);
+}
+.tm-effect h4 { margin: 0 0 var(--sp-2); font-size: 13px; }
+.tm-effect p { margin: 0 0 var(--sp-1); font-size: 13px; }
+.tm-effect p:last-child { margin-bottom: 0; }
+.tm-effect-lose strong { color: var(--c-danger); }
+.tm-effect-gain strong { color: var(--c-success); }
+
 /*
  * Готовность канала: полоса «что мешает гостю». Не тревожная плашка на
  * пол-экрана — строка с делом и адресом, где оно чинится.

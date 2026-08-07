@@ -4,7 +4,7 @@ import {
   can, accessSummary, accessScope, accessSource, rolesAllowing,
   filterRoster, sortRoster, lastShiftLabel, shiftIndex, statusOf,
   personRowLabel, resolveTab, staffErrorText, hasRecords, locationLabel,
-  PERM_KEYS,
+  PERM_KEYS, roleAccessDiff, levelChangeEffect,
 } from './roster'
 
 /**
@@ -197,5 +197,56 @@ describe('адреса и ошибки', () => {
 
   it('незнакомый текст сервера показывается как есть', () => {
     assert.equal(staffErrorText('network unreachable'), 'network unreachable')
+  })
+})
+
+// ── Предпросмотр эффекта до сохранения (Phase 9) ─────────────
+
+describe('roleAccessDiff', () => {
+  const role = { id: 'r1', name: 'Старший бариста', perms: ['discount', 'refund'] }
+
+  it('снятая галочка названа потерей, а не «изменением»', () => {
+    const diff = roleAccessDiff(role, ['discount'], [{ id: 's1' }, { id: 's2' }])
+    assert.deepEqual(diff.lost.map((p) => p.key), ['refund'])
+    assert.deepEqual(diff.gained, [])
+    assert.equal(diff.people, 2)
+    assert.equal(diff.changed, true)
+  })
+
+  it('добавленное действие тоже показывается', () => {
+    const diff = roleAccessDiff(role, ['discount', 'refund', 'void_order'], [])
+    assert.deepEqual(diff.gained.map((p) => p.key), ['void_order'])
+    assert.equal(diff.people, 0, 'у новой роли носителей нет — и это честный ответ')
+  })
+
+  it('без изменений предпросмотр молчит', () => {
+    assert.equal(roleAccessDiff(role, ['refund', 'discount'], []).changed, false)
+  })
+})
+
+describe('levelChangeEffect', () => {
+  const settings = { perms: { refund: 'manager' } }
+  const roles = [{ id: 'r1', name: 'Старший бариста', perms: ['refund'] }]
+  const staff = [
+    { id: 's1', name: 'Дана', role: 'barista', role_id: null },
+    { id: 's2', name: 'Йоси', role: 'manager', role_id: null },
+    { id: 's3', name: 'Ави', role: 'barista', role_id: 'r1' },
+    { id: 's4', name: 'Владелец', role: 'owner', role_id: null },
+  ]
+
+  it('называет поимённо тех, кого переключатель правда затронет', () => {
+    const effect = levelChangeEffect('refund', 'all', staff, roles, settings)
+    assert.deepEqual(effect.people, ['Дана'], 'менеджер и так мог, у Ави своя роль')
+  })
+
+  it('человека с собственной ролью уровень точки не касается', () => {
+    const effect = levelChangeEffect('refund', 'all', staff, roles, settings)
+    assert.equal(effect.withOwnRole, 1)
+    assert.ok(!effect.people.includes('Ави'))
+  })
+
+  it('владелец не считается никогда', () => {
+    const effect = levelChangeEffect('discount', 'manager', staff, roles, settings)
+    assert.ok(!effect.people.includes('Владелец'))
   })
 })

@@ -3,6 +3,7 @@ import { supabase } from './supabase'
 export {
   ROLES, ROLE_LABELS, isValidPin,
   PERM_KEYS, PERM_DEFAULTS, PERM_LABELS, PERM_HINTS, permLevel,
+  roleAccessDiff, levelChangeEffect,
   can, roleOf, accessRows, accessSource, accessScope, accessSummary,
   rolesAllowing, roleHolders,
   locationLabel, roleTitle, lastShiftLabel, daysBetween,

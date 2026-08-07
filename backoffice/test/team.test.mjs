@@ -524,3 +524,34 @@ describe('команда: телефон и клавиатура', { skip }, () 
     await page.close()
   })
 })
+
+describe('эффект переключения права', { skip }, () => {
+  /**
+   * Право меняется одним нажатием, но действует на людей. Проверяем, что
+   * кабинет говорит, на кого именно, и умеет вернуть как было — без
+   * этого владелец узнаёт о потере доступа от людей за прилавком.
+   */
+  it('называет затронутых поимённо и возвращает как было', async () => {
+    const page = await open('tab=access')
+    await page.waitForSelector('.tm-matrix-row')
+    await page.evaluate(() => {
+      const row = [...document.querySelectorAll('.tm-matrix-row')]
+        .find((r) => r.textContent.startsWith('Refunds'))
+      row.querySelector('[aria-checked="false"]').click()
+    })
+    await page.waitForSelector('.tm-effect-live')
+    const shown = await page.evaluate(() => document.querySelector('.tm-effect-live')?.textContent ?? '')
+    assert.match(shown, /Refunds/)
+    assert.match(shown, /affected/)
+
+    // Отмена возвращает прежний уровень тем же путём — патчем по точке
+    await page.evaluate(() => {
+      [...document.querySelectorAll('.tm-effect-live button')]
+        .find((b) => /Undo/.test(b.textContent)).click()
+    })
+    await page.waitForFunction(() => window.__CALLS__.length > 1)
+    const calls = await page.evaluate(() => window.__CALLS__)
+    assert.deepEqual(calls[1], ['patchLocationSettings', 'loc-1', { perms: { refund: 'manager' } }])
+    await page.close()
+  })
+})

@@ -354,3 +354,56 @@ export function staffErrorText(message) {
 export function hasRecords(message) {
   return /staff has records/i.test(String(message || ''))
 }
+
+// ── Предпросмотр эффекта до сохранения (Phase 9) ─────────────
+
+/**
+ * Что изменится, если сохранить набор роли.
+ *
+ * План требует показать «effective access» ДО сохранения. Причина
+ * простая: набор роли исчерпывающий — снятая галочка отбирает действие
+ * у всех её носителей, даже если точка разрешает это действие всем.
+ * Владелец, снимающий «Refunds» у роли «Старший бариста», должен
+ * увидеть, что возвраты потеряют трое, а не узнать это от них.
+ *
+ * Сравнивается набор ролей: до и после. Люди берутся те, у кого эта
+ * роль уже стоит; для новой роли (носителей нет) список пуст, и это
+ * честный ответ, а не «0 человек потеряют доступ».
+ */
+export function roleAccessDiff(role, nextPerms, holders = []) {
+  const before = new Set(role?.perms ?? [])
+  const after = new Set(nextPerms ?? [])
+  const gained = PERM_KEYS.filter((key) => after.has(key) && !before.has(key))
+  const lost = PERM_KEYS.filter((key) => before.has(key) && !after.has(key))
+  return {
+    gained: gained.map((key) => ({ key, label: PERM_LABELS[key] })),
+    lost: lost.map((key) => ({ key, label: PERM_LABELS[key] })),
+    people: holders.length,
+    changed: gained.length > 0 || lost.length > 0,
+  }
+}
+
+/**
+ * Кого затронет смена уровня права на точке.
+ *
+ * Считается по тем же правилам, что `can`: у кого есть своя роль —
+ * уровень точки его не касается вовсе, и обещать обратное нельзя.
+ * Владелец не считается никогда: он может всё.
+ */
+export function levelChangeEffect(key, nextLevel, staff, roles, settings) {
+  const affected = (staff ?? []).filter((member) => {
+    if (member.role === 'owner') return false
+    if (roleOf(member, roles)) return false
+    return can(member, key, settings, null) !== can(
+      member, key, { ...settings, perms: { ...(settings?.perms ?? {}), [key]: nextLevel } }, null,
+    )
+  })
+  return {
+    key,
+    label: PERM_LABELS[key],
+    people: affected.map((m) => m.name).filter(Boolean),
+    // С ролью уровень точки не спорит — таких людей называем отдельно,
+    // иначе владелец решит, что переключатель их тоже задел.
+    withOwnRole: (staff ?? []).filter((m) => m.role !== 'owner' && roleOf(m, roles)).length,
+  }
+}

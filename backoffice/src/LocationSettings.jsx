@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react'
+import { useCallback, useEffect, useState } from 'react'
 import { Check, Download } from 'lucide-react'
 import {
   fetchLocation, patchLocationSettings, updateLocationConfig, runUfExport,
@@ -6,6 +6,7 @@ import {
 import { fetchCategories, updateCategory } from './menu'
 import { agorotToInput, inputToAgorot } from './online'
 import { PageHeader } from './ui/Layout'
+import ConfirmDialog from './ui/ConfirmDialog'
 
 /**
  * Настройки точки в бэкофисе — теперь единственное место, где правится
@@ -80,6 +81,29 @@ export default function LocationSettings({ context, locationId, tab: tabFromUrl,
   const [location, setLocation] = useState(null)
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState('')
+  /*
+   * Несохранённые правки. Раньше переключение вкладки просто
+   * размонтировало форму — набранные реквизиты чека исчезали молча, и
+   * узнать об этом можно было только по тому, что на чеке их нет.
+   */
+  const [dirty, setDirty] = useState(false)
+  const [pendingTab, setPendingTab] = useState(null)
+
+  // Закрытие вкладки браузера — тот же случай, только чинить некому
+  useEffect(() => {
+    if (!dirty) return undefined
+    function onBeforeUnload(event) {
+      event.preventDefault()
+      event.returnValue = ''
+    }
+    window.addEventListener('beforeunload', onBeforeUnload)
+    return () => window.removeEventListener('beforeunload', onBeforeUnload)
+  }, [dirty])
+
+  function askTab(next) {
+    if (!dirty || next === tab) { setTab(next); return }
+    setPendingTab(next)
+  }
 
   useEffect(() => {
     if (!activeId) return undefined
@@ -114,23 +138,47 @@ export default function LocationSettings({ context, locationId, tab: tabFromUrl,
             role="tab"
             aria-selected={tab === t.key}
             className={tab === t.key ? 'is-active' : ''}
-            onClick={() => setTab(t.key)}
+            onClick={() => askTab(t.key)}
           >
             {t.label}
           </button>
         ))}
       </div>
 
+      {/*
+        Область действия. У сети настройки точек не общие, и владелец
+        должен видеть это до того, как поменяет НДС «для всех». Про
+        терминал сказано отдельно: печать и быстрые суммы живут на самой
+        кассе (107), и искать их здесь бесполезно.
+      */}
+      <p className="settings-scope">
+        Applies to <strong>{location?.name || locations.find((l) => l.id === activeId)?.name}</strong>
+        {locations.length > 1 ? ' only — other locations are configured separately' : ''}.
+        {' '}Printing and register shortcuts stay on the terminal itself.
+      </p>
+
       {error && <p className="form-error" role="alert">{error}</p>}
+
+      {pendingTab && (
+        <ConfirmDialog
+          title="Leave without saving?"
+          description="The changes on this tab are not saved yet. Leaving loses them."
+          confirmLabel="Discard changes"
+          cancelLabel="Keep editing"
+          tone="danger"
+          onCancel={() => setPendingTab(null)}
+          onConfirm={() => { setDirty(false); setTab(pendingTab); setPendingTab(null) }}
+        />
+      )}
 
       {loading || !location ? (
         <section className="panel form-panel"><p className="empty-state">Loading…</p></section>
       ) : (
         <>
-          {tab === 'general' && <GeneralTab key={location.id} location={location} onSaved={setLocation} />}
-          {tab === 'receipt' && <ReceiptTab key={location.id} location={location} onSaved={setLocation} />}
-          {tab === 'loyalty' && <LoyaltyTab key={location.id} location={location} onSaved={setLocation} />}
-          {tab === 'register' && <RegisterTab key={location.id} location={location} onSaved={setLocation} />}
+          {tab === 'general' && <GeneralTab key={location.id} location={location} onSaved={setLocation} onDirty={setDirty} />}
+          {tab === 'receipt' && <ReceiptTab key={location.id} location={location} onSaved={setLocation} onDirty={setDirty} />}
+          {tab === 'loyalty' && <LoyaltyTab key={location.id} location={location} onSaved={setLocation} onDirty={setDirty} />}
+          {tab === 'register' && <RegisterTab key={location.id} location={location} onSaved={setLocation} onDirty={setDirty} />}
           {tab === 'export' && <ExportTab key={location.id} location={location} />}
         </>
       )}
@@ -152,11 +200,19 @@ function SaveRow({ saving, saved, error }) {
 }
 
 /** Обёртка «форма из колонок locations»: собирает diff и шлёт RPC. */
-function useConfigForm(location, initial, onSaved) {
+function useConfigForm(location, initial, onSaved, onDirty) {
   const [form, setForm] = useState(initial)
   const [saving, setSaving] = useState(false)
   const [saved, setSaved] = useState(false)
   const [error, setError] = useState('')
+
+  /*
+   * Несохранённое считается сравнением с исходным, а не флагом «трогали»:
+   * вернул значение обратно — терять уже нечего, и предупреждать не о чем.
+   */
+  const dirty = Object.keys(initial).some((key) => String(form[key] ?? '') !== String(initial[key] ?? ''))
+  useEffect(() => { onDirty?.(dirty) }, [dirty, onDirty])
+  useEffect(() => () => onDirty?.(false), [onDirty])
 
   function update(field, value) {
     setForm((prev) => ({ ...prev, [field]: value }))
@@ -176,6 +232,7 @@ function useConfigForm(location, initial, onSaved) {
       }
       onSaved({ ...location, ...patch, settings: nextSettings })
       setSaved(true)
+      onDirty?.(false)
     } catch (e) {
       setError(e.message)
     } finally {
@@ -183,17 +240,17 @@ function useConfigForm(location, initial, onSaved) {
     }
   }
 
-  return { form, update, save, saving, saved, error }
+  return { form, update, save, saving, saved, error, dirty }
 }
 
 // ── General: имя, витринное имя, режим обслуживания, НДС ─────
-function GeneralTab({ location, onSaved }) {
+function GeneralTab({ location, onSaved, onDirty }) {
   const { form, update, save, saving, saved, error } = useConfigForm(location, {
     name: location.name || '',
     display_name: location.settings?.display_name || '',
     service_mode: location.service_mode || 'counter',
     vat_rate: String(Number(location.vat_rate ?? 18)),
-  }, onSaved)
+  }, onSaved, onDirty)
 
   function submit(event) {
     event.preventDefault()
@@ -237,7 +294,7 @@ function GeneralTab({ location, onSaved }) {
 }
 
 // ── Receipt & tax: реквизиты хешбонита + содержимое чека ─────
-function ReceiptTab({ location, onSaved }) {
+function ReceiptTab({ location, onSaved, onDirty }) {
   const { form, update, save, saving, saved, error } = useConfigForm(location, {
     receipt_business_name: location.receipt_business_name || '',
     receipt_tax_id: location.receipt_tax_id || '',
@@ -246,7 +303,7 @@ function ReceiptTab({ location, onSaved }) {
     receipt_footer: location.receipt_footer || '',
     print_modifiers: location.settings?.receipt?.print_modifiers ?? false,
     copies: location.settings?.receipt?.copies ?? 1,
-  }, onSaved)
+  }, onSaved, onDirty)
 
   function submit(event) {
     event.preventDefault()
@@ -300,13 +357,13 @@ function ReceiptTab({ location, onSaved }) {
 }
 
 // ── Loyalty: механика + штампуемые категории ─────────────────
-function LoyaltyTab({ location, onSaved }) {
+function LoyaltyTab({ location, onSaved, onDirty }) {
   const { form, update, save, saving, saved, error } = useConfigForm(location, {
     loyalty_mode: location.loyalty_mode || 'off',
     loyalty_stamps_goal: String(location.loyalty_stamps_goal ?? 10),
     loyalty_points_percent: String(Number(location.loyalty_points_percent ?? 5)),
     loyalty_points_min_redeem: agorotToInput(location.loyalty_points_min_redeem ?? 1000),
-  }, onSaved)
+  }, onSaved, onDirty)
 
   const [categories, setCategories] = useState(null)
   const [catError, setCatError] = useState('')
@@ -416,7 +473,7 @@ function LoyaltyTab({ location, onSaved }) {
 }
 
 // ── Register defaults: смена и видимость элементов POS ───────
-function RegisterTab({ location, onSaved }) {
+function RegisterTab({ location, onSaved, onDirty }) {
   const shift = location.settings?.shift || {}
   const ui = location.settings?.interface || {}
   const { form, update, save, saving, saved, error } = useConfigForm(location, {
@@ -426,7 +483,7 @@ function RegisterTab({ location, onSaved }) {
     cash_warn_threshold: agorotToInput(shift.cash_warn_threshold ?? 0),
     show_all_items_tab: ui.show_all_items_tab !== false,
     inventory_enabled: ui.inventory_enabled !== false,
-  }, onSaved)
+  }, onSaved, onDirty)
 
   function submit(event) {
     event.preventDefault()

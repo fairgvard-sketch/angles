@@ -9,6 +9,7 @@ import {
   rolesAllowing, roleHolders, locationLabel, roleTitle,
   lastShiftLabel, SHIFT_WINDOW_DAYS, shiftIndex, statusOf, personRowLabel,
   sortRoster, filterRoster, TABS, resolveTab, staffErrorText, hasRecords,
+  roleAccessDiff, levelChangeEffect,
 } from './team'
 import { fetchLocation, patchLocationSettings } from './settings'
 import { fetchHours } from './timesheet'
@@ -589,6 +590,7 @@ function RoleCard({ role, holders, onClose, onSaved }) {
   const [busy, setBusy] = useState(false)
   const [error, setError] = useState('')
   const [removing, setRemoving] = useState(false)
+  const diff = roleAccessDiff(role, [...perms], Array.from({ length: holders }))
 
   function toggle(key) {
     setPerms((prev) => {
@@ -671,6 +673,33 @@ function RoleCard({ role, holders, onClose, onSaved }) {
           </ul>
         </section>
 
+        {/*
+          Что изменится, если сохранить. Набор роли исчерпывающий: снятая
+          галочка отбирает действие у всех носителей, даже если точка
+          разрешает его всем. Владелец должен увидеть это ДО сохранения,
+          а не узнать от людей за прилавком.
+        */}
+        {diff.changed && (
+          <section className="tm-effect" aria-live="polite">
+            <h4>If you save this</h4>
+            {diff.lost.length > 0 && (
+              <p className="tm-effect-lose">
+                <strong>{holders} {holders === 1 ? 'person loses' : 'people lose'}</strong>{' '}
+                {diff.lost.map((p) => p.label).join(', ')}
+              </p>
+            )}
+            {diff.gained.length > 0 && (
+              <p className="tm-effect-gain">
+                <strong>{holders} {holders === 1 ? 'person gains' : 'people gain'}</strong>{' '}
+                {diff.gained.map((p) => p.label).join(', ')}
+              </p>
+            )}
+            {holders === 0 && (
+              <p className="tm-hint">Nobody has this role yet — nothing changes for anyone today.</p>
+            )}
+          </section>
+        )}
+
         {error && <ErrorText>{error}</ErrorText>}
 
         <div className="tm-card-actions">
@@ -712,10 +741,12 @@ function AccessTab({ locations, roles, staff, settingsByLocation, onSettingsChan
   const [saving, setSaving] = useState('')
   const [error, setError] = useState('')
   const [editing, setEditing] = useState(null)
+  // Что изменило последнее переключение: { key, from, to, effect }
+  const [lastChange, setLastChange] = useState(null)
 
   const settings = settingsByLocation[locationId]
 
-  async function setLevel(key, level) {
+  async function applyLevel(key, level) {
     setSaving(key)
     setError('')
     try {
@@ -726,6 +757,23 @@ function AccessTab({ locations, roles, staff, settingsByLocation, onSettingsChan
     } finally {
       setSaving('')
     }
+  }
+
+  /**
+   * Право меняется одним нажатием — так и должно быть, это переключатель,
+   * а не форма. Но оно действует на людей, поэтому сразу после записи
+   * кабинет говорит, на кого именно, и предлагает вернуть как было.
+   *
+   * Диалога подтверждения здесь нет намеренно: он превратил бы быстрый
+   * переключатель в анкету. Объяснение постфактум с отменой честнее и
+   * быстрее — ошибка стоит одного нажатия.
+   */
+  function setLevel(key, level) {
+    const staffHere = (staff ?? []).filter((m) => !m.location_id || m.location_id === locationId)
+    const effect = levelChangeEffect(key, level, staffHere, roles, settings)
+    const from = permLevel(settings, key)
+    applyLevel(key, level)
+    setLastChange(effect.people.length > 0 ? { key, from, to: level, effect } : null)
   }
 
   if (locations.length === 0) {
@@ -749,6 +797,28 @@ function AccessTab({ locations, roles, staff, settingsByLocation, onSettingsChan
       </div>
 
       {error && <ErrorText>{error}</ErrorText>}
+
+      {/* Кого это задело — сразу после переключения, с возвратом как было */}
+      {lastChange && (
+        <div className="tm-effect-live" role="status">
+          <span>
+            <strong>{lastChange.effect.label}</strong>
+            {lastChange.to === 'manager' ? ' — manager and owner only. ' : ' — everyone. '}
+            {lastChange.effect.people.join(', ')}
+            {lastChange.effect.people.length === 1 ? ' is affected' : ' are affected'}
+            {lastChange.effect.withOwnRole > 0
+              ? `; ${lastChange.effect.withOwnRole} with their own role ${lastChange.effect.withOwnRole === 1 ? 'is' : 'are'} not.`
+              : '.'}
+          </span>
+          <Button
+            size="compact"
+            disabled={saving === lastChange.key}
+            onClick={() => { applyLevel(lastChange.key, lastChange.from); setLastChange(null) }}
+          >
+            Undo
+          </Button>
+        </div>
+      )}
 
       <div className="tm-access-grid">
         <Panel
