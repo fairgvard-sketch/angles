@@ -1585,6 +1585,19 @@ a { color: inherit; }
 
 /* ── Настройки точки: табы тем, отчёт УФ-экспорта ───────────── */
 .settings-topic-tabs { margin-top: -4px; }
+/*
+ * Темы настроек — одна строка с прокруткой, а не перенос. На 390px пять
+ * тем ложились в две строки, активная уезжала во вторую, и экран
+ * начинался с двухэтажной навигации вместо самих настроек.
+ */
+@media (max-width: 640px) {
+  .settings-topic-tabs {
+    flex-wrap: nowrap; overflow-x: auto; overscroll-behavior-x: contain;
+    scrollbar-width: none; padding-bottom: 2px;
+  }
+  .settings-topic-tabs::-webkit-scrollbar { display: none; }
+  .settings-topic-tabs button { flex: 0 0 auto; }
+}
 .settings-topic-tabs button { min-height: 34px; padding: 0 13px; font-size: 12px; border-radius: var(--r-pill); }
 .export-downloads { justify-content: flex-start; flex-wrap: wrap; }
 .export-report { width: 100%; border-collapse: collapse; font-size: 14px; }
@@ -4279,4 +4292,33 @@ a { color: inherit; }
   }
   .tm-matrix-row .perm-switch { justify-self: start; }
   .tm-matrix-row .perm-switch button { min-height: var(--h-touch); }
+}
+
+
+/*
+ * ── Палец вместо мыши ────────────────────────────────────────
+ *
+ * Замер по всем экранам (Phase 10) показал цели в 27–34px там, где
+ * работают пальцем: «View all» на главной, стрелки дня в бронях,
+ * период в отчёте, темы настроек, иконки парка касс. Мышью в такую
+ * цель попадают, пальцем — через раз.
+ *
+ * Правило включается по `pointer: coarse`, а не по ширине экрана:
+ * планшет бывает шире ноутбука, а палец у него всё равно палец.
+ * Десктопная плотность при этом не меняется — там мышь.
+ */
+@media (pointer: coarse) {
+  .text-button { min-height: 40px; }
+  .icon-button { width: 40px; height: 40px; }
+  .period-switch button,
+  .location-tabs button,
+  .desk-tabs button,
+  .channel-tabs button { min-height: 40px; }
+  /* Строчные действия в таблицах и списках тоже трогают пальцем */
+  .data-row button, .menu-row-wrap button, .tm-matrix-row button { min-height: 36px; }
+  /* Селекторы с собственной высотой перечислены поимённо: у них
+     специфичность выше, и общее правило их не достаёт. */
+  .sales-periods button,
+  .perm-switch button,
+  .timeline-pan .text-button { min-height: 40px; }
 }
