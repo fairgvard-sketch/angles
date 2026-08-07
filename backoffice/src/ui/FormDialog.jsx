@@ -1,6 +1,6 @@
 import { useEffect, useRef } from 'react'
 import { Button } from './Button'
-import { isTopLayer, pushLayer } from './overlay-stack'
+import { overlayClass, useOverlayExit } from './overlay-motion'
 
 /**
  * Компактный диалог с формой: завести категорию, группу модификаторов,
@@ -31,28 +31,27 @@ export default function FormDialog({
 }) {
   const panelRef = useRef(null)
   const returnRef = useRef(null)
-  const layerRef = useRef({})
   // Занятость читается из ref: пересобирать обработчик клавиш на каждый
   // вдох формы значит терять место в стеке слоёв.
   const busyRef = useRef(busy)
   busyRef.current = busy
-
-  useEffect(() => pushLayer(layerRef.current), [])
+  // Отмена уводит лист вниз (на телефоне) или гасит его на месте (на
+  // десктопе), и только после этого экран снимает диалог.
+  const { closing, close, isTop } = useOverlayExit(onCancel)
 
   useEffect(() => {
     returnRef.current = document.activeElement
     const panel = panelRef.current
-    const layer = layerRef.current
     // Первое поле формы, а не кнопка: диалог открыт, чтобы что-то ввести.
     panel?.querySelector('input, select, textarea')?.focus()
 
     function onKey(event) {
-      if (!isTopLayer(layer)) return
+      if (!isTop()) return
       if (event.key === 'Escape') {
         event.stopPropagation()
         // Закрыть форму посреди записи — значит не узнать, чем она
         // кончилась: запрос уже ушёл.
-        if (!busyRef.current) onCancel()
+        if (!busyRef.current) close()
         return
       }
       if (event.key !== 'Tab') return
@@ -76,10 +75,14 @@ export default function FormDialog({
       document.removeEventListener('keydown', onKey, true)
       if (returnRef.current instanceof HTMLElement) returnRef.current.focus()
     }
-  }, [onCancel])
+  }, [close, isTop])
 
   return (
-    <div className="sheet-backdrop" onClick={busy ? undefined : onCancel} role="presentation">
+    <div
+      className={overlayClass('sheet-backdrop', closing)}
+      onClick={busy ? undefined : close}
+      role="presentation"
+    >
       <form
         className="sheet form-dialog"
         ref={panelRef}
@@ -95,7 +98,7 @@ export default function FormDialog({
         <div className="form-dialog-body">{children}</div>
         {error && <p className="form-error" role="alert">{error}</p>}
         <div className="order-actions">
-          <Button onClick={onCancel} disabled={busy}>{cancelLabel}</Button>
+          <Button onClick={close} disabled={busy}>{cancelLabel}</Button>
           <Button variant="primary" size="compact" type="submit" busy={busy} busyLabel="Saving…">
             {submitLabel}
           </Button>

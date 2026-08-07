@@ -1,7 +1,7 @@
 import { useEffect, useRef } from 'react'
 import { X } from 'lucide-react'
 import { IconButton } from './Button'
-import { isTopLayer, pushLayer } from './overlay-stack'
+import { overlayClass, useOverlayExit } from './overlay-motion'
 
 /**
  * Боковая панель для деталей и правки.
@@ -25,29 +25,31 @@ import { isTopLayer, pushLayer } from './overlay-stack'
  * блокируется, Tab может уйти в список, и для скринридера остальная
  * страница остаётся доступной (`aria-modal` снят). Escape закрывает в
  * обоих случаях.
+ *
+ * Панель приезжает и уезжает: сбоку на широком экране, снизу на
+ * телефоне. Уход идёт через `useOverlayExit` — иначе поверхность в пол-
+ * экрана пропадала в один кадр, и было не видно, куда она делась.
  */
 export default function Drawer({
   title, subtitle, onClose, children, footer, actions, labelledBy, modal = true,
 }) {
   const panelRef = useRef(null)
   const returnRef = useRef(null)
-  const layerRef = useRef({})
   const titleId = labelledBy || 'drawer-title'
-
   /*
-   * Место в стеке слоёв берётся ОДИН раз, на монтирование.
+   * Место в стеке слоёв и уход панели живут в одном хуке: место берётся
+   * ОДИН раз, на монтирование, и отдаётся в момент начала ухода.
    *
-   * Соблазнительно было положить это в общий эффект ниже, но он зависит
-   * от `onClose` — а его экраны создают заново на каждом рендере.
-   * Перерегистрация возвращала панель на вершину стека, и открытый
-   * поверх неё диалог снова терял Escape.
+   * Соблазнительно было положить регистрацию в общий эффект ниже, но
+   * тот перезапускается при смене `modal`, а перерегистрация возвращает
+   * панель на вершину стека — и открытый поверх неё диалог снова теряет
+   * Escape.
    */
-  useEffect(() => pushLayer(layerRef.current), [])
+  const { closing, close, isTop } = useOverlayExit(onClose)
 
   useEffect(() => {
     returnRef.current = document.activeElement
     const panel = panelRef.current
-    const layer = layerRef.current
     // Первый фокус — на саму панель: читалка объявит заголовок целиком,
     // а не первое попавшееся поле.
     panel?.focus()
@@ -59,10 +61,10 @@ export default function Drawer({
     }
 
     function onKey(event) {
-      if (!isTopLayer(layer)) return
+      if (!isTop()) return
       if (event.key === 'Escape') {
         event.stopPropagation()
-        onClose()
+        close()
         return
       }
       // Ловушка фокуса — свойство модального слоя: рядом с немодальной
@@ -93,12 +95,12 @@ export default function Drawer({
       // пользователь после закрытия оказывается в начале документа.
       if (returnRef.current instanceof HTMLElement) returnRef.current.focus()
     }
-  }, [onClose, modal])
+  }, [close, isTop, modal])
 
   return (
     <div
-      className={modal ? 'drawer-backdrop' : 'drawer-backdrop is-bare'}
-      onClick={modal ? onClose : undefined}
+      className={overlayClass(modal ? 'drawer-backdrop' : 'drawer-backdrop is-bare', closing)}
+      onClick={modal ? close : undefined}
       role="presentation"
     >
       <aside
@@ -120,7 +122,7 @@ export default function Drawer({
           </div>
           <div className="drawer-head-actions">
             {actions}
-            <IconButton label="Close" onClick={onClose}><X /></IconButton>
+            <IconButton label="Close" onClick={close}><X /></IconButton>
           </div>
         </header>
         <div className="drawer-body">{children}</div>

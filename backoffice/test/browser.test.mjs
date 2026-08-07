@@ -56,7 +56,17 @@ const GUEST_PAGE = `<!doctype html><html><head><meta charset="utf-8">
 let browser = null
 let skip = false
 try {
-  browser = await puppeteer.launch({ headless: true, args: ['--no-sandbox'] })
+  /*
+   * `--force-prefers-reduced-motion` — не про доступность, а про
+   * надёжность набора: слои теперь приезжают и уезжают, и клик по кнопке
+   * внутри ещё не доехавшей панели уходит мимо (puppeteer честно
+   * отвечает «node is not clickable»). Здесь проверяется поведение, а
+   * само движение — отдельным набором, где анимация включена обратно.
+   */
+  browser = await puppeteer.launch({
+    headless: true,
+    args: ['--no-sandbox', '--force-prefers-reduced-motion'],
+  })
 } catch (error) {
   skip = `no browser for puppeteer (${error.message.split('\n')[0]}); run: npx puppeteer browsers install chrome`
 }
@@ -398,6 +408,9 @@ before(async () => {
             >
               <input id="field-a" aria-label="Guest name" />
               <input id="field-b" aria-label="Phone" />
+              {/* Длинная форма по требованию: на телефоне такой лист
+                  обязан забрать экран целиком, короткий — нет */}
+              {location.hash.includes('tall') && <div className="tall">long form</div>}
             </Drawer>
           )}
         </main>
@@ -1125,16 +1138,23 @@ describe('слои: панель и диалог поверх неё', { skip },
     return page
   }
 
+  /*
+   * Ждём состояние, а не секундомер. Слой теперь не исчезает, а уезжает:
+   * между нажатием и снятием узла есть анимация, и фиксированная пауза в
+   * тесте закрепила бы её длительность как контракт.
+   */
+  const gone = (page, selector) => page.waitForFunction(
+    (css) => !document.querySelector(css), {}, selector
+  )
+
   it('Escape закрывает диалог, а панель визита остаётся открытой', async () => {
     const page = await open()
     await page.keyboard.press('Escape')
-    await new Promise((resolve) => setTimeout(resolve, 150))
+    await gone(page, '.confirm-dialog')
     const state = await page.evaluate(() => ({
-      dialogs: document.querySelectorAll('.confirm-dialog').length,
       drawers: document.querySelectorAll('.drawer').length,
       cancelled: !!document.getElementById('did-cancel'),
     }))
-    assert.equal(state.dialogs, 0, 'диалог закрылся')
     assert.equal(state.drawers, 1, 'панель осталась')
     // Отказ от диалога не должен ничего выполнять
     assert.equal(state.cancelled, false)
@@ -1144,9 +1164,9 @@ describe('слои: панель и диалог поверх неё', { skip },
   it('второй Escape закрывает уже панель', async () => {
     const page = await open()
     await page.keyboard.press('Escape')
-    await new Promise((resolve) => setTimeout(resolve, 150))
+    await gone(page, '.confirm-dialog')
     await page.keyboard.press('Escape')
-    await new Promise((resolve) => setTimeout(resolve, 150))
+    await gone(page, '.drawer')
     assert.equal(await page.evaluate(() => document.querySelectorAll('.drawer').length), 0)
     await page.close()
   })
@@ -1158,6 +1178,129 @@ describe('слои: панель и диалог поверх неё', { skip },
       () => !!document.querySelector('.confirm-dialog')?.contains(document.activeElement)
     )
     assert.equal(inside, true)
+    await page.close()
+  })
+})
+
+/**
+ * Движение слоёв — единственный набор, где анимация ВКЛЮЧЕНА.
+ *
+ * Проверяется не красота, а два свойства, которых не было: слой уходит
+ * туда же, откуда пришёл (иначе «куда делась карточка» — вопрос при
+ * каждом закрытии), и уходящий слой сразу отдаёт клавиатуру тому, что
+ * под ним. Длительности здесь не закрепляются: тест ждёт состояния
+ * анимации, а не миллисекунды.
+ */
+describe('движение слоёв', { skip }, () => {
+  const withMotion = async (page) => {
+    await page.emulateMediaFeatures([
+      { name: 'prefers-reduced-motion', value: 'no-preference' },
+    ])
+    return page
+  }
+
+  /** Пока слой едет, клик внутрь уходит мимо — ждём остановки */
+  const settled = (page, css) => page.waitForFunction(
+    (selector) => {
+      const el = document.querySelector(selector)
+      return !!el && el.getAnimations().every((a) => a.playState === 'finished')
+    },
+    {},
+    css
+  )
+
+  const openDrawer = async ({ width = 1440, height = 900, hash = '' } = {}) => {
+    const page = await withMotion(await browser.newPage())
+    await page.setViewport({ width, height })
+    await page.goto(`${appOrigin}/drawer${hash}`, { waitUntil: 'networkidle0' })
+    await page.click('#opener')
+    await page.waitForSelector('.drawer')
+    return page
+  }
+
+  const runningName = (page, css) => page.evaluate((selector) => {
+    const el = document.querySelector(selector)
+    return el?.getAnimations().map((a) => a.animationName).join(',') ?? ''
+  }, css)
+
+  it('на широком экране панель приезжает сбоку и встаёт на место', async () => {
+    const page = await openDrawer()
+    assert.match(await runningName(page, '.drawer'), /panel-slide-in/)
+    await settled(page, '.drawer')
+    const rect = await page.evaluate(() => {
+      const el = document.querySelector('.drawer')
+      const box = el.getBoundingClientRect()
+      return { right: Math.round(box.right), width: window.innerWidth }
+    })
+    assert.equal(rect.right, rect.width, 'панель обязана доехать до края')
+    await page.close()
+  })
+
+  it('Escape уводит панель обратно, а не гасит её на месте', async () => {
+    const page = await openDrawer()
+    await settled(page, '.drawer')
+    await page.keyboard.press('Escape')
+    await page.waitForSelector('.drawer-backdrop.is-closing')
+    assert.match(await runningName(page, '.drawer'), /panel-slide-out/)
+    // Уходящий слой не ловит тапы: решение уже принято
+    assert.equal(
+      await page.evaluate(() => getComputedStyle(document.querySelector('.drawer')).pointerEvents),
+      'none'
+    )
+    await page.waitForFunction(() => !document.querySelector('.drawer'))
+    await page.close()
+  })
+
+  it('на телефоне лист едет снизу', async () => {
+    const page = await openDrawer({ width: 390, height: 740 })
+    assert.match(await runningName(page, '.drawer'), /sheet-rise/)
+    await settled(page, '.drawer')
+    await page.keyboard.press('Escape')
+    await page.waitForSelector('.drawer-backdrop.is-closing')
+    assert.match(await runningName(page, '.drawer'), /sheet-sink/)
+    await page.close()
+  })
+
+  /**
+   * «Весь экран, если необходимо»: длинная форма забирает телефон
+   * целиком, короткая карточка остаётся листом на своей высоте.
+   */
+  it('на телефоне длинный лист занимает весь экран, короткий — нет', async () => {
+    const tall = await openDrawer({ width: 390, height: 740, hash: '#tall' })
+    await settled(tall, '.drawer')
+    const tallHeight = await tall.evaluate(
+      () => Math.round(document.querySelector('.drawer').getBoundingClientRect().height)
+    )
+    assert.equal(tallHeight, 740, 'длинная форма обязана занять экран целиком')
+    await tall.close()
+
+    const short = await openDrawer({ width: 390, height: 740 })
+    await settled(short, '.drawer')
+    const shortHeight = await short.evaluate(
+      () => Math.round(document.querySelector('.drawer').getBoundingClientRect().height)
+    )
+    assert.ok(shortHeight < 740, `короткая карточка не должна раздуваться: ${shortHeight}`)
+    await short.close()
+  })
+
+  /**
+   * Уходящий диалог отдаёт клавиатуру сразу, не дожидаясь конца
+   * анимации: иначе два Escape подряд срабатывали бы как один — панель
+   * под уезжающим диалогом второго нажатия просто не получала.
+   */
+  it('два Escape подряд закрывают оба слоя', async () => {
+    const page = await withMotion(await browser.newPage())
+    await page.setViewport({ width: 1440, height: 900 })
+    await page.goto(`${appOrigin}/layers`, { waitUntil: 'networkidle0' })
+    await settled(page, '.drawer')
+    await page.click('#ask')
+    await page.waitForSelector('.confirm-dialog')
+    await settled(page, '.sheet')
+
+    await page.keyboard.press('Escape')
+    await page.keyboard.press('Escape')
+    await page.waitForFunction(() => !document.querySelector('.confirm-dialog'))
+    await page.waitForFunction(() => !document.querySelector('.drawer'))
     await page.close()
   })
 })

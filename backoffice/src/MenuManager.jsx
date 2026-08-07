@@ -21,6 +21,7 @@ import { RowMenu, OrderButtons } from './ui/RowMenu'
 import FormDialog from './ui/FormDialog'
 import ConfirmDialog from './ui/ConfirmDialog'
 import { SearchField } from './ui/Layout'
+import { overlayClass, useOverlayExit } from './ui/overlay-motion'
 import useNarrow from './ui/useNarrow'
 
 /**
@@ -142,13 +143,18 @@ function Availability({ item }) {
  */
 function BulkReview({ rows, action, busy, error, onCancel, onApply }) {
   const changing = changedCount(rows)
+  const { closing, close } = useOverlayExit(onCancel)
   const titles = {
     availability: 'Change availability',
     category: 'Move to another category',
     price: 'Change prices',
   }
   return (
-    <div className="sheet-backdrop" onClick={busy ? undefined : onCancel} role="presentation">
+    <div
+      className={overlayClass('sheet-backdrop', closing)}
+      onClick={busy ? undefined : close}
+      role="presentation"
+    >
       <div
         className="sheet"
         onClick={(e) => e.stopPropagation()}
@@ -172,7 +178,7 @@ function BulkReview({ rows, action, busy, error, onCancel, onApply }) {
         </div>
         {error && <p className="form-error" role="alert">{error}</p>}
         <div className="order-actions">
-          <Button onClick={onCancel} disabled={busy}>Cancel</Button>
+          <Button onClick={close} disabled={busy}>Cancel</Button>
           <Button
             variant="primary"
             size="compact"

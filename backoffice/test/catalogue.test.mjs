@@ -114,7 +114,17 @@ createRoot(document.getElementById('root')).render(h(Harness))
 let browser = null
 let skip = false
 try {
-  browser = await puppeteer.launch({ headless: true, args: ['--no-sandbox'] })
+  /*
+   * `--force-prefers-reduced-motion` — не про доступность, а про
+   * надёжность набора: слои теперь приезжают и уезжают, и клик по кнопке
+   * внутри ещё не доехавшей панели уходит мимо (puppeteer честно
+   * отвечает «node is not clickable»). Здесь проверяется поведение, а
+   * само движение — отдельным набором, где анимация включена обратно.
+   */
+  browser = await puppeteer.launch({
+    headless: true,
+    args: ['--no-sandbox', '--force-prefers-reduced-motion'],
+  })
 } catch (error) {
   skip = `no browser for puppeteer (${error.message.split('\n')[0]}); run: npx puppeteer browsers install chrome`
 }

@@ -28,6 +28,7 @@ import AppShell, { Brand } from './ui/AppShell'
 import HomeDashboard from './HomeDashboard'
 import { ActivityCard } from './ActivityManager'
 import { PageHeader } from './ui/Layout'
+import { overlayClass, useOverlayExit } from './ui/overlay-motion'
 import Skeleton, { SkeletonBar, SkeletonPanel } from './ui/Skeleton'
 
 /**
@@ -382,15 +383,18 @@ const HELP_STEPS = [
 function HelpPanel({ context, email, onNavigate, onClose }) {
   const closeRef = useRef(null)
   const [copied, setCopied] = useState(false)
+  const { closing, close, isTop } = useOverlayExit(onClose)
 
   useEffect(() => {
     closeRef.current?.focus()
     function onKey(event) {
-      if (event.key === 'Escape') onClose()
+      // Escape принадлежит верхнему слою: поверх помощи может стоять
+      // диалог, и закрывать надо его, а не лист под ним.
+      if (event.key === 'Escape' && isTop()) close()
     }
     document.addEventListener('keydown', onKey)
     return () => document.removeEventListener('keydown', onKey)
-  }, [onClose])
+  }, [close, isTop])
 
   const locations = context.locations || []
   const diagnostics = [
@@ -414,7 +418,7 @@ function HelpPanel({ context, email, onNavigate, onClose }) {
   const steps = HELP_STEPS.filter((step) => hasCapability(context, step.capability))
 
   return (
-    <div className="sheet-backdrop" onClick={onClose} role="presentation">
+    <div className={overlayClass('sheet-backdrop', closing)} onClick={close} role="presentation">
       <div
         className="sheet help-sheet"
         onClick={(event) => event.stopPropagation()}
@@ -428,7 +432,7 @@ function HelpPanel({ context, email, onNavigate, onClose }) {
             type="button"
             className="icon-button"
             aria-label="Close help"
-            onClick={onClose}
+            onClick={close}
             ref={closeRef}
           >
             <X />
@@ -444,7 +448,7 @@ function HelpPanel({ context, email, onNavigate, onClose }) {
                   key={step.view}
                   type="button"
                   className="help-step"
-                  onClick={() => { onNavigate(step.view); onClose() }}
+                  onClick={() => { onNavigate(step.view); close() }}
                 >
                   <span>
                     <strong>{step.title}</strong>

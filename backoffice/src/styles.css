@@ -115,6 +115,26 @@
   --h-control: 40px;
   --h-touch: 44px;
 
+  /*
+   * Движение слоёв: панели, листа, диалога.
+   *
+   * Приход длиннее ухода. Приезжающую поверхность человек читает — она
+   * обязана успеть встать и объяснить, откуда взялась; уходящую читать
+   * уже не надо, и лишние миллисекунды на ней ощущаются как тормоз.
+   *
+   * `--motion-out` обязан совпадать с `OVERLAY_EXIT_MS` в
+   * `ui/overlay-motion.js`: раньше времени снятый узел обрывает
+   * анимацию, позже — оставляет застывшую поверхность поверх страницы.
+   *
+   * Кривая входа с нулевым замедлением на конце (`.32 .72 0 1`) — та
+   * самая, по которой едут системные листы iOS: поверхность выходит
+   * быстро и мягко останавливается, а не «доползает».
+   */
+  --motion-in: 260ms;
+  --motion-out: 200ms;
+  --ease-out-soft: cubic-bezier(.32, .72, 0, 1);
+  --ease-in-soft: cubic-bezier(.4, 0, 1, 1);
+
   font-family: Inter, "Helvetica Neue", Arial, sans-serif;
   color: var(--c-text);
   background: var(--c-page);
@@ -959,7 +979,7 @@ a { color: inherit; }
   .modal-scrim { padding: 0; place-items: stretch; }
   .modal {
     width: 100%; max-width: none; height: 100svh; max-height: none;
-    border-radius: 0; animation: sheet-up .22s ease;
+    border-radius: 0; animation: sheet-rise var(--motion-in) var(--ease-out-soft);
   }
   .modal-head { position: sticky; top: 0; z-index: 1; background: var(--c-surface); padding: max(14px, env(safe-area-inset-top)) 18px 14px; }
   .modal-body { padding: 16px 18px 20px; gap: 14px; }
@@ -975,8 +995,6 @@ a { color: inherit; }
   /* На телефоне поля крупнее: 16px не даёт iOS зумить при фокусе */
   .modal-body input, .modal-body select { height: 46px; font-size: 16px; }
 }
-
-@keyframes sheet-up { from { transform: translateY(14px); opacity: .6; } to { transform: none; opacity: 1; } }
 
 /* Лист редактора выезжает снизу — движение крупной поверхности, то
    самое, от которого у части людей кружится голова. */
@@ -997,7 +1015,9 @@ a { color: inherit; }
     border-right: 0; visibility: hidden;
     overflow: hidden;
     transform: translateX(-100%);
-    transition: transform .24s ease, visibility .24s;
+    /* Та же кривая и та же длительность, что у панели и листа: шторка —
+       такой же слой, и приезжать он обязан по одному закону с ними. */
+    transition: transform var(--motion-in) var(--ease-out-soft), visibility var(--motion-in);
   }
   .sidebar.is-open { visibility: visible; transform: translateX(0); }
   .sidebar-top, .sidebar-bottom { flex: 0 0 auto; }
@@ -1051,7 +1071,7 @@ a { color: inherit; }
  * закрытая шторка попадает в область прокрутки и даёт сдвиг на iOS.
  */
 @media (max-width: 980px) and (prefers-reduced-motion: reduce) {
-  .sidebar { transition: visibility .24s; }
+  .sidebar { transition: visibility var(--motion-in); }
 }
 
 @media (max-width: 720px) {
@@ -2089,16 +2109,61 @@ a { color: inherit; }
  * телефоне ширины для этого нет — там панель занимает почти весь экран
  * снизу, как обычный лист.
  */
+/*
+ * ── Движение слоёв ───────────────────────────────────────────
+ *
+ * Один словарь на всё, что открывается поверх страницы. Приход играет
+ * сам, как только узел вставлен; уход играет по классу `is-closing`,
+ * который вешает `useOverlayExit` перед тем, как снять слой.
+ *
+ * Лист ездит по вертикали и уходит ТУДА ЖЕ, откуда пришёл, — вниз за
+ * край экрана. Обратный путь важнее красоты: он отвечает на вопрос
+ * «куда делась карточка», который при мгновенном исчезновении вставал
+ * каждый раз.
+ */
+/*
+ * Затемнение гаснет ОТДЕЛЬНО от поверхности: гасить их вместе (opacity
+ * на общем контейнере) значит делать полупрозрачной и саму панель — на
+ * середине ухода сквозь неё просвечивает страница, и уезжает как будто
+ * привидение. Цвет фона у слоёв разный, поэтому конец берётся из
+ * `--scrim` самого слоя.
+ */
+@keyframes scrim-in { from { background-color: rgb(0 0 0 / 0%); } to { background-color: var(--scrim); } }
+@keyframes scrim-out { from { background-color: var(--scrim); } to { background-color: rgb(0 0 0 / 0%); } }
+@keyframes sheet-rise { from { transform: translateY(100%); } to { transform: translateY(0); } }
+@keyframes sheet-sink { from { transform: translateY(0); } to { transform: translateY(100%); } }
+@keyframes panel-slide-in { from { transform: translateX(100%); } to { transform: translateX(0); } }
+@keyframes panel-slide-out { from { transform: translateX(0); } to { transform: translateX(100%); } }
+/* Диалог по центру не ездит: ему неоткуда взяться сбоку. Он приходит
+   на место с лёгким подъёмом и уходит обратно вниз. */
+@keyframes dialog-in { from { opacity: 0; transform: translateY(10px) scale(.99); } to { opacity: 1; transform: none; } }
+@keyframes dialog-out { from { opacity: 1; transform: none; } to { opacity: 0; transform: translateY(6px) scale(.99); } }
+
 .drawer-backdrop {
-  position: fixed; inset: 0; z-index: 50; background: rgb(0 0 0 / 32%);
+  --scrim: rgb(0 0 0 / 32%);
+  position: fixed; inset: 0; z-index: 50; background: var(--scrim);
   display: flex; justify-content: flex-end;
+  animation: scrim-in var(--motion-in) var(--ease-out-soft);
 }
+/*
+ * Уходящий слой не кликается. Иначе последние 200 мс он всё ещё ловит
+ * тап по фону и по своим кнопкам — а решение уже принято.
+ */
+.drawer-backdrop.is-closing {
+  pointer-events: none;
+  animation: scrim-out var(--motion-out) var(--ease-in-soft) forwards;
+}
+/* `.is-bare` ниже по файлу возвращает панели клики — уходящей они не
+   нужны, поэтому селектор здесь заведомо сильнее. */
+.drawer-backdrop.is-closing .drawer,
+.drawer-backdrop.is-bare.is-closing .drawer { pointer-events: none; }
 .drawer {
   width: min(440px, 100%); height: 100%; display: flex; flex-direction: column;
   background: var(--c-surface); border-inline-start: 1px solid var(--c-border-panel);
   box-shadow: var(--shadow-pop); outline: none;
-  animation: drawer-in .18s ease-out;
+  animation: panel-slide-in var(--motion-in) var(--ease-out-soft);
 }
+.is-closing > .drawer { animation: panel-slide-out var(--motion-out) var(--ease-in-soft) forwards; }
 .drawer-head {
   display: flex; align-items: flex-start; justify-content: space-between; gap: var(--sp-3);
   padding: var(--sp-4) var(--sp-4) var(--sp-3);
@@ -2115,17 +2180,26 @@ a { color: inherit; }
   padding: var(--sp-3) var(--sp-4);
   border-top: 1px solid var(--c-border-soft); background: var(--c-surface);
 }
-@keyframes drawer-in { from { transform: translateX(16px); opacity: .6; } to { transform: none; opacity: 1; } }
-@media (prefers-reduced-motion: reduce) {
-  .drawer { animation: none; }
-}
 @media (max-width: 640px) {
   .drawer-backdrop { align-items: flex-end; }
+  /*
+   * На телефоне панель — лист снизу, и высоту он берёт по содержимому:
+   * короткая карточка остаётся короткой, длинная форма забирает экран
+   * целиком. Прежний потолок в 92svh давал худшее из двух: редактор
+   * товара всё равно не помещался, а сверху оставалась полоска фона,
+   * из-за которой лист выглядел уехавшим за край.
+   *
+   * `svh`, а не `dvh`: при выехавшем адресном тулбаре Safari лист
+   * обязан оставаться видимым целиком, включая футер с «Save».
+   */
   .drawer {
-    width: 100%; height: auto; max-height: 92svh;
+    width: 100%; height: auto; max-height: 100svh;
     border-inline-start: 0; border-radius: 16px 16px 0 0;
-    animation-name: sheet-up;
+    animation-name: sheet-rise;
   }
+  .is-closing > .drawer { animation-name: sheet-sink; }
+  /* Кнопки листа не должны стоять под индикатором home */
+  .drawer-foot { padding-bottom: calc(var(--sp-3) + env(safe-area-inset-bottom)); }
 }
 
 /*
@@ -2217,14 +2291,22 @@ a { color: inherit; }
 .conflict-options { display: flex; flex-wrap: wrap; gap: var(--sp-2); }
 
 .sheet-backdrop {
-  position: fixed; inset: 0; z-index: 50; background: rgb(0 0 0 / 40%);
+  --scrim: rgb(0 0 0 / 40%);
+  position: fixed; inset: 0; z-index: 50; background: var(--scrim);
   display: flex; align-items: flex-end; justify-content: center;
+  animation: scrim-in var(--motion-in) var(--ease-out-soft);
+}
+.sheet-backdrop.is-closing {
+  pointer-events: none;
+  animation: scrim-out var(--motion-out) var(--ease-in-soft) forwards;
 }
 .sheet {
   width: 100%; max-width: 560px; background: var(--c-surface);
   border-radius: 16px 16px 0 0; padding: 20px; display: flex; flex-direction: column; gap: 10px;
-  max-height: 88vh; overflow-y: auto;
+  max-height: 100svh; overflow-y: auto;
+  animation: sheet-rise var(--motion-in) var(--ease-out-soft);
 }
+.is-closing > .sheet { animation: sheet-sink var(--motion-out) var(--ease-in-soft) forwards; }
 /*
  * Лист снизу — раскладка для ТЕЛЕФОНА: диалог приходит под большой
  * палец, и снизу его удобно закрывать. На десктопе та же раскладка
@@ -2237,7 +2319,10 @@ a { color: inherit; }
  */
 @media (min-width: 561px) {
   .sheet-backdrop { align-items: center; }
-  .sheet { border-radius: 16px; }
+  /* По центру ехать неоткуда: диалог появляется на месте, а не выезжает
+     из-за нижнего края экрана в полутора метрах от кнопки. */
+  .sheet { border-radius: 16px; max-height: 88svh; animation-name: dialog-in; }
+  .is-closing > .sheet { animation-name: dialog-out; }
 }
 .sheet h3 { font-size: 18px; color: var(--c-text); }
 .sheet-sub { color: var(--c-text-muted); font-size: 14px; }
@@ -2912,7 +2997,9 @@ a { color: inherit; }
 .ord-handoff-head svg { width: 15px; height: 15px; }
 /* Немодальная панель: фон не гасит страницу и не ловит клики — по
    соседней строке списка можно попасть, не закрывая панель */
-.drawer-backdrop.is-bare { background: transparent; pointer-events: none; }
+/* Немодальная панель фон не гасит: `--scrim` прозрачен, и анимация
+   затемнения на ней ничего не рисует — едет только сама панель. */
+.drawer-backdrop.is-bare { --scrim: rgb(0 0 0 / 0%); background: transparent; pointer-events: none; }
 .drawer-backdrop.is-bare .drawer { pointer-events: auto; }
 
 /* Свёрнутый долг прошлых дней (Phase 4) */
@@ -4428,4 +4515,24 @@ a { color: inherit; }
 @media (max-width: 980px) { .sk-split { grid-template-columns: minmax(0, 1fr); } }
 @media (prefers-reduced-motion: reduce) {
   .sk-bar { animation: none; }
+}
+
+/*
+ * ── Движение слоёв выключено ─────────────────────────────────
+ *
+ * Блок стоит в КОНЦЕ файла, и это не вкус: правила панели и листа
+ * доопределяются в отзывчивых блоках (`max-width: 640px` возвращает
+ * листу `sheet-rise`, `min-width: 561px` — диалогу `dialog-in`), а
+ * селекторы здесь той же силы. Поставленный выше, этот блок молча
+ * проигрывал бы им — и на телефоне, где движение крупнее всего,
+ * анимация оставалась бы включённой.
+ *
+ * Выключается движение целиком, а не ускоряется: `useOverlayExit` в
+ * этом режиме зовёт закрытие сразу, без ожидания анимации.
+ */
+@media (prefers-reduced-motion: reduce) {
+  .drawer-backdrop, .drawer-backdrop.is-closing,
+  .drawer, .is-closing > .drawer,
+  .sheet-backdrop, .sheet-backdrop.is-closing,
+  .sheet, .is-closing > .sheet { animation: none; }
 }

@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState } from 'react'
 import { Button } from './Button'
-import { isTopLayer, pushLayer } from './overlay-stack'
+import { overlayClass, useOverlayExit } from './overlay-motion'
 
 /**
  * Подтверждение действия — с необязательным полем причины.
@@ -34,24 +34,26 @@ export default function ConfirmDialog({
   const panelRef = useRef(null)
   const returnRef = useRef(null)
   const firstRef = useRef(null)
-  const layerRef = useRef({})
   const [text, setText] = useState('')
-
-  // Слой берётся один раз, на монтирование: диалог открывается поверх
-  // панели, и клавиатура принадлежит ему, пока он жив.
-  useEffect(() => pushLayer(layerRef.current), [])
+  /*
+   * Отказ от действия уводит диалог тем же путём, которым он пришёл.
+   * Подтверждение — дело экрана: он ждёт сервера и снимает диалог сам.
+   *
+   * Слой берётся один раз, на монтирование: диалог открывается поверх
+   * панели, и клавиатура принадлежит ему, пока он не начал уходить.
+   */
+  const { closing, close, isTop } = useOverlayExit(onCancel)
 
   useEffect(() => {
     returnRef.current = document.activeElement
     firstRef.current?.focus()
     const panel = panelRef.current
-    const layer = layerRef.current
 
     function onKey(event) {
-      if (!isTopLayer(layer)) return
+      if (!isTop()) return
       if (event.key === 'Escape') {
         event.stopPropagation()
-        onCancel()
+        close()
         return
       }
       if (event.key !== 'Tab') return
@@ -75,10 +77,10 @@ export default function ConfirmDialog({
       document.removeEventListener('keydown', onKey, true)
       if (returnRef.current instanceof HTMLElement) returnRef.current.focus()
     }
-  }, [onCancel])
+  }, [close, isTop])
 
   return (
-    <div className="sheet-backdrop" onClick={onCancel} role="presentation">
+    <div className={overlayClass('sheet-backdrop', closing)} onClick={close} role="presentation">
       <div
         className="sheet confirm-dialog"
         ref={panelRef}
@@ -103,7 +105,7 @@ export default function ConfirmDialog({
         )}
         {error && <p className="form-error" role="alert">{error}</p>}
         <div className="order-actions">
-          <Button ref={reason ? undefined : firstRef} onClick={onCancel}>{cancelLabel}</Button>
+          <Button ref={reason ? undefined : firstRef} onClick={close}>{cancelLabel}</Button>
           <Button
             variant={tone === 'danger' ? 'secondary' : 'primary'}
             size="compact"
