@@ -3,6 +3,7 @@ import { createReservation, deskErrorText, fromLocalInput, toLocalInput } from '
 import { conflictAlternatives, isConflict } from './desk-availability'
 import Drawer from './ui/Drawer'
 import { Button } from './ui/Button'
+import { coarsePointer } from './ui/focus-entry'
 
 /**
  * Ручная бронь и walk-in (Kassa 127).
@@ -60,7 +61,13 @@ export default function BookingForm({
     return [...groups.values()]
   }, [tables])
 
-  useEffect(() => { firstRef.current?.focus() }, [])
+  /*
+   * Автофокус в имя гостя — только с мышью. Пальцем вместе с формой
+   * выезжала клавиатура: она закрывала половину листа, и открыть бронь,
+   * чтобы просто посмотреть время, было нельзя, не убрав её сначала.
+   * Фокус в этом случае держит сама панель — Tab и читалка работают.
+   */
+  useEffect(() => { if (!coarsePointer()) firstRef.current?.focus() }, [])
 
   async function submit(event) {
     event.preventDefault()

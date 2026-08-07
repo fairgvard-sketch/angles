@@ -385,10 +385,24 @@ before(async () => {
   `, { stubSupabase: true })
 
   await bundle('drawer', `
-    import { useState } from 'react'
+    import { useEffect, useState } from 'react'
     import { createRoot } from 'react-dom/client'
     import Drawer from './ui/Drawer'
     import { Button } from './ui/Button'
+
+    /**
+     * Содержимое, приезжающее по сети уже после открытия: карточка
+     * клиента ведёт себя именно так, и на ней было видно, как лист
+     * дёргается, если высота считается по содержимому.
+     */
+    function Late() {
+      const [ready, setReady] = useState(false)
+      useEffect(() => {
+        const timer = setTimeout(() => setReady(true), 120)
+        return () => clearTimeout(timer)
+      }, [])
+      return ready ? <div className="tall">loaded</div> : <p>Loading…</p>
+    }
 
     function Page() {
       const [open, setOpen] = useState(false)
@@ -408,10 +422,37 @@ before(async () => {
             >
               <input id="field-a" aria-label="Guest name" />
               <input id="field-b" aria-label="Phone" />
-              {/* Длинная форма по требованию: на телефоне такой лист
-                  обязан забрать экран целиком, короткий — нет */}
               {location.hash.includes('tall') && <div className="tall">long form</div>}
+              {location.hash.includes('late') && <Late />}
             </Drawer>
+          )}
+        </main>
+      )
+    }
+    createRoot(document.getElementById('root')).render(<Page />)
+  `)
+
+  await bundle('form-dialog', `
+    import { useState } from 'react'
+    import { createRoot } from 'react-dom/client'
+    import FormDialog from './ui/FormDialog'
+
+    function Page() {
+      const [open, setOpen] = useState(true)
+      return (
+        <main className="content">
+          <button id="opener" className="secondary-button" onClick={() => setOpen(true)}>New category</button>
+          {open && (
+            <FormDialog
+              title="New category"
+              onSubmit={() => setOpen(false)}
+              onCancel={() => setOpen(false)}
+            >
+              <label className="qr-field">
+                <span>Name</span>
+                <input id="cat-name" />
+              </label>
+            </FormDialog>
           )}
         </main>
       )
@@ -1183,6 +1224,45 @@ describe('слои: панель и диалог поверх неё', { skip },
 })
 
 /**
+ * Куда встаёт фокус, когда слой открылся.
+ *
+ * Форма, которая сама фокусирует поле, на телефоне открывается вместе с
+ * клавиатурой: половина листа закрыта, и посмотреть, что там вообще
+ * спрашивают, нельзя, не убрав её. Автофокус в поле остаётся там, где
+ * ничего не заслоняет — с мышью; пальцем фокус входит в сам слой.
+ */
+describe('фокус при открытии слоя', { skip }, () => {
+  const open = async (viewport) => {
+    const page = await browser.newPage()
+    await page.setViewport(viewport)
+    await page.goto(`${appOrigin}/form-dialog`, { waitUntil: 'networkidle0' })
+    await page.waitForSelector('.form-dialog')
+    return page
+  }
+
+  const activeId = (page) => page.evaluate(() => ({
+    id: document.activeElement?.id || '',
+    inDialog: !!document.querySelector('.form-dialog')?.contains(document.activeElement),
+    isDialog: document.activeElement === document.querySelector('.form-dialog'),
+  }))
+
+  it('с мышью диалог сразу принимает ввод', async () => {
+    const page = await open({ width: 1440, height: 900 })
+    assert.deepEqual(await activeId(page), { id: 'cat-name', inDialog: true, isDialog: false })
+    await page.close()
+  })
+
+  it('пальцем фокус входит в диалог, а не в поле — клавиатура ждёт тапа', async () => {
+    const page = await open({ width: 390, height: 740, hasTouch: true, isMobile: true })
+    const state = await activeId(page)
+    assert.equal(state.isDialog, true, `фокус обязан быть на самом диалоге, а он на «${state.id}»`)
+    // Ловушка Tab и объявление читалкой держатся на том, что фокус ВНУТРИ
+    assert.equal(state.inDialog, true)
+    await page.close()
+  })
+})
+
+/**
  * Движение слоёв — единственный набор, где анимация ВКЛЮЧЕНА.
  *
  * Проверяется не красота, а два свойства, которых не было: слой уходит
@@ -1262,25 +1342,66 @@ describe('движение слоёв', { skip }, () => {
   })
 
   /**
-   * «Весь экран, если необходимо»: длинная форма забирает телефон
-   * целиком, короткая карточка остаётся листом на своей высоте.
+   * Высота панели на телефоне не зависит от содержимого — и это главное
+   * свойство, а не экономия места: панель наполняется по сети, и высота
+   * по содержимому пересчитывалась прямо во время движения. Лист дёргался
+   * на полпути, потому что `translateY(100%)` считается от неё.
+   *
+   * Компактный диалог высоту по-прежнему берёт по содержимому: там
+   * приезжать по сети нечему.
    */
-  it('на телефоне длинный лист занимает весь экран, короткий — нет', async () => {
-    const tall = await openDrawer({ width: 390, height: 740, hash: '#tall' })
-    await settled(tall, '.drawer')
-    const tallHeight = await tall.evaluate(
-      () => Math.round(document.querySelector('.drawer').getBoundingClientRect().height)
-    )
-    assert.equal(tallHeight, 740, 'длинная форма обязана занять экран целиком')
-    await tall.close()
+  it('на телефоне панель держит высоту экрана независимо от содержимого', async () => {
+    const heights = []
+    for (const hash of ['', '#tall']) {
+      const page = await openDrawer({ width: 390, height: 740, hash })
+      await settled(page, '.drawer')
+      heights.push(await page.evaluate(
+        () => Math.round(document.querySelector('.drawer').getBoundingClientRect().height)
+      ))
+      await page.close()
+    }
+    assert.deepEqual(heights, [740, 740], 'короткая и длинная панель обязаны быть одной высоты')
+  })
 
-    const short = await openDrawer({ width: 390, height: 740 })
-    await settled(short, '.drawer')
-    const shortHeight = await short.evaluate(
-      () => Math.round(document.querySelector('.drawer').getBoundingClientRect().height)
+  /**
+   * Регресс живой приёмки 07.08: профиль клиента выезжал рвано и как
+   * будто подвисал на середине. Причина не в длительности, а в
+   * геометрии — ответ сервера приходил, пока лист ещё ехал, и высота
+   * пересчитывалась под новым содержимым.
+   */
+  it('лист не меняет высоту, пока едет, даже если содержимое приехало по сети', async () => {
+    const page = await openDrawer({ width: 390, height: 740, hash: '#late' })
+    const seen = await page.evaluate(() => new Promise((resolve) => {
+      const panel = document.querySelector('.drawer')
+      const heights = []
+      const tick = () => {
+        heights.push(Math.round(panel.getBoundingClientRect().height))
+        if (panel.getAnimations().every((a) => a.playState === 'finished')) resolve(heights)
+        else requestAnimationFrame(tick)
+      }
+      requestAnimationFrame(tick)
+    }))
+    assert.ok(seen.length >= 3, `движение обязано занять несколько кадров, снято ${seen.length}`)
+    assert.equal(
+      new Set(seen).size, 1,
+      `высота менялась на ходу: ${[...new Set(seen)].join(', ')}`
     )
-    assert.ok(shortHeight < 740, `короткая карточка не должна раздуваться: ${shortHeight}`)
-    await short.close()
+    await page.close()
+  })
+
+  it('компактный диалог на телефоне остаётся по содержимому', async () => {
+    const page = await withMotion(await browser.newPage())
+    await page.setViewport({ width: 390, height: 740 })
+    await page.goto(`${appOrigin}/layers`, { waitUntil: 'networkidle0' })
+    await settled(page, '.drawer')
+    await page.click('#ask')
+    await page.waitForSelector('.confirm-dialog')
+    await settled(page, '.sheet')
+    const height = await page.evaluate(
+      () => Math.round(document.querySelector('.sheet').getBoundingClientRect().height)
+    )
+    assert.ok(height < 740, `диалог не должен раздуваться во весь экран: ${height}`)
+    await page.close()
   })
 
   /**

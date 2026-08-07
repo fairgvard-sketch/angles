@@ -393,7 +393,16 @@ function ProfileView({ guest, card, mode, error, onErase }) {
       {error && <ErrorText>{error}</ErrorText>}
 
       {!card && !error ? (
-        <p className="empty-state">Loading…</p>
+        /*
+         * Скелет, а не «Loading…»: карточка открывается листом снизу, и
+         * пока она едет, приходит ответ сервера. Строка текста
+         * сменялась историей заказов прямо посреди движения — лист менял
+         * высоту на ходу и дёргался. Скелет держит ту же геометрию,
+         * что и готовый список.
+         */
+        <Skeleton label="Loading the customer…">
+          {[0, 1, 2].map((i) => <SkeletonRow key={i} height={46} columns={['28%', '18%']} />)}
+        </Skeleton>
       ) : tab === 'orders' ? (
         <OrderHistory orders={orders} />
       ) : events.length === 0 ? (

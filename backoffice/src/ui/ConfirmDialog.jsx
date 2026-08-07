@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState } from 'react'
 import { Button } from './Button'
 import { overlayClass, useOverlayExit } from './overlay-motion'
+import { focusOnOpen } from './focus-entry'
 
 /**
  * Подтверждение действия — с необязательным полем причины.
@@ -44,10 +45,18 @@ export default function ConfirmDialog({
    */
   const { closing, close, isTop } = useOverlayExit(onCancel)
 
+  const hasReason = Boolean(reason)
+
   useEffect(() => {
     returnRef.current = document.activeElement
-    firstRef.current?.focus()
     const panel = panelRef.current
+    /*
+     * Кнопка отказа фокусируется всегда — клавиатуру она не вызывает.
+     * Поле причины — только с мышью: пальцем клавиатура выехала бы
+     * прежде, чем человек успел прочитать сам вопрос.
+     */
+    if (hasReason) focusOnOpen(panel, firstRef.current)
+    else firstRef.current?.focus()
 
     function onKey(event) {
       if (!isTop()) return
@@ -77,13 +86,14 @@ export default function ConfirmDialog({
       document.removeEventListener('keydown', onKey, true)
       if (returnRef.current instanceof HTMLElement) returnRef.current.focus()
     }
-  }, [close, isTop])
+  }, [close, isTop, hasReason])
 
   return (
     <div className={overlayClass('sheet-backdrop', closing)} onClick={close} role="presentation">
       <div
         className="sheet confirm-dialog"
         ref={panelRef}
+        tabIndex={-1}
         role="alertdialog"
         aria-modal="true"
         aria-labelledby="confirm-title"

@@ -13,6 +13,7 @@ import Drawer from './ui/Drawer'
 import ConfirmDialog from './ui/ConfirmDialog'
 import PartyCount from './ui/PartyCount'
 import { Button } from './ui/Button'
+import { coarsePointer } from './ui/focus-entry'
 
 /**
  * Очередь ожидания у стойки (Kassa 122/137).
@@ -346,7 +347,8 @@ function AddToWaitlist({ locationId, busy, onClose, onSubmit }) {
    */
   const clientUuid = useRef(crypto.randomUUID())
 
-  useEffect(() => { firstRef.current?.focus() }, [])
+  // Пальцем клавиатура не выезжает вместе с формой — фокус держит панель
+  useEffect(() => { if (!coarsePointer()) firstRef.current?.focus() }, [])
 
   return (
     <Drawer

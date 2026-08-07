@@ -1,6 +1,7 @@
 import { useEffect, useRef } from 'react'
 import { Button } from './Button'
 import { overlayClass, useOverlayExit } from './overlay-motion'
+import { focusOnOpen } from './focus-entry'
 
 /**
  * Компактный диалог с формой: завести категорию, группу модификаторов,
@@ -42,8 +43,9 @@ export default function FormDialog({
   useEffect(() => {
     returnRef.current = document.activeElement
     const panel = panelRef.current
-    // Первое поле формы, а не кнопка: диалог открыт, чтобы что-то ввести.
-    panel?.querySelector('input, select, textarea')?.focus()
+    // С мышью — сразу в первое поле: диалог открыт, чтобы что-то ввести.
+    // Пальцем — в сам диалог, иначе вместе с ним выезжает клавиатура.
+    focusOnOpen(panel, panel?.querySelector('input, select, textarea'))
 
     function onKey(event) {
       if (!isTop()) return
@@ -86,6 +88,7 @@ export default function FormDialog({
       <form
         className="sheet form-dialog"
         ref={panelRef}
+        tabIndex={-1}
         role="dialog"
         aria-modal="true"
         aria-labelledby="form-dialog-title"
