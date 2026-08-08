@@ -1,8 +1,8 @@
 import test from 'node:test'
 import assert from 'node:assert/strict'
 import {
-  NAV_ITEMS, groupedNavigation, hasCapability, isLocationScoped, productState,
-  visibleNavigation,
+  LOCATION_TABS, NAV_ITEMS, groupedNavigation, hasCapability, isLocationScoped,
+  productState, visibleLocationTabs, visibleNavigation,
 } from './navigation.js'
 
 /**
@@ -151,6 +151,36 @@ test('Разделы одной точки помечены — для них п
   assert.equal(isLocationScoped('team'), false)
   assert.equal(isLocationScoped('guests'), false)
   assert.equal(isLocationScoped('sales'), false)
+})
+
+// ── Вкладки настроек точки ───────────────────────────────────
+
+const tabKeys = (context) => visibleLocationTabs(context).map((t) => t.key)
+
+test('Раздел Locations виден всем — но кассовые вкладки только с кассой', () => {
+  assert.deepEqual(tabKeys(POS_ONLY), LOCATION_TABS.map((t) => t.key))
+  for (const digital of [MENU_ONLY, ORDERS_ONLY, RESERVE_ONLY]) {
+    assert.deepEqual(tabKeys(digital), ['general'])
+  }
+})
+
+test('Организация без продуктов настраивает только имя и режим точки', () => {
+  assert.deepEqual(tabKeys({ products: [], capabilities: [] }), ['general'])
+})
+
+test('Старый контекст без capabilities и products показывает все вкладки', () => {
+  assert.deepEqual(tabKeys({}), LOCATION_TABS.map((t) => t.key))
+})
+
+test('Контекст до 105: кассовые вкладки приближаются по продукту pos', () => {
+  assert.deepEqual(tabKeys({ products: ['pos'] }), LOCATION_TABS.map((t) => t.key))
+  assert.deepEqual(tabKeys({ products: ['menu'] }), ['general'])
+})
+
+test('General остаётся всегда — иначе раздел открывается пустым', () => {
+  for (const shape of [POS_ONLY, MENU_ONLY, ORDERS_ONLY, RESERVE_ONLY, DEVELOPER, {}]) {
+    assert.equal(visibleLocationTabs(shape)[0].key, 'general')
+  }
 })
 
 test('Состояние карточки продукта: active / developer / included / pending / addon', () => {

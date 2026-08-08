@@ -64,6 +64,32 @@ export function isLocationScoped(view) {
   return NAV_ITEMS.some((item) => item.id === view && item.scoped)
 }
 
+/**
+ * Вкладки настроек точки. Правило то же, что у разделов: аккаунт без кассы
+ * не должен находить у себя дефолты смены, реквизиты чека и фискальную
+ * выгрузку — терминала, который их исполняет, у него нет, и настройка
+ * выглядит как обещание продукта, который не куплен.
+ *
+ * Лояльность тоже POS-контур: начисление живёт в pay_order на кассе
+ * (Kassa 046/113), онлайн-заказ только привязывает гостя. Без кассы
+ * программа не начислит ничего.
+ *
+ * Раздел Locations виден всем (там имя, витринное имя, режим и НДС), а вот
+ * его наполнение зависит от продуктов — поэтому фильтр здесь, рядом с
+ * `visibleNavigation`, а не в самом экране: это одно и то же правило.
+ */
+export const LOCATION_TABS = [
+  { key: 'general', label: 'General' },
+  { key: 'receipt', label: 'Receipt & tax', capability: 'pos_operate' },
+  { key: 'loyalty', label: 'Loyalty', capability: 'pos_operate' },
+  { key: 'register', label: 'Register defaults', capability: 'pos_operate' },
+  { key: 'export', label: 'Fiscal export', capability: 'pos_operate' },
+]
+
+export function visibleLocationTabs(context) {
+  return LOCATION_TABS.filter(({ capability }) => !capability || hasCapability(context, capability))
+}
+
 export function isDeveloperAccount(context) {
   return context?.account_type === 'developer'
 }

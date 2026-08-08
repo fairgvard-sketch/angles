@@ -5,6 +5,7 @@ import {
 } from './settings'
 import { fetchCategories, updateCategory } from './menu'
 import { agorotToInput, inputToAgorot } from './online'
+import { hasCapability, visibleLocationTabs } from './navigation'
 import { PageHeader } from './ui/Layout'
 import ConfirmDialog from './ui/ConfirmDialog'
 import Tabs from './ui/Tabs'
@@ -21,14 +22,6 @@ import Skeleton, { SkeletonBar, SkeletonPanel } from './ui/Skeleton'
  * JSONB-настройки (смена, интерфейс, содержимое чека) — через
  * patch_location_settings_web с server-side merge, шлём только изменённое.
  */
-
-const TABS = [
-  { key: 'general', label: 'General' },
-  { key: 'receipt', label: 'Receipt & tax' },
-  { key: 'loyalty', label: 'Loyalty' },
-  { key: 'register', label: 'Register defaults' },
-  { key: 'export', label: 'Fiscal export' },
-]
 
 const SERVICE_MODES = [
   { value: 'counter', label: 'Counter — orders at the till' },
@@ -78,8 +71,15 @@ function shekels(agorot) {
 export default function LocationSettings({ context, locationId, tab: tabFromUrl, onTabChange }) {
   const locations = context?.locations || []
   const activeId = locationId || locations[0]?.id || null
-  const tab = TABS.some((t) => t.key === tabFromUrl) ? tabFromUrl : 'general'
+  /*
+   * Вкладки — по продуктам аккаунта (см. navigation.js). Ссылка на скрытую
+   * вкладку (закладка владельца, у которого кассу отключили) ведёт на
+   * General, а не на пустой экран.
+   */
+  const tabs = visibleLocationTabs(context)
+  const tab = tabs.some((t) => t.key === tabFromUrl) ? tabFromUrl : 'general'
   const setTab = onTabChange
+  const hasRegister = hasCapability(context, 'pos_operate')
   const [location, setLocation] = useState(null)
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState('')
@@ -134,14 +134,17 @@ export default function LocationSettings({ context, locationId, tab: tabFromUrl,
 
       {/* Полоса тем — на общий примитив: до него все пять кнопок были
           отдельными остановками Tab, а стрелки не двигали ничего, хотя
-          `role="tablist"` обещал читалке ровно обратное. */}
-      <Tabs
-        className="location-tabs settings-topic-tabs"
-        label="Settings topic"
-        items={TABS.map((t) => ({ key: t.key, label: t.label }))}
-        value={tab}
-        onChange={askTab}
-      />
+          `role="tablist"` обещал читалке ровно обратное. Одна вкладка —
+          полосы нет: выбор из самого себя ничего не выбирает. */}
+      {tabs.length > 1 && (
+        <Tabs
+          className="location-tabs settings-topic-tabs"
+          label="Settings topic"
+          items={tabs.map((t) => ({ key: t.key, label: t.label }))}
+          value={tab}
+          onChange={askTab}
+        />
+      )}
 
       {/*
         Область действия. У сети настройки точек не общие, и владелец
@@ -152,7 +155,7 @@ export default function LocationSettings({ context, locationId, tab: tabFromUrl,
       <p className="settings-scope">
         Applies to <strong>{location?.name || locations.find((l) => l.id === activeId)?.name}</strong>
         {locations.length > 1 ? ' only — other locations are configured separately' : ''}.
-        {' '}Printing and register shortcuts stay on the terminal itself.
+        {hasRegister && ' Printing and register shortcuts stay on the terminal itself.'}
       </p>
 
       {error && <p className="form-error" role="alert">{error}</p>}
