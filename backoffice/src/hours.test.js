@@ -4,7 +4,7 @@ import {
   groupByDay, formatDay, formatTime, formatHm, decimalHours, formatRanges,
   formatDayLine, dateKey, monthRange, monthTitle, shiftMonth,
   hoursToCsv, hoursFileName, idleStaff, dayBounds, dayBreakSeconds,
-  HEBREW_DOW, EN_DOW,
+  filterHoursStaff, HEBREW_DOW, EN_DOW,
 } from './hours.js'
 
 const TZ = 'Asia/Jerusalem'
@@ -182,6 +182,23 @@ test('уволенный без смен в список не поднимает
 
 test('фильтр точки не показывает чужих сотрудников', () => {
   assert.ok(!idleStaff([], roster, 'loc-1').some((s) => s.id === 's3'))
+})
+
+/*
+ * Отбор табеля. Он честный: отчёт за период и штат уже сведены в один
+ * список, поэтому «нашёлся один» значит «один во всей организации», а не
+ * «один на загруженной странице».
+ */
+test('табель отбирается по имени и не различает регистр', () => {
+  const rows = [{ name: 'Dana' }, { name: 'Avi' }, { name: 'דנה' }]
+  assert.deepEqual(filterHoursStaff(rows, 'DA').map((r) => r.name), ['Dana'])
+  assert.deepEqual(filterHoursStaff(rows, 'דנ').map((r) => r.name), ['דנה'])
+})
+
+test('пустой запрос отдаёт весь список, включая тех, кто не работал', () => {
+  const rows = [{ name: 'Dana', shifts: 2 }, { name: 'Avi', shifts: 0 }]
+  assert.equal(filterHoursStaff(rows, '   ').length, 2)
+  assert.equal(filterHoursStaff(null, '').length, 0)
 })
 
 test('сотрудник без точки работает на всех', () => {

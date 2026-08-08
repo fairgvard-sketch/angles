@@ -287,35 +287,114 @@ export function sortRoster(staff) {
   })
 }
 
-/** Отбор списка: имя и точка. Роутер тут не нужен — штат уже загружен */
-export function filterRoster(staff, { search = '', locationId = '' } = {}) {
+/**
+ * Отбор списка: имя, роль и точка. Роутер тут не нужен — штат организации
+ * загружен целиком, поэтому отбор идёт по ПОЛНОМУ множеству, а не по
+ * первой странице: обещать «нашлось столько» можно только так.
+ *
+ * По роли ищут не реже, чем по имени: «покажи менеджеров» и «кто у меня
+ * старший бариста» — это тот же вопрос к тому же полю ввода. Роли
+ * передаются отдельно, потому что в карточке человека лежит только id.
+ */
+export function filterRoster(staff, { search = '', locationId = '', roles = null } = {}) {
   const needle = search.trim().toLowerCase()
   return (staff ?? []).filter((member) => {
-    if (needle && !String(member.name).toLowerCase().includes(needle)) return false
+    if (needle) {
+      const title = roles ? roleTitle(member, roleOf(member, roles)) : ''
+      const hay = `${member.name} ${title} ${ROLE_LABELS[member.role] || ''}`.toLowerCase()
+      if (!hay.includes(needle)) return false
+    }
     // Человек без привязки работает на всех точках, включая выбранную
     if (locationId && member.location_id && member.location_id !== locationId) return false
     return true
   })
 }
 
+/**
+ * Сколько людей работает и сколько отключено.
+ *
+ * Считается по ПОЛНОМУ штату, а не по видимым строкам: счётчик под
+ * заголовком отвечает на вопрос «сколько у меня людей», и подменять его
+ * длиной текущего отбора — врать.
+ */
+export function rosterCounts(staff) {
+  const list = staff ?? []
+  const active = list.filter((m) => m.is_active).length
+  return { active, inactive: list.length - active, total: list.length }
+}
+
+/** Отбор ролей по имени — тот же принцип: полный список уже загружен */
+export function filterRoles(roles, search = '') {
+  const needle = search.trim().toLowerCase()
+  if (!needle) return roles ?? []
+  return (roles ?? []).filter((role) => String(role.name).toLowerCase().includes(needle))
+}
+
+/**
+ * С какого размера список перестаёт читаться целиком.
+ *
+ * Порог, а не «всегда»: три человека под поиском и ограниченной высотой
+ * выглядят как обрезанная таблица. Поле поиска и внутренняя прокрутка
+ * появляются, когда без них действительно тяжело.
+ */
+export const PEOPLE_SEARCH_FROM = 8
+export const ROLE_SEARCH_FROM = 6
+
+/** Сколько строк показывать на телефоне до «Load more» */
+export const PEOPLE_PAGE = 20
+export const ROLE_PAGE = 10
+
 // ── Вкладки ──────────────────────────────────────────────────
 
+/**
+ * Две вкладки, а не три.
+ *
+ * Люди, роли и права точки отвечают на ОДИН вопрос — что человеку можно,
+ * — и переопределяют друг друга по действиям. Разложенные по вкладкам,
+ * они заставляли владельца держать матрицу в голове: там уровень точки,
+ * здесь галочки роли, а какая победит — написано абзацем текста.
+ *
+ * Часы остались отдельно намеренно: табель отвечает на другой вопрос —
+ * кто когда работал и что уходит в зарплату. Месячная сетка с правкой
+ * задним числом, печатью и выгрузкой, поставленная под матрицу прав,
+ * похоронила бы обе поверхности.
+ */
 export const TABS = [
-  { key: 'people', label: 'People' },
-  { key: 'access', label: 'Access' },
+  { key: 'people', label: 'People & access' },
   { key: 'hours', label: 'Hours' },
 ]
 
 /**
- * Прежние адреса вкладок. Раздел был из четырёх вкладок, роли и права
- * съехались в одну — присланная вчера ссылка не должна открывать не то,
- * что в ней написано.
+ * Прежние адреса вкладок → вкладка и место, к которому надо подвести.
+ *
+ * Раздел пережил две перестройки: сначала четыре вкладки, потом три.
+ * Присланная вчера ссылка не должна открывать не то, что в ней написано,
+ * — поэтому `roles` ведёт к ролям, а `perms` к правам точки, хотя обе
+ * теперь живут на одной странице с людьми.
+ *
+ * `focus` — не «проскроллить куда попало», а имя секции: экран сам
+ * решает, когда она отрисована и её можно показать.
  */
-const LEGACY_TABS = { staff: 'people', roles: 'access', perms: 'access' }
+const TAB_ROUTES = {
+  people: { tab: 'people', focus: 'people' },
+  hours: { tab: 'hours', focus: null },
+  access: { tab: 'people', focus: 'access' },
+  staff: { tab: 'people', focus: 'people' },
+  roles: { tab: 'people', focus: 'roles' },
+  perms: { tab: 'people', focus: 'perms' },
+}
 
+/**
+ * Что открыть по адресу. Мусор в параметре — не ошибка, а устаревшая
+ * ссылка: открывается вкладка по умолчанию и никуда не ведёт.
+ */
+export function resolveTeamRoute(tab) {
+  return TAB_ROUTES[tab] || { tab: TABS[0].key, focus: null }
+}
+
+/** Только вкладка — для `Tabs`, который про секции ничего не знает */
 export function resolveTab(tab) {
-  if (TABS.some((t) => t.key === tab)) return tab
-  return LEGACY_TABS[tab] || TABS[0].key
+  return resolveTeamRoute(tab).tab
 }
 
 // ── Ошибки ───────────────────────────────────────────────────

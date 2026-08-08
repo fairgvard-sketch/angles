@@ -33,14 +33,20 @@ export function PageHeader({ title, actions, children }) {
   )
 }
 
-/** Панель с необязательной шапкой: заголовок, подпись и действия справа */
-export function Panel({ title, description, actions, className = '', children }) {
+/**
+ * Панель с необязательной шапкой: заголовок, подпись и действия справа.
+ *
+ * `titleId` нужен, когда панель — адресуемая секция страницы: обёртка
+ * ссылается на её заголовок через `aria-labelledby`, и читалка называет
+ * место, к которому подвела ссылка, а не «группа».
+ */
+export function Panel({ title, titleId, description, actions, className = '', children }) {
   return (
     <section className={className ? `panel ${className}` : 'panel'}>
       {(title || actions) && (
         <div className="panel-heading">
           <div>
-            {title && <h2>{title}</h2>}
+            {title && <h2 id={titleId}>{title}</h2>}
             {description && <p>{description}</p>}
           </div>
           {actions}

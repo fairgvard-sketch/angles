@@ -90,11 +90,14 @@ const TEAM_STUB = `
 
 const SETTINGS_STUB = `
   const DATA = ${JSON.stringify(SETTINGS)}
+  const params = new URLSearchParams(location.search)
   export async function fetchLocation(id) {
     return { id, settings: JSON.parse(JSON.stringify(DATA[id] ?? {})) }
   }
   export async function patchLocationSettings(id, patch) {
     window.__CALLS__.push(['patchLocationSettings', id, patch])
+    // Отказ сервера: переключатель обязан вернуться на прежний уровень
+    if (params.get('permfail')) throw new Error('permission denied')
     return {}
   }
 `
@@ -212,7 +215,7 @@ async function open(query = '', width = 1280) {
   page.on('pageerror', (e) => errors.push(String(e.message)))
   await page.setViewport({ width, height: 950 })
   await page.goto(`${origin}/?${query}`, { waitUntil: 'networkidle0' })
-  await page.waitForFunction(() => document.querySelector('.tm-row, .tm-matrix-row, .section-placeholder'))
+  await page.waitForFunction(() => document.querySelector('.tm-row, .tm-matrix-row, .hrs-row, .section-placeholder'))
   // Настройки точек и смены приезжают отдельно от списка — колонка
   // доступа обязана дождаться их, иначе тест меряет пустое место
   await page.waitForFunction(() => !document.querySelector('.tm-row')
@@ -271,14 +274,63 @@ describe('команда: список людей', { skip }, () => {
   })
 
   it('прежняя ссылка на вкладку открывает то, что в ней написано', async () => {
-    for (const [legacy, expected] of [['roles', 'Access'], ['perms', 'Access'], ['staff', 'People']]) {
+    // Раздел пережил две перестройки. Все четыре прежних адреса ведут
+    // на одну страницу — и каждый к своему месту на ней.
+    for (const [legacy, focused] of [
+      ['roles', 'tm-roles-title'],
+      ['perms', 'tm-perms-title'],
+      ['access', 'tm-perms-title'],
+      ['staff', null],
+    ]) {
       const page = await open(`tab=${legacy}`)
-      const selected = await page.evaluate(
-        () => document.querySelector('.menu-tabs [aria-selected="true"]').textContent
-      )
-      assert.equal(selected, expected, `tab=${legacy}`)
+      await page.waitForSelector('.tm-matrix-row')
+      if (focused) {
+        await page.waitForFunction(
+          (id) => document.activeElement?.getAttribute('aria-labelledby') === id,
+          {}, focused,
+        )
+      }
+      const state = await page.evaluate(() => ({
+        selected: document.querySelector('.menu-tabs [aria-selected="true"]').textContent,
+        tabs: [...document.querySelectorAll('.menu-tabs [role="tab"]')].map((t) => t.textContent),
+        // Секция, к которой подвела ссылка, названа читалке заголовком
+        labelledBy: document.activeElement.getAttribute('aria-labelledby'),
+      }))
+      assert.equal(state.selected, 'People & access', `tab=${legacy}`)
+      assert.deepEqual(state.tabs, ['People & access', 'Hours'], 'вкладок ровно две')
+      if (focused) assert.equal(state.labelledBy, focused, `tab=${legacy} подвёл не туда`)
       await page.close()
     }
+  })
+
+  it('люди, роли и права стоят на одной странице', async () => {
+    const page = await open()
+    const state = await page.evaluate(() => ({
+      people: Boolean(document.querySelector('#tm-people-title')),
+      roles: Boolean(document.querySelector('#tm-roles-title')),
+      perms: Boolean(document.querySelector('#tm-perms-title')),
+      counts: document.querySelector('.tm-section-count')?.textContent,
+    }))
+    assert.ok(state.people && state.roles && state.perms, JSON.stringify(state))
+    // Счёт по всему штату, а не по видимым строкам
+    assert.equal(state.counts, '5 active · 1 inactive')
+    assert.deepEqual(page.errors, [])
+    await page.close()
+  })
+
+  it('поиск отбирает по имени и по роли, счёт остаётся честным', async () => {
+    const page = await open()
+    await page.type('.tm-section-head input', 'senior')
+    await page.waitForFunction(() => document.querySelectorAll('.tm-row').length === 1)
+    const state = await page.evaluate(() => ({
+      names: [...document.querySelectorAll('.tm-cell-name strong')].map((n) => n.textContent),
+      found: document.querySelector('.tm-count').textContent,
+      counts: document.querySelector('.tm-section-count').textContent,
+    }))
+    assert.deepEqual(state.names, ['Noa'], 'нашёлся носитель роли, а не совпадение по имени')
+    assert.equal(state.found, '1 of 6')
+    assert.equal(state.counts, '5 active · 1 inactive', 'счёт штата отбор не трогает')
+    await page.close()
   })
 })
 
@@ -468,13 +520,71 @@ describe('команда: доступ одной поверхностью', { s
   it('смена точки показывает её правила, а не первой в списке', async () => {
     const page = await open('tab=access')
     await page.waitForSelector('.tm-matrix-row')
-    await page.select('.tm-select select', 'loc-2')
+    // Точка прав — своя, отдельно от фильтра точки в списке людей
+    await page.select('.tm-matrix-panel .tm-select select', 'loc-2')
     await page.waitForFunction(() => [...document.querySelectorAll('.tm-matrix-row')]
       .find((r) => r.textContent.startsWith('Refunds'))
       .querySelector('[aria-checked="true"]').textContent === 'Everyone')
     const roles = await page.evaluate(() => document.querySelectorAll('.tm-role-row').length)
     // Роли общие для организации и от точки не зависят
     assert.equal(roles, 1)
+    await page.close()
+  })
+
+  it('строка роли называет уровень, набор и число носителей', async () => {
+    const page = await open()
+    await page.waitForSelector('.tm-role-row')
+    const state = await page.evaluate(() => ({
+      name: document.querySelector('.tm-role-name').textContent,
+      meta: document.querySelector('.tm-role-meta').textContent,
+      holders: document.querySelector('.tm-role-holders').textContent.trim(),
+      label: document.querySelector('.tm-role-row').getAttribute('aria-label'),
+    }))
+    assert.equal(state.name, 'Senior barista')
+    assert.equal(state.meta, 'Manager base · 2 of 9 actions')
+    assert.equal(state.holders, '1 person')
+    assert.match(state.label, /Open role Senior barista/)
+    await page.close()
+  })
+
+  it('отказ сервера возвращает переключатель на прежний уровень', async () => {
+    const page = await open('tab=access&permfail=1')
+    await page.waitForSelector('.tm-matrix-row')
+    await page.evaluate(() => {
+      const row = [...document.querySelectorAll('.tm-matrix-row')]
+        .find((r) => r.textContent.startsWith('Refunds'))
+      row.querySelector('[aria-checked="false"]').click()
+    })
+    await page.waitForSelector('.tm-matrix-panel .form-error')
+    const state = await page.evaluate(() => ({
+      level: [...document.querySelectorAll('.tm-matrix-row')]
+        .find((r) => r.textContent.startsWith('Refunds'))
+        .querySelector('[aria-checked="true"]').textContent,
+      error: document.querySelector('.tm-matrix-panel .form-error').textContent,
+      alive: document.querySelector('.tm-matrix-panel .form-error').getAttribute('role'),
+      // Обещание, которого сервер не выполнил, не должно остаться на экране
+      effect: Boolean(document.querySelector('.tm-effect-live')),
+    }))
+    assert.equal(state.level, 'Manager', 'уровень откатился к тому, что на сервере')
+    assert.match(state.error, /cannot change the team/)
+    assert.equal(state.alive, 'alert')
+    assert.equal(state.effect, false)
+    await page.close()
+  })
+
+  it('успешная запись отзывается «Saved»', async () => {
+    const page = await open('tab=access')
+    await page.waitForSelector('.tm-matrix-row')
+    await page.evaluate(() => {
+      const row = [...document.querySelectorAll('.tm-matrix-row')]
+        .find((r) => r.textContent.startsWith('Void order'))
+      row.querySelector('[aria-checked="false"]').click()
+    })
+    await page.waitForFunction(
+      () => document.querySelector('.tm-panel-state')?.textContent.includes('Saved')
+    )
+    const role = await page.evaluate(() => document.querySelector('.tm-panel-state').getAttribute('role'))
+    assert.equal(role, 'status')
     await page.close()
   })
 })
@@ -524,13 +634,159 @@ describe('команда: телефон и клавиатура', { skip }, () 
     const page = await open()
     await page.focus('.menu-tabs [aria-selected="true"]')
     await page.keyboard.press('ArrowRight')
-    await page.waitForSelector('.tm-matrix-row')
+    await page.waitForFunction(
+      () => document.querySelector('.menu-tabs [aria-selected="true"]')?.textContent === 'Hours'
+    )
     const state = await page.evaluate(() => ({
       selected: document.querySelector('.menu-tabs [aria-selected="true"]').textContent,
       focused: document.activeElement.textContent,
+      // Табель — не карточка под правами, а полноценный экран
+      timesheet: Boolean(document.querySelector('.hrs-toolbar')),
+      access: Boolean(document.querySelector('.tm-matrix-row')),
     }))
-    assert.equal(state.selected, 'Access')
-    assert.equal(state.focused, 'Access')
+    assert.equal(state.selected, 'Hours')
+    assert.equal(state.focused, 'Hours')
+    assert.ok(state.timesheet, 'вкладка Hours показывает табель')
+    assert.equal(state.access, false, 'права остались на первой вкладке')
+    await page.close()
+  })
+
+  it('на телефоне список растёт кнопкой, а не вложенной прокруткой', async () => {
+    const page = await open('', 390)
+    const state = await page.evaluate(() => {
+      const scroll = document.querySelector('.tm-scroll')
+      const style = getComputedStyle(scroll)
+      return {
+        overflow: style.overflowY,
+        maxHeight: style.maxHeight,
+        region: scroll.getAttribute('role'),
+        rows: document.querySelectorAll('.tm-row').length,
+      }
+    })
+    // Вложенная прокрутка ловит палец и не отпускает страницу
+    assert.equal(state.maxHeight, 'none')
+    assert.notEqual(state.overflow, 'auto')
+    assert.equal(state.region, null, 'без прокрутки область незачем объявлять')
+    assert.equal(state.rows, 6, 'шесть человек влезают в первую порцию')
+    await page.close()
+  })
+
+  it('на 390 px страница не уезжает боком ни на одной вкладке', async () => {
+    for (const query of ['', 'tab=hours']) {
+      const page = await open(query, 390)
+      const overflow = await page.evaluate(
+        () => document.documentElement.scrollWidth - document.documentElement.clientWidth
+      )
+      assert.equal(overflow, 0, `${query || 'people'}: уехало на ${overflow}px`)
+      await page.close()
+    }
+  })
+
+  it('вкладки раздела остаются одной стабильной строкой на телефоне', async () => {
+    const page = await open('', 390)
+    const state = await page.evaluate(() => {
+      const tabs = [...document.querySelectorAll('.menu-tabs [role="tab"]')]
+      const tops = new Set(tabs.map((t) => Math.round(t.getBoundingClientRect().top)))
+      return { count: tabs.length, rows: tops.size, height: tabs[0].getBoundingClientRect().height }
+    })
+    assert.equal(state.count, 2)
+    assert.equal(state.rows, 1, 'две вкладки обязаны уместиться в одну строку')
+    assert.ok(state.height >= 40, `${state.height}px — мелко для пальца`)
+    await page.close()
+  })
+
+  it('секции страницы названы заголовками, а не «группой»', async () => {
+    const page = await open()
+    await page.waitForSelector('.tm-matrix-row')
+    const state = await page.evaluate(() => {
+      const sections = [...document.querySelectorAll('.tm-section')]
+      return sections.map((s) => {
+        const id = s.getAttribute('aria-labelledby')
+        return { id, heading: document.getElementById(id)?.textContent ?? null }
+      })
+    })
+    assert.deepEqual(state.map((s) => s.heading), ['People', 'Custom roles', 'Default register permissions'])
+    await page.close()
+  })
+
+  it('на десктопе длинный список прокручивается внутри панели', async () => {
+    const page = await open()
+    const state = await page.evaluate(() => {
+      const scroll = document.querySelector('.tm-scroll')
+      const head = document.querySelector('.tm-head')
+      return {
+        overflow: getComputedStyle(scroll).overflowY,
+        bounded: getComputedStyle(scroll).maxHeight !== 'none',
+        sticky: getComputedStyle(head).position,
+        label: scroll.getAttribute('aria-label'),
+      }
+    })
+    assert.equal(state.overflow, 'auto')
+    assert.ok(state.bounded, 'высота списка ограничена, иначе роли уезжают вниз')
+    assert.equal(state.sticky, 'sticky', 'шапка колонок держится при прокрутке')
+    assert.equal(state.label, 'People')
+    await page.close()
+  })
+})
+
+describe('команда: часы отдельной вкладкой', { skip }, () => {
+  it('табель открывается на всю ширину и считает месяц', async () => {
+    const page = await open('tab=hours')
+    await page.waitForSelector('.hrs-row')
+    const state = await page.evaluate(() => ({
+      columns: [...document.querySelectorAll('.hrs-head > span')].map((s) => s.textContent),
+      names: [...document.querySelectorAll('.hrs-cell-name')].map((n) => n.textContent),
+      total: document.querySelector('.hrs-total').textContent,
+      // Права и люди остались на своей вкладке, а не уехали под табель
+      access: Boolean(document.querySelector('.tm-matrix-row')),
+      people: Boolean(document.querySelector('.tm-row')),
+    }))
+    assert.deepEqual(state.columns, ['Employee', 'Days', 'Shifts', 'Hours'])
+    // Отработавшие впереди, остальной штат — следом нулевыми строками
+    assert.deepEqual(state.names.slice(0, 2), ['Dana · on shift', 'Avi'])
+    assert.match(state.total, /in total/)
+    assert.equal(state.access, false)
+    assert.equal(state.people, false)
+    assert.deepEqual(page.errors, [])
+    await page.close()
+  })
+
+  it('«Open hours» из карточки открывает табель на этом человеке', async () => {
+    const page = await open()
+    await page.click('.tm-row:nth-of-type(2)')
+    await page.waitForSelector('.drawer')
+    await page.evaluate(() => [...document.querySelectorAll('.drawer button')]
+      .find((b) => b.textContent.includes('Open hours')).click())
+    await page.waitForSelector('#hours-card-title')
+    const state = await page.evaluate(() => ({
+      tab: document.querySelector('.menu-tabs [aria-selected="true"]').textContent,
+      person: document.querySelector('#hours-card-title').textContent,
+      // Табель под карточкой обязан остаться: соседа открывают щелчком
+      list: document.querySelectorAll('.hrs-row').length > 0,
+    }))
+    assert.equal(state.tab, 'Hours')
+    assert.equal(state.person, 'Dana')
+    assert.ok(state.list, 'таблица табеля обязана остаться на месте')
+    await page.close()
+  })
+
+  it('уйдя из табеля и вернувшись, владелец не получает чужую карточку', async () => {
+    const page = await open()
+    await page.click('.tm-row:nth-of-type(2)')
+    await page.waitForSelector('.drawer')
+    await page.evaluate(() => [...document.querySelectorAll('.drawer button')]
+      .find((b) => b.textContent.includes('Open hours')).click())
+    await page.waitForSelector('#hours-card-title')
+
+    // Назад к людям и снова в часы — уже без выбранного человека
+    await page.evaluate(() => [...document.querySelectorAll('.menu-tabs [role="tab"]')]
+      .find((t) => t.textContent === 'People & access').click())
+    await page.waitForSelector('.tm-row')
+    await page.evaluate(() => [...document.querySelectorAll('.menu-tabs [role="tab"]')]
+      .find((t) => t.textContent === 'Hours').click())
+    await page.waitForSelector('.hrs-row')
+    const card = await page.evaluate(() => Boolean(document.querySelector('#hours-card-title')))
+    assert.equal(card, false, 'карточка недельной давности не должна открываться сама')
     await page.close()
   })
 })

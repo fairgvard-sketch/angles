@@ -143,6 +143,28 @@ export function idleStaff(worked, roster, locationId = null) {
     .sort((a, b) => a.name.localeCompare(b.name))
 }
 
+/**
+ * Отбор табеля по имени.
+ *
+ * Отбор честный: отчёт за период приезжает целиком, отработавшие и
+ * остальной штат уже сведены в один список. Поэтому «нашёлся один» здесь
+ * значит «один во всей организации», а не «один на загруженной странице».
+ */
+export function filterHoursStaff(staff, search = '') {
+  const needle = search.trim().toLowerCase()
+  if (!needle) return staff ?? []
+  return (staff ?? []).filter((row) => String(row.name).toLowerCase().includes(needle))
+}
+
+/**
+ * С какого размера табель перестаёт читаться целиком. Поле поиска над
+ * списком из четырёх человек — лишний элемент, а не помощь.
+ */
+export const HOURS_SEARCH_FROM = 8
+
+/** Сколько строк табеля показывать на телефоне до «Load more» */
+export const HOURS_PAGE = 20
+
 // ── Выгрузка ─────────────────────────────────────────────────
 
 /**

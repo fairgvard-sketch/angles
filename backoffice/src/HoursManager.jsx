@@ -6,13 +6,15 @@ import {
   dayBounds, dayBreakSeconds,
   dateKey, monthRange, monthTitle, shiftMonth, hoursToCsv, hoursFileName,
   idleStaff, EN_DOW, HEBREW_DOW,
+  filterHoursStaff, HOURS_SEARCH_FROM, HOURS_PAGE,
 } from './timesheet'
 import { fetchStaff } from './team'
-import { Panel } from './ui/Layout'
+import { Panel, SearchField } from './ui/Layout'
 import { Button, IconButton } from './ui/Button'
 import Drawer from './ui/Drawer'
 import FormDialog from './ui/FormDialog'
 import ConfirmDialog from './ui/ConfirmDialog'
+import useNarrow from './ui/useNarrow'
 
 /**
  * Часы сотрудников за месяц — то, по чему считают зарплату.
@@ -332,8 +334,11 @@ function download(csv, filename) {
 export default function HoursManager({ context, initialStaffId = null }) {
   const locations = context.locations || []
   const now = new Date()
+  const narrow = useNarrow()
   const [cursor, setCursor] = useState({ year: now.getFullYear(), month: now.getMonth() })
   const [locationId, setLocationId] = useState('')
+  const [search, setSearch] = useState('')
+  const [shown, setShown] = useState(HOURS_PAGE)
   const [report, setReport] = useState(null)
   const [roster, setRoster] = useState([])
   const [error, setError] = useState('')
@@ -391,6 +396,16 @@ export default function HoursManager({ context, initialStaffId = null }) {
     return [...worked, ...rest]
   }, [report?.staff, roster, locationId])
 
+  /*
+   * Отбор идёт по СОБРАННОМУ списку: отчёт за месяц и штат приезжают
+   * целиком, отработавшие и нулевые уже сведены вместе. Поэтому «нашёлся
+   * один» здесь значит «один во всей организации».
+   */
+  const rows = useMemo(() => filterHoursStaff(staff, search), [staff, search])
+  useEffect(() => { setShown(HOURS_PAGE) }, [search, locationId, cursor, narrow])
+  const visible = narrow ? rows.slice(0, shown) : rows
+  const searchable = staff.length >= HOURS_SEARCH_FROM
+
   const person = staff.find((s) => s.staff_id === selected) || null
   const totalSeconds = report?.totals?.seconds ?? 0
 
@@ -406,6 +421,16 @@ export default function HoursManager({ context, initialStaffId = null }) {
             <ChevronRight />
           </IconButton>
         </div>
+
+        {searchable && (
+          <SearchField
+            label="Search the timesheet"
+            value={search}
+            onChange={setSearch}
+            placeholder="Search employee"
+            className="order-search hrs-search"
+          />
+        )}
 
         {locations.length > 1 && (
           <label className="hrs-select">
@@ -437,40 +462,62 @@ export default function HoursManager({ context, initialStaffId = null }) {
           <p className="empty-state">Loading…</p>
         ) : staff.length === 0 ? (
           <p className="empty-state">Nobody has been added to the team yet.</p>
+        ) : rows.length === 0 ? (
+          <p className="empty-state">Nobody matches this search.</p>
         ) : (
-          <div className="hrs-list">
-            <div className="hrs-head">
-              <span>Employee</span>
-              <span>Days</span>
-              <span>Shifts</span>
-              <span>Hours</span>
+          <>
+            {/* Прокрутка живёт внутри табеля, а не под всей страницей:
+                иначе итог месяца и стрелки уезжают за верхний край */}
+            <div
+              className="hrs-scroll"
+              role={narrow ? undefined : 'region'}
+              aria-label={narrow ? undefined : 'Timesheet'}
+              tabIndex={!narrow && rows.length > 10 ? 0 : undefined}
+            >
+              <div className="hrs-list">
+                <div className="hrs-head">
+                  <span>Employee</span>
+                  <span>Days</span>
+                  <span>Shifts</span>
+                  <span>Hours</span>
+                </div>
+                {visible.map((row) => (
+                  <button
+                    type="button"
+                    key={row.staff_id}
+                    className={[
+                      'hrs-row',
+                      row.staff_id === selected ? 'is-selected' : '',
+                      // Не работал в этом месяце — строка тише, но открывается
+                      row.shifts ? '' : 'is-idle',
+                    ].filter(Boolean).join(' ')}
+                    aria-expanded={row.staff_id === selected}
+                    onClick={() => setSelected(row.staff_id === selected ? null : row.staff_id)}
+                  >
+                    <span className="hrs-cell-name">
+                      {row.name}
+                      {row.has_open && <small> · on shift</small>}
+                    </span>
+                    <span className="hrs-cell-num">{row.shifts ? row.days : '—'}</span>
+                    <span className="hrs-cell-num">{row.shifts || '—'}</span>
+                    <span className={row.shifts ? 'hrs-cell-num is-strong' : 'hrs-cell-num'}>
+                      {row.shifts ? formatHm(row.seconds) : '—'}
+                      {row.shifts > 0 && <small>{decimalHours(row.seconds)}</small>}
+                    </span>
+                  </button>
+                ))}
+              </div>
             </div>
-            {staff.map((row) => (
-              <button
-                type="button"
-                key={row.staff_id}
-                className={[
-                  'hrs-row',
-                  row.staff_id === selected ? 'is-selected' : '',
-                  // Не работал в этом месяце — строка тише, но открывается
-                  row.shifts ? '' : 'is-idle',
-                ].filter(Boolean).join(' ')}
-                aria-expanded={row.staff_id === selected}
-                onClick={() => setSelected(row.staff_id === selected ? null : row.staff_id)}
-              >
-                <span className="hrs-cell-name">
-                  {row.name}
-                  {row.has_open && <small> · on shift</small>}
-                </span>
-                <span className="hrs-cell-num">{row.shifts ? row.days : '—'}</span>
-                <span className="hrs-cell-num">{row.shifts || '—'}</span>
-                <span className={row.shifts ? 'hrs-cell-num is-strong' : 'hrs-cell-num'}>
-                  {row.shifts ? formatHm(row.seconds) : '—'}
-                  {row.shifts > 0 && <small>{decimalHours(row.seconds)}</small>}
-                </span>
-              </button>
-            ))}
-          </div>
+
+            {visible.length < rows.length && (
+              <div className="hrs-more">
+                <Button size="compact" onClick={() => setShown((n) => n + HOURS_PAGE)}>
+                  Load more
+                </Button>
+                <span className="hrs-more-count">{visible.length} of {rows.length}</span>
+              </div>
+            )}
+          </>
         )}
       </Panel>
 

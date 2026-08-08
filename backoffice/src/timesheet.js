@@ -6,6 +6,7 @@ export {
   formatRanges, formatDayLine, dayBounds, dayBreakSeconds,
   dateKey, monthRange, monthTitle, shiftMonth,
   hoursToCsv, hoursFileName, idleStaff,
+  filterHoursStaff, HOURS_SEARCH_FROM, HOURS_PAGE,
 } from './hours'
 
 /**

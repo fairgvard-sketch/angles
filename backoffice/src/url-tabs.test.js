@@ -58,17 +58,15 @@ describe('вкладка приходит из адреса', () => {
   })
 
   it('команда и настройки точки тоже адресуемы', () => {
-    const access = renderToStaticMarkup(h(TeamManager, { context, tab: 'access', onTabChange: noop }))
-    assert.equal(selectedTab(access), 'Access')
-
-    // Роли и права съехались в одну вкладку — присланная вчера ссылка
-    // обязана открыть её, а не первую попавшуюся
-    for (const legacy of ['roles', 'perms']) {
+    // Люди, роли и права съехались на одну страницу: все четыре прежних
+    // адреса обязаны открыть её, а не первую попавшуюся вкладку
+    for (const legacy of ['access', 'roles', 'perms', 'staff']) {
       const html = renderToStaticMarkup(h(TeamManager, { context, tab: legacy, onTabChange: noop }))
-      assert.equal(selectedTab(html), 'Access', `tab=${legacy}`)
+      assert.equal(selectedTab(html), 'People &amp; access', `tab=${legacy}`)
     }
-    const staff = renderToStaticMarkup(h(TeamManager, { context, tab: 'staff', onTabChange: noop }))
-    assert.equal(selectedTab(staff), 'People')
+    // Табель остался отдельной вкладкой — у него другой вопрос и свой месяц
+    const hours = renderToStaticMarkup(h(TeamManager, { context, tab: 'hours', onTabChange: noop }))
+    assert.equal(selectedTab(hours), 'Hours')
 
     const receipt = renderToStaticMarkup(
       h(LocationSettings, { context, locationId: 'loc-1', tab: 'receipt', onTabChange: noop })

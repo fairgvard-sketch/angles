@@ -8,8 +8,9 @@ export {
   rolesAllowing, roleHolders,
   locationLabel, roleTitle, lastShiftLabel, daysBetween,
   SHIFT_WINDOW_DAYS, shiftIndex, statusOf, personRowLabel,
-  sortRoster, filterRoster,
-  TABS, resolveTab, staffErrorText, hasRecords,
+  sortRoster, filterRoster, rosterCounts, filterRoles,
+  ROLE_SEARCH_FROM, PEOPLE_PAGE, ROLE_PAGE,
+  TABS, resolveTab, resolveTeamRoute, staffErrorText, hasRecords,
 } from './roster'
 
 /**

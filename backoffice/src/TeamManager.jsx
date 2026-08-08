@@ -1,5 +1,5 @@
-import { useCallback, useEffect, useMemo, useState } from 'react'
-import { Check, Clock, Plus, UserPlus, Users, X } from 'lucide-react'
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
+import { Check, ChevronRight, Clock, Plus, UserPlus, Users, X } from 'lucide-react'
 import {
   ROLES, ROLE_LABELS, isValidPin,
   fetchStaff, createStaff, updateStaff, setStaffPin, deleteStaff,
@@ -8,7 +8,9 @@ import {
   roleOf, accessRows, accessSource, accessScope, accessSummary,
   rolesAllowing, roleHolders, locationLabel, roleTitle,
   lastShiftLabel, SHIFT_WINDOW_DAYS, shiftIndex, statusOf, personRowLabel,
-  sortRoster, filterRoster, TABS, resolveTab, staffErrorText, hasRecords,
+  sortRoster, filterRoster, rosterCounts, filterRoles,
+  ROLE_SEARCH_FROM, PEOPLE_PAGE, ROLE_PAGE,
+  TABS, resolveTeamRoute, staffErrorText, hasRecords,
   roleAccessDiff, levelChangeEffect,
 } from './team'
 import { fetchLocation, patchLocationSettings } from './settings'
@@ -23,16 +25,22 @@ import FormDialog from './ui/FormDialog'
 import ConfirmDialog from './ui/ConfirmDialog'
 import HoursManager from './HoursManager'
 import Skeleton, { SkeletonPanel, SkeletonRow } from './ui/Skeleton'
+import useNarrow from './ui/useNarrow'
 
 /**
- * Команда — три вкладки вместо четырёх: People, Access, Hours.
+ * Команда — две вкладки: «People & access» и «Hours».
  *
- * Почему роли и права съехались в одну вкладку. Они отвечают на ОДИН
- * вопрос — что человеку можно, — и переопределяют друг друга по
- * действиям. Разложенные по двум вкладкам, они заставляли владельца
+ * Люди, роли и права точки съехались на одну страницу, потому что
+ * отвечают на ОДИН вопрос — что человеку можно, — и переопределяют друг
+ * друга по действиям. Разложенные по вкладкам, они заставляли владельца
  * держать матрицу в голове: там уровень точки, здесь галочки роли, а
- * какая из них победит — написано абзацем текста. Теперь право читается
- * одной строкой: «Refunds — только менеджер, плюс Senior barista».
+ * какая победит — написано абзацем текста. Теперь право читается одной
+ * строкой: «Refunds — только менеджер, плюс Senior barista».
+ *
+ * Часы остались отдельной вкладкой намеренно. Табель отвечает на другой
+ * вопрос — кто когда работал и что уходит в зарплату; у него свой месяц,
+ * своя правка задним числом, печать и выгрузка. Поставленный под матрицу
+ * прав, он похоронил бы обе поверхности.
  *
  * Заодно исправлено обещание, которого система не выполняла. Прежний
  * редактор роли говорил «базовый уровень применяется ко всему, что не
@@ -42,6 +50,12 @@ import Skeleton, { SkeletonPanel, SkeletonRow } from './ui/Skeleton'
  * Роль владельца защищена сервером (Kassa 093), клиент лишь не показывает
  * недоступное: менеджер не редактирует owner-строки и не выдаёт роль owner.
  */
+
+/** Прокрутка к секции: движение выключено, если человек его отключил */
+function scrollBehavior() {
+  if (typeof window === 'undefined' || !window.matchMedia) return 'auto'
+  return window.matchMedia('(prefers-reduced-motion: reduce)').matches ? 'auto' : 'smooth'
+}
 
 // ── Люди ─────────────────────────────────────────────────────
 
@@ -438,22 +452,37 @@ function AccessList({ member, settings, role }) {
   )
 }
 
-function PeopleTab({
+/**
+ * Люди — первая и главная секция страницы.
+ *
+ * Список ограничен по высоте, а не по числу загруженных строк: штат
+ * организации приезжает целиком, поэтому поиск и счётчики отвечают за
+ * ВЕСЬ штат, а не за первую страницу. Прокрутка живёт внутри списка,
+ * иначе двадцать человек уводят роли и права на два экрана вниз.
+ */
+function PeopleSection({
   staff, roles, locations, settingsByLocation, shifts, loading,
-  iAmOwner, onChanged, onOpenHours,
+  iAmOwner, narrow, sectionRef, onAdd, onChanged, onOpenHours,
 }) {
   const [search, setSearch] = useState('')
   const [locationId, setLocationId] = useState('')
   const [selectedId, setSelectedId] = useState(null)
-  const [adding, setAdding] = useState(false)
+  const [shown, setShown] = useState(PEOPLE_PAGE)
 
   const rows = useMemo(
-    () => sortRoster(filterRoster(staff, { search, locationId })),
-    [staff, search, locationId],
+    () => sortRoster(filterRoster(staff, { search, locationId, roles })),
+    [staff, search, locationId, roles],
   )
+  const counts = useMemo(() => rosterCounts(staff), [staff])
 
   const selected = (staff ?? []).find((s) => s.id === selectedId) || null
   const filtered = search.trim() !== '' || locationId !== ''
+
+  // Телефон досматривает список по частям, десктоп прокручивает его
+  // внутри панели: вложенная прокрутка на телефоне ловит палец и не
+  // отпускает страницу.
+  useEffect(() => { setShown(PEOPLE_PAGE) }, [search, locationId, narrow])
+  const visible = narrow ? rows.slice(0, shown) : rows
 
   /** Строку владельца правит только владелец — сервер это тоже проверяет */
   function editable(member) {
@@ -461,38 +490,49 @@ function PeopleTab({
   }
 
   return (
-    <>
-      <div className="tm-toolbar">
-        <SearchField
-          label="Search the team"
-          value={search}
-          onChange={setSearch}
-          placeholder="Name"
-          className="order-search tm-search"
-        />
-
-        {locations.length > 1 && (
-          <label className="tm-select">
-            <span className="visually-hidden">Location</span>
-            <select value={locationId} onChange={(e) => setLocationId(e.target.value)}>
-              <option value="">All locations</option>
-              {locations.map((l) => <option key={l.id} value={l.id}>{l.name}</option>)}
-            </select>
-          </label>
+    <section
+      className="tm-section"
+      ref={sectionRef}
+      tabIndex={-1}
+      aria-labelledby="tm-people-title"
+    >
+      <div className="tm-section-head">
+        <h2 id="tm-people-title">People</h2>
+        {staff !== null && (
+          <p className="tm-section-count">
+            {counts.active} active · {counts.inactive} inactive
+          </p>
         )}
 
-        <Button
-          variant="primary"
-          size="compact"
-          disabled={locations.length === 0}
-          onClick={() => setAdding(true)}
-        >
-          <UserPlus aria-hidden /> Add person
-        </Button>
+        <div className="tm-toolbar">
+          <SearchField
+            label="Search the team"
+            value={search}
+            onChange={setSearch}
+            placeholder="Search team"
+            className="order-search tm-search"
+          />
 
-        <p className="tm-count" role="status">
-          {loading && !staff ? 'Loading…' : `${rows.length} ${rows.length === 1 ? 'person' : 'people'}`}
-        </p>
+          {locations.length > 1 && (
+            <label className="tm-select">
+              <span className="visually-hidden">Location</span>
+              <select value={locationId} onChange={(e) => setLocationId(e.target.value)}>
+                <option value="">All locations</option>
+                {locations.map((l) => <option key={l.id} value={l.id}>{l.name}</option>)}
+              </select>
+            </label>
+          )}
+
+          {/* Сколько нашлось — только когда идёт отбор: у полного списка на
+              этот вопрос уже отвечает счётчик под заголовком */}
+          <p className="tm-count" role="status">
+            {loading && !staff
+              ? 'Loading…'
+              : filtered
+                ? `${rows.length} of ${counts.total}`
+                : ''}
+          </p>
+        </div>
       </div>
 
       {staff === null ? (
@@ -512,40 +552,58 @@ function PeopleTab({
             ? 'No one matches this search. Try another name or clear the filter.'
             : 'Add the people who work the register. Each of them signs in with their own PIN.'}
           action={!filtered && locations.length > 0 && (
-            <Button variant="primary" size="compact" onClick={() => setAdding(true)}>
+            <Button variant="primary" size="compact" onClick={onAdd}>
               <UserPlus aria-hidden /> Add person
             </Button>
           )}
         />
       ) : (
         <Panel className="tm-panel">
-          <div className={`tm-list${locations.length > 1 ? ' has-location' : ''}`}>
-            {/* Шапка скрыта от читалки: имя строки уже называет все
-                значения, и второй раз перечислять их незачем */}
-            <div className="tm-head" aria-hidden="true">
-              <span>Person</span>
-              <span>Role</span>
-              {locations.length > 1 && <span>Location</span>}
-              <span>Access</span>
-              <span>Last shift</span>
-              <span>Status</span>
+          {/* Прокручиваемая область названа и доступна с клавиатуры: без
+              этого до строк за нижней границей не добраться Tab'ом */}
+          <div
+            className="tm-scroll"
+            role={narrow ? undefined : 'region'}
+            aria-label={narrow ? undefined : 'People'}
+            tabIndex={!narrow && rows.length > 8 ? 0 : undefined}
+          >
+            <div className={`tm-list${locations.length > 1 ? ' has-location' : ''}`}>
+              {/* Шапка скрыта от читалки: имя строки уже называет все
+                  значения, и второй раз перечислять их незачем */}
+              <div className="tm-head" aria-hidden="true">
+                <span>Person</span>
+                <span>Role</span>
+                {locations.length > 1 && <span>Location</span>}
+                <span>Access</span>
+                <span>Last shift</span>
+                <span>Status</span>
+              </div>
+              {visible.map((member) => {
+                const role = roleOf(member, roles)
+                return (
+                  <PersonRow
+                    key={member.id}
+                    member={member}
+                    role={role}
+                    locations={locations}
+                    access={accessSummary(member, role, settingsByLocation, locations)}
+                    shift={shifts?.get(member.id)}
+                    selected={member.id === selectedId}
+                    onOpen={(m) => setSelectedId(m.id === selectedId ? null : m.id)}
+                  />
+                )
+              })}
             </div>
-            {rows.map((member) => {
-              const role = roleOf(member, roles)
-              return (
-                <PersonRow
-                  key={member.id}
-                  member={member}
-                  role={role}
-                  locations={locations}
-                  access={accessSummary(member, role, settingsByLocation, locations)}
-                  shift={shifts?.get(member.id)}
-                  selected={member.id === selectedId}
-                  onOpen={(m) => setSelectedId(m.id === selectedId ? null : m.id)}
-                />
-              )
-            })}
           </div>
+
+          {visible.length < rows.length && (
+            <div className="tm-more">
+              <Button size="compact" onClick={() => setShown((n) => n + PEOPLE_PAGE)}>
+                Load more
+              </Button>
+              <span className="tm-more-count">{visible.length} of {rows.length}</span>
+            </div>
+          )}
         </Panel>
       )}
 
@@ -566,17 +624,7 @@ function PeopleTab({
           onOpenHours={onOpenHours}
         />
       )}
-
-      {adding && (
-        <AddPersonDialog
-          locations={locations}
-          roles={roles ?? []}
-          canAssignOwner={iAmOwner}
-          onClose={() => setAdding(false)}
-          onSaved={() => { setAdding(false); onChanged() }}
-        />
-      )}
-    </>
+    </section>
   )
 }
 
@@ -741,26 +789,148 @@ function RoleCard({ role, holders, onClose, onSaved }) {
 }
 
 /**
- * Одна поверхность «кто что может»: правило точки и исключения из него —
- * в одной строке, роли — рядом.
+ * Кастомные роли — узкая колонка рядом с правами точки.
+ *
+ * Список компактный, а не карточками: роль опознают по имени и по тому,
+ * сколько людей её носит, а полный набор действий живёт в редакторе.
+ * Считать носителей можно только по полному штату — поэтому счётчики
+ * берутся из общего списка, а не из видимой страницы.
  */
-function AccessTab({ locations, roles, staff, settingsByLocation, onSettingsChanged, onRolesChanged }) {
+function RolesPanel({ roles, staff, narrow, sectionRef, onOpen }) {
+  const [search, setSearch] = useState('')
+  const [shown, setShown] = useState(ROLE_PAGE)
+
+  const rows = useMemo(() => filterRoles(roles, search), [roles, search])
+  useEffect(() => { setShown(ROLE_PAGE) }, [search, narrow])
+  const visible = narrow ? rows.slice(0, shown) : rows
+  const searchable = (roles?.length ?? 0) >= ROLE_SEARCH_FROM
+
+  return (
+    <section
+      className="tm-section"
+      ref={sectionRef}
+      tabIndex={-1}
+      aria-labelledby="tm-roles-title"
+    >
+      <Panel
+        className="tm-roles-panel"
+        titleId="tm-roles-title"
+        title="Custom roles"
+        description="A role is a fixed set of actions for one person — it replaces the location rules entirely."
+        actions={(
+          <Button size="compact" onClick={() => onOpen({})}>
+            <Plus aria-hidden /> New role
+          </Button>
+        )}
+      >
+        {searchable && (
+          <div className="tm-panel-toolbar">
+            <SearchField
+              label="Search roles"
+              value={search}
+              onChange={setSearch}
+              placeholder="Search roles"
+              className="order-search tm-search"
+            />
+          </div>
+        )}
+
+        {roles === null ? (
+          <EmptyState>Loading…</EmptyState>
+        ) : rows.length === 0 ? (
+          <EmptyState>
+            {search.trim()
+              ? 'No role matches this search.'
+              : `No custom roles yet. Create one to allow a single action — refunds for a
+                 senior barista — without making someone a manager.`}
+          </EmptyState>
+        ) : (
+          <>
+            <div className="tm-scroll tm-scroll-roles">
+              <div className="tm-roles">
+                {visible.map((role) => {
+                  const holders = roleHolders(staff, role.id)
+                  const allowed = (role.perms ?? []).length
+                  return (
+                    <button
+                      type="button"
+                      className="tm-role-row"
+                      key={role.id}
+                      onClick={() => onOpen(role)}
+                      aria-label={`Open role ${role.name} · ${ROLE_LABELS[role.base] || role.base} base · ${allowed} of ${PERM_KEYS.length} actions · ${holders} people`}
+                    >
+                      <span className="tm-role-name">{role.name}</span>
+                      <span className="tm-role-meta">
+                        {ROLE_LABELS[role.base] || role.base} base · {allowed} of {PERM_KEYS.length} actions
+                      </span>
+                      <span className="tm-role-holders">
+                        {holders > 0 ? `${holders} ${holders === 1 ? 'person' : 'people'}` : 'unused'}
+                        <ChevronRight aria-hidden />
+                      </span>
+                    </button>
+                  )
+                })}
+              </div>
+            </div>
+
+            {visible.length < rows.length && (
+              <div className="tm-more">
+                <Button size="compact" onClick={() => setShown((n) => n + ROLE_PAGE)}>
+                  Load more
+                </Button>
+                <span className="tm-more-count">{visible.length} of {rows.length}</span>
+              </div>
+            )}
+          </>
+        )}
+      </Panel>
+    </section>
+  )
+}
+
+/**
+ * Права точки: девять действий, у каждого выбор из двух уровней.
+ *
+ * Переключатель отзывается сразу и откатывается, если сервер отказал:
+ * право — это переключатель, а не форма, и ждать сети он не должен. Кого
+ * задело последнее нажатие, написано ПОД той самой строкой и с возвратом
+ * как было — искать объяснение в другом конце панели никто не станет.
+ */
+function PermissionsPanel({
+  locations, roles, staff, settingsByLocation, sectionRef, onSettingsChanged, onOpenRole,
+}) {
   const [locationId, setLocationId] = useState(locations[0]?.id || '')
   const [saving, setSaving] = useState('')
+  const [saved, setSaved] = useState('')
   const [error, setError] = useState('')
-  const [editing, setEditing] = useState(null)
   // Что изменило последнее переключение: { key, from, to, effect }
   const [lastChange, setLastChange] = useState(null)
 
   const settings = settingsByLocation[locationId]
+  const here = locations.find((l) => l.id === locationId) || null
+
+  // «Saved» гаснет само: подпись, висящая до следующего нажатия, через
+  // минуту уже врёт — она про то, чего человек не помнит.
+  useEffect(() => {
+    if (!saved) return undefined
+    const timer = setTimeout(() => setSaved(''), 2500)
+    return () => clearTimeout(timer)
+  }, [saved])
 
   async function applyLevel(key, level) {
+    const previous = permLevel(settings, key)
     setSaving(key)
     setError('')
+    setSaved('')
+    // Оптимистично: нажатие отзывается сразу, сеть догоняет
+    onSettingsChanged(locationId, { [key]: level })
     try {
       await patchLocationSettings(locationId, { perms: { [key]: level } })
-      onSettingsChanged(locationId, { [key]: level })
+      setSaved(key)
     } catch (saveError) {
+      // Сервер отказал — возвращаем то, что на нём и осталось
+      onSettingsChanged(locationId, { [key]: previous })
+      setLastChange(null)
       setError(staffErrorText(saveError.message))
     } finally {
       setSaving('')
@@ -784,70 +954,53 @@ function AccessTab({ locations, roles, staff, settingsByLocation, onSettingsChan
     setLastChange(effect.people.length > 0 ? { key, from, to: level, effect } : null)
   }
 
-  if (locations.length === 0) {
-    return <EmptyState>No locations are linked to this account.</EmptyState>
-  }
-
   return (
-    <>
-      <div className="tm-toolbar">
-        {locations.length > 1 && (
-          <label className="tm-select">
-            <span className="visually-hidden">Location</span>
-            <select value={locationId} onChange={(e) => setLocationId(e.target.value)}>
-              {locations.map((l) => <option key={l.id} value={l.id}>{l.name}</option>)}
-            </select>
-          </label>
+    <section
+      className="tm-section"
+      ref={sectionRef}
+      tabIndex={-1}
+      aria-labelledby="tm-perms-title"
+    >
+      <Panel
+        className="tm-matrix-panel"
+        titleId="tm-perms-title"
+        title="Default register permissions"
+        description="Applied to everyone without a custom role. Restricted actions ask for a manager PIN on the register."
+        actions={(
+          <div className="tm-panel-actions">
+            {/* Одна точка себя не выбирает: селектор из одного пункта —
+                это подпись, притворившаяся управлением */}
+            {locations.length > 1 ? (
+              <label className="tm-select">
+                <span className="visually-hidden">Location</span>
+                <select value={locationId} onChange={(e) => setLocationId(e.target.value)}>
+                  {locations.map((l) => <option key={l.id} value={l.id}>{l.name}</option>)}
+                </select>
+              </label>
+            ) : here && <span className="tm-panel-where">{here.name}</span>}
+            <span className="tm-panel-state" role="status">
+              {saved && <><Check aria-hidden /> Saved</>}
+            </span>
+          </div>
         )}
-        <Button size="compact" onClick={() => setEditing({})}>
-          <Plus aria-hidden /> New role
-        </Button>
-      </div>
+      >
+        {error && <ErrorText>{error}</ErrorText>}
 
-      {error && <ErrorText>{error}</ErrorText>}
-
-      {/* Кого это задело — сразу после переключения, с возвратом как было */}
-      {lastChange && (
-        <div className="tm-effect-live" role="status">
-          <span>
-            <strong>{lastChange.effect.label}</strong>
-            {lastChange.to === 'manager' ? ' — manager and owner only. ' : ' — everyone. '}
-            {lastChange.effect.people.join(', ')}
-            {lastChange.effect.people.length === 1 ? ' is affected' : ' are affected'}
-            {lastChange.effect.withOwnRole > 0
-              ? `; ${lastChange.effect.withOwnRole} with their own role ${lastChange.effect.withOwnRole === 1 ? 'is' : 'are'} not.`
-              : '.'}
-          </span>
-          <Button
-            size="compact"
-            disabled={saving === lastChange.key}
-            onClick={() => { applyLevel(lastChange.key, lastChange.from); setLastChange(null) }}
-          >
-            Undo
-          </Button>
-        </div>
-      )}
-
-      <div className="tm-access-grid">
-        <Panel
-          className="tm-matrix-panel"
-          title="What the team can do"
-          description="Everyone follows these rules, except people who have a role — a role replaces them entirely."
-        >
-          {!settings ? (
-            <EmptyState>Loading…</EmptyState>
-          ) : (
-            <div className="tm-matrix">
-              <div className="tm-matrix-head" aria-hidden="true">
-                <span>Action</span>
-                <span>Allowed for</span>
-                <span>Roles that allow it</span>
-              </div>
-              {PERM_KEYS.map((key) => {
-                const level = permLevel(settings, key)
-                const exceptions = rolesAllowing(roles ?? [], key)
-                return (
-                  <div className="tm-matrix-row" key={key}>
+        {!settings ? (
+          <EmptyState>Loading…</EmptyState>
+        ) : (
+          <div className="tm-matrix">
+            <div className="tm-matrix-head" aria-hidden="true">
+              <span>Action</span>
+              <span>Allowed for</span>
+              <span>Roles that allow it</span>
+            </div>
+            {PERM_KEYS.map((key) => {
+              const level = permLevel(settings, key)
+              const exceptions = rolesAllowing(roles ?? [], key)
+              return (
+                <div className="tm-matrix-group" key={key}>
+                  <div className="tm-matrix-row">
                     <span className="tm-matrix-name" id={`tm-perm-${key}`}>
                       {PERM_LABELS[key]}
                       <small>{PERM_HINTS[key]}</small>
@@ -888,57 +1041,122 @@ function AccessTab({ locations, roles, staff, settingsByLocation, onSettingsChan
                             type="button"
                             className="tm-role-chip"
                             key={r.id}
-                            onClick={() => setEditing(r)}
+                            onClick={() => onOpenRole(r)}
                           >
                             {r.name}
                           </button>
                         ))}
                     </span>
                   </div>
-                )
-              })}
-            </div>
-          )}
-        </Panel>
 
-        <Panel
-          className="tm-roles-panel"
-          title="Roles"
-          description="A role is a fixed set of actions for one person — it ignores the rules on the left."
-        >
-          {roles === null ? (
-            <EmptyState>Loading…</EmptyState>
-          ) : roles.length === 0 ? (
-            <EmptyState>
-              No roles yet. Create one to allow a single action — refunds for a
-              senior barista — without making someone a manager.
-            </EmptyState>
-          ) : (
-            <div className="tm-roles">
-              {roles.map((role) => {
-                const holders = roleHolders(staff, role.id)
-                return (
-                  <button
-                    type="button"
-                    className="tm-role-row"
-                    key={role.id}
-                    onClick={() => setEditing(role)}
-                    aria-label={`Open role ${role.name} · ${(role.perms ?? []).length} of ${PERM_KEYS.length} actions · ${holders} people`}
-                  >
-                    <span className="tm-role-name">{role.name}</span>
-                    <span className="tm-role-count">
-                      {(role.perms ?? []).length} of {PERM_KEYS.length}
-                    </span>
-                    <span className="tm-role-holders">
-                      {holders > 0 ? `${holders} ${holders === 1 ? 'person' : 'people'}` : 'unused'}
-                    </span>
-                  </button>
-                )
-              })}
-            </div>
-          )}
-        </Panel>
-      </div>
+                  {/* Кого это задело — под той самой строкой, с возвратом
+                      как было: объяснение в другом конце панели не читают */}
+                  {lastChange?.key === key && (
+                    <div className="tm-effect-live" role="status">
+                      <span>
+                        <strong>{lastChange.effect.label}</strong>
+                        {lastChange.to === 'manager' ? ' — manager and owner only. ' : ' — everyone. '}
+                        {lastChange.effect.people.join(', ')}
+                        {lastChange.effect.people.length === 1 ? ' is affected' : ' are affected'}
+                        {lastChange.effect.withOwnRole > 0
+                          ? `; ${lastChange.effect.withOwnRole} with their own role ${lastChange.effect.withOwnRole === 1 ? 'is' : 'are'} not.`
+                          : '.'}
+                      </span>
+                      <Button
+                        size="compact"
+                        disabled={saving === lastChange.key}
+                        onClick={() => { applyLevel(lastChange.key, lastChange.from); setLastChange(null) }}
+                      >
+                        Undo
+                      </Button>
+                    </div>
+                  )}
+                </div>
+              )
+            })}
+          </div>
+        )}
+      </Panel>
+    </section>
+  )
+}
+
+/**
+ * Первая вкладка: люди, а под ними — правила, по которым им что-то можно.
+ *
+ * Одна загрузка на обе секции: роли нужны и колонке доступа в списке, и
+ * панели ролей, и счётчику носителей — тянуть их дважды значит показать
+ * два разных ответа на один вопрос.
+ */
+function PeopleAndAccess({
+  staff, roles, locations, settingsByLocation, shifts, loading, iAmOwner,
+  focus, onAdd, onChanged, onSettingsChanged, onOpenHours,
+}) {
+  const narrow = useNarrow()
+  const [editing, setEditing] = useState(null)
+  const peopleRef = useRef(null)
+  const permsRef = useRef(null)
+  const rolesRef = useRef(null)
+  const focused = useRef(null)
+
+  const ready = staff !== null && roles !== null
+
+  /*
+   * Прежний адрес ведёт к своей секции.
+   *
+   * Подводим только когда секция уже отрисована с данными: до этого её
+   * высота ещё меняется, и прокрутка попадёт мимо. Наведение делается
+   * один раз на значение из адреса — иначе каждая перерисовка утаскивала
+   * бы страницу обратно.
+   */
+  useEffect(() => {
+    if (!focus || !ready || focused.current === focus) return
+    const target = { access: permsRef, perms: permsRef, roles: rolesRef }[focus]?.current
+    focused.current = focus
+    if (!target) return
+    target.scrollIntoView({ block: 'start', behavior: scrollBehavior() })
+    target.focus({ preventScroll: true })
+  }, [focus, ready])
+
+  return (
+    <>
+      <PeopleSection
+        staff={staff}
+        roles={roles}
+        locations={locations}
+        settingsByLocation={settingsByLocation}
+        shifts={shifts}
+        loading={loading}
+        iAmOwner={iAmOwner}
+        narrow={narrow}
+        sectionRef={peopleRef}
+        onAdd={onAdd}
+        onChanged={onChanged}
+        onOpenHours={onOpenHours}
+      />
+
+      {locations.length === 0 ? (
+        <EmptyState>No locations are linked to this account.</EmptyState>
+      ) : (
+        <div className="tm-access-grid">
+          <RolesPanel
+            roles={roles}
+            staff={staff}
+            narrow={narrow}
+            sectionRef={rolesRef}
+            onOpen={setEditing}
+          />
+          <PermissionsPanel
+            locations={locations}
+            roles={roles}
+            staff={staff}
+            settingsByLocation={settingsByLocation}
+            sectionRef={permsRef}
+            onSettingsChanged={onSettingsChanged}
+            onOpenRole={setEditing}
+          />
+        </div>
+      )}
 
       {editing && (
         <RoleCard
@@ -946,7 +1164,7 @@ function AccessTab({ locations, roles, staff, settingsByLocation, onSettingsChan
           role={editing}
           holders={editing.id ? roleHolders(staff, editing.id) : 0}
           onClose={() => setEditing(null)}
-          onSaved={() => { setEditing(null); onRolesChanged() }}
+          onSaved={() => { setEditing(null); onChanged() }}
         />
       )}
     </>
@@ -958,7 +1176,8 @@ function AccessTab({ locations, roles, staff, settingsByLocation, onSettingsChan
 export default function TeamManager({ context, tab: tabFromUrl, onTabChange }) {
   const locations = useMemo(() => context.locations || [], [context.locations])
   const iAmOwner = context.member?.role === 'owner'
-  const tab = resolveTab(tabFromUrl)
+  const route = resolveTeamRoute(tabFromUrl)
+  const tab = route.tab
 
   const [staff, setStaff] = useState(null)
   const [roles, setRoles] = useState(null)
@@ -966,6 +1185,7 @@ export default function TeamManager({ context, tab: tabFromUrl, onTabChange }) {
   const [shifts, setShifts] = useState(null)
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState('')
+  const [adding, setAdding] = useState(false)
   const [hoursStaffId, setHoursStaffId] = useState(null)
 
   const load = useCallback(async () => {
@@ -1017,7 +1237,14 @@ export default function TeamManager({ context, tab: tabFromUrl, onTabChange }) {
     return () => { alive = false }
   }, [])
 
-  /** Оптимистично: переключатель права отзывается сразу, ошибку показываем */
+  /*
+   * Уходя из табеля, забываем, кого в нём открывали: иначе владелец,
+   * заглянувший в часы Даны неделю назад, получит её карточку в лицо при
+   * следующем заходе в раздел.
+   */
+  useEffect(() => { if (tab !== 'hours') setHoursStaffId(null) }, [tab])
+
+  /** Правку прав держим в общем состоянии: её видит и колонка доступа */
   function applySettings(locationId, permPatch) {
     setSettings((prev) => ({
       ...prev,
@@ -1035,7 +1262,19 @@ export default function TeamManager({ context, tab: tabFromUrl, onTabChange }) {
 
   return (
     <>
-      <PageHeader title="Team" />
+      <PageHeader
+        title="Team"
+        actions={tab === 'people' && (
+          <Button
+            variant="primary"
+            size="compact"
+            disabled={locations.length === 0}
+            onClick={() => setAdding(true)}
+          >
+            <UserPlus aria-hidden /> Add person
+          </Button>
+        )}
+      />
 
       <Tabs
         label="Team section"
@@ -1048,7 +1287,7 @@ export default function TeamManager({ context, tab: tabFromUrl, onTabChange }) {
       {error && <ErrorText>{error}</ErrorText>}
 
       {tab === 'people' && (
-        <PeopleTab
+        <PeopleAndAccess
           staff={staff}
           roles={roles}
           locations={locations}
@@ -1056,25 +1295,27 @@ export default function TeamManager({ context, tab: tabFromUrl, onTabChange }) {
           shifts={shifts}
           loading={loading}
           iAmOwner={iAmOwner}
+          focus={route.focus}
+          onAdd={() => setAdding(true)}
           onChanged={load}
-          onOpenHours={openHours}
-        />
-      )}
-
-      {tab === 'access' && (
-        <AccessTab
-          locations={locations}
-          roles={roles}
-          staff={staff}
-          settingsByLocation={settingsByLocation}
           onSettingsChanged={applySettings}
-          onRolesChanged={load}
+          onOpenHours={openHours}
         />
       )}
 
       {/* Часы стоят в «Команде», а не отдельным разделом: их открывают о
           том же человеке, что и карточку сотрудника, и в один клик от неё */}
       {tab === 'hours' && <HoursManager context={context} initialStaffId={hoursStaffId} />}
+
+      {adding && (
+        <AddPersonDialog
+          locations={locations}
+          roles={roles ?? []}
+          canAssignOwner={iAmOwner}
+          onClose={() => setAdding(false)}
+          onSaved={() => { setAdding(false); load() }}
+        />
+      )}
     </>
   )
 }

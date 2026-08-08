@@ -197,7 +197,12 @@ a { color: inherit; }
 .auth-form input { width: 100%; height: 58px; padding: 0 16px; border: 1px solid #c7cad0; border-radius: var(--r-sm); outline: none; background: var(--c-surface); color: var(--c-text-strong); font-size: 17px; }
 .auth-form input:focus { border-color: var(--c-text); box-shadow: var(--focus-ring); }
 .primary-button, .secondary-button, .icon-button, .text-button { display: inline-flex; align-items: center; justify-content: center; border: 0; }
-.primary-button { min-height: 54px; padding: 0 24px; border-radius: var(--r-sm); background: var(--c-text-strong); color: var(--c-on-ink); font-weight: 750; }
+/* Просвет между иконкой и подписью — здесь, а не в каждом разделе: две
+   витрины уже чинили это у себя локально, и «Add person» слипался ровно
+   там, где кнопку не успели пропатчить. Тексту без иконки gap ничего не
+   меняет: у одного потомка промежутку не с чем считаться. */
+.primary-button { min-height: 54px; gap: 8px; padding: 0 24px; border-radius: var(--r-sm); background: var(--c-text-strong); color: var(--c-on-ink); font-weight: 750; }
+.primary-button svg { width: 16px; height: 16px; }
 .primary-button.compact {
   min-height: 40px; height: 40px; padding: 0 14px;
   border-radius: 7px; font-size: 13px;
@@ -2219,10 +2224,13 @@ a { color: inherit; }
 .settings-scope { margin: 0 0 var(--sp-3); color: var(--c-text-subtle); font-size: 12px; }
 .settings-scope strong { color: var(--c-text-2); }
 
-/* Что изменило переключение права — рядом с матрицей, с отменой */
+/* Что изменило переключение права — ПОД той самой строкой, с отменой.
+   Объяснение в другом конце панели не читают: к моменту, когда его
+   заметят, уже не помнят, какое право нажимали. */
 .tm-effect-live {
-  display: flex; align-items: center; justify-content: space-between; gap: var(--sp-3);
-  margin-bottom: var(--sp-3); padding: var(--sp-2) var(--sp-3);
+  display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between;
+  gap: var(--sp-2) var(--sp-3);
+  margin: 0 var(--sp-5) var(--sp-3); padding: var(--sp-2) var(--sp-3);
   border: 1px solid var(--c-border-soft); border-radius: var(--r-md);
   background: var(--c-surface-muted); font-size: 13px;
 }
@@ -4127,8 +4135,23 @@ a { color: inherit; }
   color: var(--c-text-muted); font-size: 13px;
   font-variant-numeric: tabular-nums; white-space: nowrap;
 }
+.hrs-toolbar .hrs-search { flex: 1 1 200px; max-width: 280px; min-height: var(--h-control); }
 .hrs-panel { padding: 0; overflow: hidden; }
 .hrs-panel .empty-state { padding: var(--sp-6) var(--sp-4); }
+
+/* Табель прокручивается внутри панели: иначе итог месяца и стрелки
+   листания уезжают за верхний край ровно тогда, когда по ним и надо
+   попасть. Полоса прокрутки не прячется — список, у которого не видно
+   продолжения, прячет половину смен. */
+.hrs-scroll { max-height: calc(44px + 10.5 * 58px); overflow-y: auto; overscroll-behavior: contain; }
+.hrs-scroll:focus-visible { outline: 2px solid var(--st-accent); outline-offset: -2px; }
+.hrs-more {
+  display: flex; align-items: center; gap: var(--sp-3);
+  padding: var(--sp-3) var(--sp-4); border-top: 1px solid var(--c-border-hair);
+}
+.hrs-more-count {
+  color: var(--c-text-muted); font-size: 12px; font-variant-numeric: tabular-nums;
+}
 
 .hrs-list { --hrs-cols: minmax(200px, 1fr) 72px 80px 96px; min-width: 0; }
 .hrs-head, .hrs-row {
@@ -4136,6 +4159,7 @@ a { color: inherit; }
   align-items: center; gap: var(--sp-3); padding-inline: var(--sp-4);
 }
 .hrs-head {
+  position: sticky; top: 0; z-index: 1; background: var(--c-surface);
   min-height: 44px; border-bottom: 1px solid var(--c-border-panel);
   color: var(--c-text-muted); font-size: 12px; font-weight: 650;
   text-transform: uppercase; letter-spacing: 0.02em;
@@ -4195,6 +4219,49 @@ a { color: inherit; }
 .hrs-hint { margin: var(--sp-3) 0 0; color: var(--c-text-muted); font-size: 12px; }
 .hrs-remove { color: var(--c-danger); justify-self: start; }
 
+/* ── Планшет и телефон ─────────────────────────────────────── */
+@media (max-width: 1024px) {
+  .hrs-toolbar .secondary-button, .hrs-toolbar .primary-button,
+  .hrs-select select, .hrs-toolbar .hrs-search { min-height: var(--h-touch); }
+  .hrs-month strong { min-width: 130px; }
+}
+
+@media (max-width: 720px) {
+  /* Итог месяца встаёт под стрелки, а не жмётся к ним: в одной строке
+     на 390 px «102:30 · 102.5 in total» ломается посередине */
+  .hrs-month { flex: 1 1 100%; justify-content: space-between; }
+  .hrs-toolbar .hrs-search { flex-basis: 100%; max-width: none; }
+  .hrs-select { flex: 1 1 140px; min-width: 0; }
+  .hrs-select select { width: 100%; }
+  /* Ввод меньше 16px на iOS заставляет браузер приближать страницу */
+  .hrs-toolbar input, .hrs-select select { font-size: 16px; }
+  .hrs-total { flex: 1 1 100%; margin-inline-start: 0; }
+
+  /* Той же причины, что и у людей: вложенная прокрутка ловит палец и не
+     отпускает страницу — список растёт кнопкой */
+  .hrs-scroll { max-height: none; overflow: visible; }
+
+  /* Четыре колонки на 390 px — сводка, а не таблица: имя строкой,
+     числа под ним с подписями, иначе «3 12 41:20» ничего не значит */
+  .hrs-head { display: none; }
+  .hrs-row {
+    grid-template-columns: minmax(0, 1fr) auto;
+    gap: 2px var(--sp-3); padding: var(--sp-3) var(--sp-4);
+  }
+  .hrs-cell-name { grid-area: 1 / 1 / 2 / 3; white-space: normal; }
+  .hrs-row > .hrs-cell-num:nth-of-type(1) { grid-area: 2 / 1; text-align: start; }
+  .hrs-row > .hrs-cell-num:nth-of-type(2) { grid-area: 3 / 1; text-align: start; }
+  .hrs-row > .hrs-cell-num:nth-of-type(3) { grid-area: 2 / 2 / 4 / 3; align-self: center; font-size: 15px; }
+  .hrs-row > .hrs-cell-num:nth-of-type(1)::before { content: 'Days: '; color: var(--c-text-subtle); font-weight: 500; }
+  .hrs-row > .hrs-cell-num:nth-of-type(2)::before { content: 'Shifts: '; color: var(--c-text-subtle); font-weight: 500; }
+
+  /* День недели и перерыв уступают месту: дата, приход, уход и итог —
+     то, ради чего табель открывают с телефона */
+  .hrs-day { grid-template-columns: 76px 42px 42px minmax(0, 1fr) 36px; }
+  .hrs-day > :nth-child(2), .hrs-day-head > :nth-child(2) { display: none; }
+  .hrs-day > :nth-child(5), .hrs-day-head > :nth-child(5) { display: none; }
+}
+
 /* ── Печать табеля ─────────────────────────────────────────── */
 /* На экране источника печати нет; в печать уходит только он */
 @media screen {
@@ -4227,14 +4294,37 @@ a { color: inherit; }
  * открыть карточку, и действий внутри неё не живёт.
  * ============================================================ */
 
+/* ── Секции одной страницы ─────────────────────────────────── */
+/* Люди, роли и права стоят на одной странице, поэтому у каждой секции
+   есть имя и адрес: прежняя ссылка на вкладку подводит к своему месту.
+   Обёртка получает фокус программно — рамку рисовать ей нечего. */
+/* Шапка кабинета липкая и высотой 68px: без этого запаса ссылка на
+   секцию подводит ровно под неё, и заголовок оказывается за краем */
+.tm-section { min-width: 0; scroll-margin-top: 84px; }
+.tm-section:focus { outline: none; }
+.tm-section:focus-visible { outline: 2px solid var(--st-accent); outline-offset: 4px; border-radius: var(--r-lg); }
+.tm-section + .tm-access-grid, .tm-section + .empty-state { margin-top: var(--sp-5); }
+
+/* Заголовок секции: название, тихий счёт по всему штату и отбор.
+   Счёт стоит у названия, а не над списком, — он про людей, а не про
+   строки, которые сейчас видно. */
+.tm-section-head {
+  display: flex; flex-wrap: wrap; align-items: baseline;
+  gap: var(--sp-2) var(--sp-3); margin-bottom: var(--sp-3);
+}
+.tm-section-head h2 { margin: 0; font-size: 17px; font-weight: 700; }
+.tm-section-count {
+  margin: 0; color: var(--c-text-muted); font-size: 13px;
+  font-variant-numeric: tabular-nums; white-space: nowrap;
+}
+.tm-section-head .tm-toolbar { flex: 1 1 320px; margin-bottom: 0; justify-content: flex-end; }
+
 .tm-toolbar {
   display: flex; flex-wrap: wrap; align-items: center; gap: var(--sp-2);
   margin-bottom: var(--sp-3);
 }
 .tm-toolbar .tm-search { flex: 1 1 220px; max-width: 320px; min-height: var(--h-control); }
 .tm-toolbar .secondary-button, .tm-toolbar .primary-button { min-height: var(--h-control); }
-.tm-toolbar .primary-button { gap: var(--sp-2); }
-.tm-toolbar .primary-button svg { width: 16px; height: 16px; }
 .tm-select select {
   min-height: var(--h-control); padding: 0 30px 0 10px;
   border: 1px solid var(--c-border); border-radius: var(--r-md);
@@ -4252,6 +4342,35 @@ a { color: inherit; }
 .tm-panel { padding: 0; overflow: hidden; }
 .tm-panel .empty-state { padding: var(--sp-6) var(--sp-4); }
 
+/*
+ * Список ограничен по ВЫСОТЕ, а не по числу загруженных строк.
+ *
+ * Штат организации приезжает целиком, поэтому поиск и счётчики отвечают
+ * за весь штат, а не за первую страницу. Но двадцать человек, выложенные
+ * подряд, уводят роли и права на два экрана вниз — а они и есть ответ на
+ * вопрос, ради которого сюда пришли. Поэтому прокрутка живёт внутри
+ * списка, а не под всей страницей.
+ *
+ * Полоса прокрутки не прячется: список, у которого не видно, что он
+ * продолжается, — это список, у которого не видно половины людей. На
+ * macOS её всё равно не видно, пока не тронешь, поэтому граница режет
+ * строку ПОПОЛАМ: полстроки у нижнего края — единственный знак
+ * продолжения, который виден неподвижно.
+ */
+.tm-scroll { max-height: calc(44px + 8.5 * 64px); overflow-y: auto; overscroll-behavior: contain; }
+.tm-scroll:focus-visible { outline: 2px solid var(--st-accent); outline-offset: -2px; }
+.tm-scroll-roles { max-height: calc(5.5 * 72px); }
+
+/* Догрузка на телефоне: там вложенная прокрутка ловит палец и не
+   отпускает страницу, поэтому список растёт кнопкой, а не окном */
+.tm-more {
+  display: flex; align-items: center; gap: var(--sp-3);
+  padding: var(--sp-3) var(--sp-4); border-top: 1px solid var(--c-border-hair);
+}
+.tm-more-count {
+  color: var(--c-text-muted); font-size: 12px; font-variant-numeric: tabular-nums;
+}
+
 /* Имя не забирает всю ширину: между ним и состоянием висела бы пустая
    треть страницы. Слабину отдаём роли — она текстовая и стоит рядом. */
 .tm-list { --tm-cols: minmax(160px, 300px) minmax(120px, 1fr) 96px 110px 96px; min-width: 0; }
@@ -4260,7 +4379,10 @@ a { color: inherit; }
   display: grid; grid-template-columns: var(--tm-cols);
   align-items: center; gap: var(--sp-3); padding-inline: var(--sp-4);
 }
+/* Шапка держится на месте при прокрутке списка: колонки, уехавшие
+   вверх, превращают таблицу в набор чисел без подписей */
 .tm-head {
+  position: sticky; top: 0; z-index: 1; background: var(--c-surface);
   min-height: 44px; border-bottom: 1px solid var(--c-border-panel);
   color: var(--c-text-muted); font-size: 12px; font-weight: 650;
   text-transform: uppercase; letter-spacing: 0.02em;
@@ -4358,10 +4480,35 @@ a { color: inherit; }
 /* Две колонки, а не две вкладки: правило и роль, которая его обходит,
    должны быть видны одновременно — иначе матрицу держат в голове */
 .tm-access-grid { display: grid; gap: var(--sp-3); align-items: start; }
+/* Секция — обёртка с адресом, растягиваться должна панель внутри неё */
+.tm-access-grid > .tm-section { display: flex; flex-direction: column; }
+.tm-access-grid > .tm-section > .panel { flex: 1 1 auto; }
+/* Роли слева и уже, права точки справа и шире — как в утверждённом
+   концепте. Правило точки касается всех, роль — исключение из него, и
+   исключение не должно занимать больше места, чем правило. */
 @media (min-width: 1180px) {
-  .tm-access-grid { grid-template-columns: minmax(0, 1fr) 320px; }
+  /* Панели одной высоты, как в утверждённом концепте: короткий список
+     ролей рядом с девятью правами иначе оставляет под собой пустую
+     колонку в пол-экрана */
+  .tm-access-grid { grid-template-columns: minmax(280px, 34%) minmax(0, 1fr); align-items: stretch; }
 }
 .tm-matrix-panel, .tm-roles-panel { padding-bottom: var(--sp-2); }
+/* Действие панели не переносится на две строки: «New role» в колонке
+   340 px ломался пополам ровно там, где на него смотрят */
+.tm-roles-panel .panel-heading { align-items: start; }
+.tm-roles-panel .panel-heading .secondary-button { white-space: nowrap; }
+
+/* Управление панели: точка и «Saved». У одной точки выбора нет — её имя
+   стоит подписью, а не выпадающим списком из одного пункта. */
+.tm-panel-actions { display: flex; flex-wrap: wrap; align-items: center; gap: var(--sp-2); }
+.tm-panel-where { color: var(--c-text-muted); font-size: 13px; }
+.tm-panel-state {
+  display: inline-flex; align-items: center; gap: 5px; min-width: 62px;
+  color: var(--c-success); font-size: 12px; font-weight: 650;
+}
+.tm-panel-state svg { width: 14px; height: 14px; }
+.tm-panel-toolbar { padding: 0 var(--sp-5) var(--sp-2); }
+.tm-panel-toolbar .tm-search { width: 100%; min-height: var(--h-control); }
 
 .tm-matrix { display: grid; }
 /* Отступ по краям равняется на шапку панели (22px): колонка «Action»
@@ -4376,8 +4523,11 @@ a { color: inherit; }
   color: var(--c-text-muted); font-size: 11px; font-weight: 650;
   text-transform: uppercase; letter-spacing: .02em;
 }
-.tm-matrix-row { min-height: 56px; border-bottom: 1px solid var(--c-border-hair); }
-.tm-matrix-row:last-child { border-bottom: 0; }
+/* Граница принадлежит группе, а не строке: под строкой может стоять
+   объяснение последнего переключения, и черта обязана идти под ним */
+.tm-matrix-group { border-bottom: 1px solid var(--c-border-hair); }
+.tm-matrix-group:last-child { border-bottom: 0; }
+.tm-matrix-row { min-height: 56px; }
 .tm-matrix-name { min-width: 0; font-size: 13px; font-weight: 650; }
 .tm-matrix-name small { display: block; color: var(--c-text-subtle); font-size: 11px; font-weight: 500; }
 .tm-matrix-roles { display: flex; flex-wrap: wrap; gap: 4px; }
@@ -4393,19 +4543,32 @@ a { color: inherit; }
 .tm-none { color: var(--c-text-subtle); font-size: 13px; }
 
 .tm-roles { display: grid; }
+/* Строка роли отвечает на три вопроса сразу: как называется, что это за
+   уровень и сколько людей её носит. Полный набор действий живёт в
+   редакторе — вываливать девять галочек в список значит превратить его
+   в стену чипов, по которой ничего не найти. */
 .tm-role-row {
   display: grid; grid-template-columns: minmax(0, 1fr) auto;
   align-items: center; gap: 2px var(--sp-3);
-  width: 100%; min-height: 56px; padding: var(--sp-2) var(--sp-5);
+  width: 100%; min-height: 64px; padding: var(--sp-2) var(--sp-5);
   border: 0; border-bottom: 1px solid var(--c-border-hair);
   background: transparent; font: inherit; text-align: start; cursor: pointer;
 }
 .tm-role-row:last-child { border-bottom: 0; }
 .tm-role-row:hover { background: var(--c-surface-hover); }
 .tm-role-row:focus-visible { outline: 2px solid var(--st-accent); outline-offset: -3px; }
-.tm-role-name { min-width: 0; font-size: 14px; font-weight: 650; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-.tm-role-count { color: var(--c-text-2); font-size: 12px; font-variant-numeric: tabular-nums; text-align: end; }
-.tm-role-holders { grid-column: 1 / -1; color: var(--c-text-subtle); font-size: 12px; }
+.tm-role-name { min-width: 0; grid-area: 1 / 1; font-size: 14px; font-weight: 650; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.tm-role-meta {
+  min-width: 0; grid-area: 2 / 1; color: var(--c-text-subtle); font-size: 12px;
+  overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+}
+/* Число носителей и шеврон — одним блоком у конца строки: длинное имя
+   роли не должно наезжать на счёт */
+.tm-role-holders {
+  grid-area: 1 / 2 / 3 / 3; display: inline-flex; align-items: center; gap: 4px;
+  color: var(--c-text-2); font-size: 12px; font-variant-numeric: tabular-nums; white-space: nowrap;
+}
+.tm-role-holders svg { width: 15px; height: 15px; color: var(--c-icon-faint); }
 
 /* ── Планшет ───────────────────────────────────────────────── */
 @media (max-width: 1024px) {
@@ -4426,6 +4589,23 @@ a { color: inherit; }
   .tm-select { flex: 1 1 140px; min-width: 0; }
   .tm-select select { width: 100%; }
   .tm-count { flex: 1 1 auto; margin-inline-start: 0; }
+
+  /* Заголовок секции и отбор — столбиком: на 390 px они не уживаются
+     в одной строке, и поиск сжимается в неиспользуемый огрызок */
+  .tm-section-head { display: grid; gap: var(--sp-2); }
+  .tm-section-head .tm-toolbar { justify-content: flex-start; }
+
+  /*
+   * Вложенной прокрутки на телефоне нет.
+   *
+   * Список внутри окна прокрутки ловит палец и не отпускает страницу:
+   * человек тянет вниз, а едет список. Поэтому здесь список растёт
+   * кнопкой «Load more», а страница остаётся единственным, что скроллится.
+   */
+  .tm-scroll, .tm-scroll-roles { max-height: none; overflow: visible; }
+  .tm-effect-live { margin-inline: var(--sp-4); }
+  .tm-panel-toolbar { padding-inline: var(--sp-4); }
+  .tm-panel-toolbar .tm-search input { font-size: 16px; }
 
   /* Шесть колонок на 390 px — не таблица, а нечитаемая сетка: строка
      становится сводкой в два столбца, шапка теряет смысл */

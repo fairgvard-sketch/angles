@@ -3,7 +3,8 @@ import { describe, it } from 'node:test'
 import {
   can, accessSummary, accessScope, accessSource, rolesAllowing,
   filterRoster, sortRoster, lastShiftLabel, shiftIndex, statusOf,
-  personRowLabel, resolveTab, staffErrorText, hasRecords, locationLabel,
+  personRowLabel, resolveTab, resolveTeamRoute, staffErrorText, hasRecords,
+  locationLabel, rosterCounts, filterRoles,
   PERM_KEYS, roleAccessDiff, levelChangeEffect,
 } from './roster'
 
@@ -133,6 +134,30 @@ describe('список команды', () => {
     assert.deepEqual(filterRoster([barista, manager], { search: 'da' }).map((s) => s.name), ['Dana'])
   })
 
+  it('поиск находит и по роли: «кто у меня менеджеры» — тот же вопрос', () => {
+    const roles = [{ id: 'r1', name: 'Senior barista', base: 'barista', perms: ['refund'] }]
+    const senior = { ...barista, id: 's9', name: 'Noa', role_id: 'r1' }
+    const rows = filterRoster([barista, manager, senior], { search: 'senior', roles })
+    assert.deepEqual(rows.map((s) => s.name), ['Noa'])
+    // Базовый уровень ищется и без списка ролей — он лежит в самой карточке
+    assert.deepEqual(
+      filterRoster([barista, manager], { search: 'manager' }).map((s) => s.name),
+      ['Avi'],
+    )
+  })
+
+  it('счётчик считает весь штат, а не видимые строки', () => {
+    const fired = { ...barista, id: 's4', name: 'Ada', is_active: false }
+    assert.deepEqual(rosterCounts([barista, manager, fired]), { active: 2, inactive: 1, total: 3 })
+    assert.deepEqual(rosterCounts(null), { active: 0, inactive: 0, total: 0 })
+  })
+
+  it('роли отбираются по имени, пустой запрос отдаёт все', () => {
+    const roles = [{ id: 'r1', name: 'Senior barista' }, { id: 'r2', name: 'Runner' }]
+    assert.deepEqual(filterRoles(roles, 'run').map((r) => r.name), ['Runner'])
+    assert.equal(filterRoles(roles, '  ').length, 2)
+  })
+
   it('точка сотрудника названа словом, а не идентификатором', () => {
     assert.equal(locationLabel(barista, locations), 'Main')
     assert.equal(locationLabel(owner, locations), 'All locations')
@@ -181,12 +206,27 @@ describe('смены', () => {
 
 describe('адреса и ошибки', () => {
   it('прежние вкладки не ломают присланную ссылку', () => {
+    // Раздел пережил две перестройки: было четыре вкладки, стало три,
+    // теперь две. Ни один из шести адресов не должен открыть не то.
+    assert.equal(resolveTab('people'), 'people')
+    assert.equal(resolveTab('access'), 'people')
     assert.equal(resolveTab('staff'), 'people')
-    assert.equal(resolveTab('roles'), 'access')
-    assert.equal(resolveTab('perms'), 'access')
+    assert.equal(resolveTab('roles'), 'people')
+    assert.equal(resolveTab('perms'), 'people')
     assert.equal(resolveTab('hours'), 'hours')
     assert.equal(resolveTab('nope'), 'people')
     assert.equal(resolveTab(null), 'people')
+  })
+
+  it('ссылка ведёт не только на вкладку, но и к своей секции', () => {
+    assert.deepEqual(resolveTeamRoute('roles'), { tab: 'people', focus: 'roles' })
+    assert.deepEqual(resolveTeamRoute('perms'), { tab: 'people', focus: 'perms' })
+    assert.deepEqual(resolveTeamRoute('access'), { tab: 'people', focus: 'access' })
+    assert.deepEqual(resolveTeamRoute('staff'), { tab: 'people', focus: 'people' })
+    assert.deepEqual(resolveTeamRoute('hours'), { tab: 'hours', focus: null })
+    // Базовый заход никуда не подводит: страница и так открыта сверху
+    assert.deepEqual(resolveTeamRoute(null), { tab: 'people', focus: null })
+    assert.deepEqual(resolveTeamRoute('nope'), { tab: 'people', focus: null })
   })
 
   it('история сотрудника — не ошибка ввода, а повод деактивировать', () => {
