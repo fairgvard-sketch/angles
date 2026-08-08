@@ -8,7 +8,6 @@ import {
   Copy,
   CreditCard,
   LayoutDashboard,
-  LogOut,
   Menu as MenuIcon,
   MonitorSmartphone,
   QrCode,
@@ -20,9 +19,10 @@ import {
 } from 'lucide-react'
 import { isSupabaseConfigured, supabase } from './supabase'
 import {
-  NAV_ITEMS, PRODUCT_META, groupedNavigation, hasCapability, isLocationScoped, productState,
+  NAV_ITEMS, groupedNavigation, hasCapability, isLocationScoped,
 } from './navigation'
-import { DEFAULT_VIEW, parseRoute, routeToUrl, sameRoute } from './routing'
+import { DEFAULT_VIEW, readRoute, routeToUrl, sameRoute } from './routing'
+import ProductsCard from './ProductsCard'
 import ViewErrorBoundary from './ErrorBoundary'
 import AppShell, { Brand } from './ui/AppShell'
 import HomeDashboard from './HomeDashboard'
@@ -50,7 +50,7 @@ import Skeleton, { SkeletonBar, SkeletonPanel } from './ui/Skeleton'
  * чем подмена его содержимого.
  */
 const VIEW_MODULES = {
-  sales: () => import('./SalesOverview'),
+  reports: () => import('./ReportsSection'),
   locations: () => import('./LocationSettings'),
   menu: () => import('./MenuManager'),
   team: () => import('./TeamManager'),
@@ -60,9 +60,11 @@ const VIEW_MODULES = {
   devices: () => import('./DevicesManager'),
   guests: () => import('./GuestsManager'),
   activity: () => import('./ActivityManager'),
+  settings: () => import('./SettingsPage'),
 }
 
-const SalesOverview = lazy(VIEW_MODULES.sales)
+const ReportsSection = lazy(VIEW_MODULES.reports)
+const SettingsPage = lazy(VIEW_MODULES.settings)
 const LocationSettings = lazy(VIEW_MODULES.locations)
 const MenuManager = lazy(VIEW_MODULES.menu)
 const TeamManager = lazy(VIEW_MODULES.team)
@@ -133,7 +135,6 @@ const NAV_ICONS = {
   overview: LayoutDashboard,
   orders: ShoppingBag,
   reservations: CalendarDays,
-  sales: BarChart3,
   activity: Activity,
   locations: Store,
   menu: MenuIcon,
@@ -480,75 +481,6 @@ function HelpPanel({ context, email, onNavigate, onClose }) {
 }
 
 /**
- * Карточка продуктов (100/104/105): жизненный цикл каждой карточки —
- * Active / Developer / Included with ANGLE Orders / Pending activation /
- * Available as add-on. Биллинга нет: «запросить» создаёт заявку
- * (request_product_activation), активирует оператор ANGLE. Карточка —
- * маркетинг/UX-состояние; настоящие запреты живут на сервере
- * (module_disabled).
- *
- * Названия продуктов живут в `navigation.js` рядом с `productState`: о
- * заявке, которая ждёт активации, сообщает ещё и дашборд.
- */
-
-function ProductRow({ context, product, onReloadContext }) {
-  const [busy, setBusy] = useState(false)
-  const [error, setError] = useState('')
-  const state = productState(context, product.id)
-
-  async function requestActivation() {
-    setBusy(true)
-    setError('')
-    const { error: rpcError } = await supabase.rpc('request_product_activation', {
-      p_product: product.id,
-    })
-    if (rpcError) {
-      setError(rpcError.message)
-      setBusy(false)
-      return
-    }
-    await onReloadContext?.()
-    setBusy(false)
-  }
-
-  const isOn = state === 'active' || state === 'developer' || state === 'included'
-  return (
-    <div className={`product-row ${isOn ? 'is-active' : ''}`}>
-      <span>
-        <strong>{product.label}</strong>
-        <small>{product.detail}</small>
-        {error && <small className="form-error">{error}</small>}
-      </span>
-      {state === 'active' && <span className="status"><i /> Active</span>}
-      {state === 'developer' && <span className="status status-developer"><i /> Developer</span>}
-      {state === 'included' && <span className="status">Included with ANGLE Orders</span>}
-      {state === 'pending' && <span className="status status-pending"><i /> Pending activation</span>}
-      {state === 'addon' && (
-        <button className="text-button" onClick={requestActivation} disabled={busy}>
-          {busy ? 'Requesting…' : 'Available as add-on — request'}
-        </button>
-      )}
-    </div>
-  )
-}
-
-function ProductsCard({ context, onReloadContext }) {
-  if (!Array.isArray(context?.products)) return null
-  return (
-    <section className="panel form-panel">
-      <div className="panel-heading">
-        <div><h2>Your products</h2><p>Modules enabled for this organisation. Everything shares one catalogue and account.</p></div>
-      </div>
-      <div className="product-list">
-        {PRODUCT_META.map((product) => (
-          <ProductRow key={product.id} context={context} product={product} onReloadContext={onReloadContext} />
-        ))}
-      </div>
-    </section>
-  )
-}
-
-/**
  * Стабильный экран «Choose a product / Pending activation» (104):
  * организация без активного продукта — валидное состояние (заявка ждёт
  * оператора), а не сломанный кабинет. Операционные разделы не рендерим.
@@ -602,10 +534,6 @@ function Overview({ context, locationId, onNavigate }) {
  * чем пользоваться сейчас.
  */
 const PLANNED_SECTIONS = {
-  reports: {
-    summary: 'Cross-location reporting beyond what Overview already shows.',
-    instead: { view: 'sales', label: 'Overview', detail: 'Revenue, orders and top items for a period.' },
-  },
   integrations: {
     summary: 'Payments, accounting and connected business tools.',
     instead: null,
@@ -638,30 +566,6 @@ function SectionPage({ section, context, onNavigate }) {
           )}
         </div>
       </section>
-    </>
-  )
-}
-
-/**
- * Аккаунт: кто вошёл и что подключено организации.
- *
- * Карточка продуктов переехала сюда с главной: подписка — не событие
- * сегодняшнего дня, её открывают отдельно и редко. Экран активации
- * (`ActivationHome`) показывает ту же карточку — организация без
- * продукта попадает на неё раньше, чем сюда.
- */
-function AccountSettingsPage({ email, context, onSignOut, onReloadContext }) {
-  return (
-    <>
-      <PageHeader title="Settings" />
-      <section className="panel account-settings-panel">
-        <div className="account-settings-copy">
-          <h2>Account</h2>
-          <p>{email}</p>
-        </div>
-        <button className="secondary-button" onClick={onSignOut}><LogOut /> Sign out</button>
-      </section>
-      <ProductsCard context={context} onReloadContext={onReloadContext} />
     </>
   )
 }
@@ -713,11 +617,14 @@ function Dashboard({ session, context, onReloadContext }) {
   // Стартовое состояние берётся из адреса: ссылка и перезагрузка
   // открывают тот же экран, что и был.
   const [route, setRoute] = useState(() => {
-    const parsed = parseRoute(window.location.search)
+    // readRoute — разбор ПЛЮС перевод устаревших ссылок в сегодняшние
+    // координаты (Sales → Reports, выгрузка и лояльность из Locations).
+    const parsed = readRoute(window.location.search)
     return {
       view: parsed.view,
       locationId: parsed.locationId || readStoredLocation(),
       tab: parsed.tab,
+      mode: parsed.mode,
       date: parsed.date,
       filters: parsed.filters,
     }
@@ -753,23 +660,25 @@ function Dashboard({ session, context, onReloadContext }) {
   // заменой записи, чтобы Назад не возвращал в него же.
   useEffect(() => {
     const current = {
-      view, locationId, tab: route.tab, date: route.date, filters: route.filters,
+      view, locationId, tab: route.tab, mode: route.mode, date: route.date, filters: route.filters,
     }
     routeRef.current = current
     const url = routeToUrl(current, window.location.pathname)
     if (url !== window.location.pathname + window.location.search) {
       window.history.replaceState({ ...current }, '', url)
     }
-  }, [view, locationId, route.tab, route.date, route.filters])
+  }, [view, locationId, route.tab, route.mode, route.date, route.filters])
 
   // Назад/Вперёд браузера меняют раздел, а не выкидывают из кабинета
   const poppedRef = useRef(false)
   useEffect(() => {
     function onPopState() {
-      const parsed = parseRoute(window.location.search)
+      // Тот же перевод устаревших ссылок: Назад может вернуть в закладку,
+      // сохранённую до перестройки разделов.
+      const parsed = readRoute(window.location.search)
       const next = {
         view: parsed.view, locationId: parsed.locationId, tab: parsed.tab,
-        date: parsed.date, filters: parsed.filters,
+        mode: parsed.mode, date: parsed.date, filters: parsed.filters,
       }
       routeRef.current = next
       poppedRef.current = true
@@ -804,6 +713,9 @@ function Dashboard({ session, context, onReloadContext }) {
       // Вкладка принадлежит разделу: уходя из него, её нельзя тащить.
       // Явно переданная вкладка — переход «в конкретное место раздела».
       tab: nextTab ?? (nextView === prev.view ? prev.tab : null),
+      // Режим — свойство вкладки: уходя из раздела или меняя вкладку явно,
+      // его нельзя тащить (экран дублей не должен открыться в Loyalty).
+      mode: nextView === prev.view && !nextTab ? prev.mode : null,
       // День и отбор — тоже свойства раздела, а не кабинета целиком.
       date: nextView === prev.view ? prev.date : null,
       filters: nextView === prev.view ? prev.filters : null,
@@ -818,7 +730,14 @@ function Dashboard({ session, context, onReloadContext }) {
   // Вкладка внутри раздела — уточнение того же экрана, а не новый шаг:
   // иначе Назад из «Waitlist» вело бы в «Timeline», а не в прошлый раздел.
   const changeTab = useCallback((nextTab) => {
-    applyRoute({ ...routeRef.current, tab: nextTab }, 'replace')
+    // Смена вкладки обнуляет режим: он принадлежит вкладке, а не разделу
+    applyRoute({ ...routeRef.current, tab: nextTab, mode: null }, 'replace')
+  }, [applyRoute])
+
+  // Режим внутри вкладки (экран дублей Directory) — тоже уточнение того же
+  // экрана: он адресуем, но не набивает историю браузера.
+  const changeMode = useCallback((nextMode) => {
+    applyRoute({ ...routeRef.current, mode: nextMode || null }, 'replace')
   }, [applyRoute])
 
   // Смена дня — то же самое: листание календаря не должно набивать
@@ -905,7 +824,19 @@ function Dashboard({ session, context, onReloadContext }) {
         {view === 'reservations' && (
           <ReservationsDesk context={context} {...scopedProps} {...tabProps} {...dateProps} />
         )}
-        {view === 'sales' && <SalesOverview context={context} />}
+        {/* Reports — продажи и фискальный набор. Точка НЕ показывается в
+            шапке: у Sales свой выбор нескольких точек, у Fiscal — свой
+            обязательный выбор одной, и третий переключатель наверху
+            обещал бы им общий скоуп, которого нет. */}
+        {view === 'reports' && (
+          <ReportsSection
+            context={context}
+            {...tabProps}
+            locationId={locationId}
+            onLocationChange={changeLocation}
+            onNavigate={navigate}
+          />
+        )}
         {view === 'activity' && <ActivityManager context={context} />}
         {view === 'locations' && <LocationSettings context={context} {...scopedProps} {...tabProps} />}
         {/* Отбор каталога живёт в адресе — как у заказов: ссылка
@@ -927,13 +858,27 @@ function Dashboard({ session, context, onReloadContext }) {
           <QrChannels context={context} {...scopedProps} {...tabProps} onNavigate={navigate} />
         )}
         {view === 'devices' && <DevicesManager context={context} />}
-        {view === 'guests' && <GuestsManager context={context} {...tabProps} />}
+        {/* Точка нужна только вкладке Loyalty — она и показывает свой
+            выбор внутри раздела: список клиентов организационный, и
+            переключатель в шапке обещал бы фильтрацию, которой нет. */}
+        {view === 'guests' && (
+          <GuestsManager
+            context={context}
+            {...tabProps}
+            mode={route.mode}
+            onModeChange={changeMode}
+            locationId={locationId}
+            onLocationChange={changeLocation}
+          />
+        )}
         {view === 'settings' && (
-          <AccountSettingsPage
+          <SettingsPage
             email={session.user.email}
             context={context}
+            {...tabProps}
             onSignOut={signOut}
             onReloadContext={onReloadContext}
+            onNavigate={navigate}
           />
         )}
         {PLANNED_SECTIONS[view] && <SectionPage section={view} context={context} onNavigate={navigate} />}

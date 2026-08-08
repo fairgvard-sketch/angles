@@ -147,6 +147,7 @@ const ENTRY = `
 import { createRoot } from 'react-dom/client'
 import { createElement as h, useState } from 'react'
 import GuestsManager from ${JSON.stringify(SRC + 'GuestsManager.jsx')}
+import { canonicalRoute } from ${JSON.stringify(SRC + 'routing.js')}
 
 const context = {
   organization: { id: 'org-1', name: 'Bulochka' },
@@ -155,10 +156,31 @@ const context = {
   capabilities: ['pos_operate'],
 }
 
+/*
+ * Стенд повторяет разбор адреса из App.jsx вместе с переводом устаревших
+ * ссылок (canonicalRoute): прежний tab=duplicates обязан открывать
+ * Directory в режиме дублей, и проверять это надо в браузере, а не только
+ * на чистой функции.
+ */
 function Harness() {
-  const [tab, setTab] = useState(new URLSearchParams(location.search).get('tab'))
+  const start = canonicalRoute({
+    tab: new URLSearchParams(location.search).get('tab'),
+    mode: new URLSearchParams(location.search).get('mode'),
+    view: 'guests',
+  })
+  const [tab, setTab] = useState(start.tab)
+  const [mode, setMode] = useState(start.mode)
   window.__TAB__ = tab
-  return h(GuestsManager, { context, tab, onTabChange: setTab })
+  window.__MODE__ = mode
+  return h(GuestsManager, {
+    context,
+    tab,
+    onTabChange: (next) => { setTab(next); setMode(null) },
+    mode,
+    onModeChange: setMode,
+    locationId: 'loc-1',
+    onLocationChange: () => {},
+  })
 }
 createRoot(document.getElementById('root')).render(h(Harness))
 `

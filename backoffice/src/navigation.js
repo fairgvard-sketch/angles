@@ -44,10 +44,12 @@ export const NAV_ITEMS = [
   { id: 'overview', label: 'Dashboard', group: null, scoped: true },
   { id: 'orders', label: 'Orders', group: 'work', scoped: true },
   { id: 'reservations', label: 'Reservations', group: 'work', scoped: true },
-  { id: 'sales', label: 'Sales', group: 'insights' },
+  // Reports — то, что произошло и что надо выгрузить: продажи и фискальный
+  // набор. Отдельного пункта Sales больше нет: он был тем же отчётом под
+  // другим именем, и владелец искал выгрузку для бухгалтера в Locations.
+  { id: 'reports', label: 'Reports', group: 'insights' },
   { id: 'activity', label: 'Activity', group: 'insights' },
   { id: 'guests', label: 'Customers', group: 'insights' },
-  { id: 'reports', label: 'Reports', group: 'insights', planned: true },
   // Каталог организационный: товары общие для точек, точка нужна только
   // как значение по умолчанию для новой категории — переключатель в шапке
   // обещал бы фильтрацию, которой нет.
@@ -66,28 +68,72 @@ export function isLocationScoped(view) {
 
 /**
  * Вкладки настроек точки. Правило то же, что у разделов: аккаунт без кассы
- * не должен находить у себя дефолты смены, реквизиты чека и фискальную
- * выгрузку — терминала, который их исполняет, у него нет, и настройка
- * выглядит как обещание продукта, который не куплен.
- *
- * Лояльность тоже POS-контур: начисление живёт в pay_order на кассе
- * (Kassa 046/113), онлайн-заказ только привязывает гостя. Без кассы
- * программа не начислит ничего.
+ * не должен находить у себя дефолты смены и реквизиты чека — терминала,
+ * который их исполняет, у него нет, и настройка выглядит как обещание
+ * продукта, который не куплен.
  *
  * Раздел Locations виден всем (там имя, витринное имя, режим и НДС), а вот
  * его наполнение зависит от продуктов — поэтому фильтр здесь, рядом с
  * `visibleNavigation`, а не в самом экране: это одно и то же правило.
+ *
+ * Лояльность и фискальная выгрузка отсюда ушли. Раздел перестал быть
+ * складом всего, у чего есть `location_id`: программа лояльности — вопрос
+ * про клиентов, а выгрузка מבנה אחיד — не настройка, а отчёт. Прежние
+ * ключи вкладок (`general`/`receipt`/`register`) остаются рабочими
+ * ссылками — их переводит `canonicalRoute` в routing.js.
  */
 export const LOCATION_TABS = [
-  { key: 'general', label: 'General' },
-  { key: 'receipt', label: 'Receipt & tax', capability: 'pos_operate' },
-  { key: 'loyalty', label: 'Loyalty', capability: 'pos_operate' },
-  { key: 'register', label: 'Register defaults', capability: 'pos_operate' },
-  { key: 'export', label: 'Fiscal export', capability: 'pos_operate' },
+  { key: 'details', label: 'Details' },
+  { key: 'receipts', label: 'Receipts & tax', capability: 'pos_operate' },
+  { key: 'pos', label: 'POS defaults', capability: 'pos_operate' },
 ]
 
 export function visibleLocationTabs(context) {
   return LOCATION_TABS.filter(({ capability }) => !capability || hasCapability(context, capability))
+}
+
+/**
+ * Вкладки Customers. Directory — кто это такие, Loyalty — как устроена
+ * программа. Программа остаётся POS-контуром: начисление живёт в pay_order
+ * на кассе (Kassa 046/113), онлайн-заказ только привязывает гостя, и без
+ * кассы настройка не начислит ничего.
+ */
+export const CUSTOMER_TABS = [
+  { key: 'directory', label: 'Directory' },
+  { key: 'loyalty', label: 'Loyalty', capability: 'pos_operate' },
+]
+
+export function visibleCustomerTabs(context) {
+  return CUSTOMER_TABS.filter(({ capability }) => !capability || hasCapability(context, capability))
+}
+
+/**
+ * Вкладки Reports. Обе живут под `pos_reports` (сам раздел), но выгрузку
+ * исполняет сервер по праву `manage` — видимость вкладки авторизацией не
+ * является.
+ */
+export const REPORT_TABS = [
+  { key: 'sales', label: 'Sales' },
+  { key: 'fiscal', label: 'Fiscal' },
+]
+
+export function visibleReportTabs(context) {
+  return REPORT_TABS.filter(({ capability }) => !capability || hasCapability(context, capability))
+}
+
+/**
+ * Вкладки Settings: как устроены организация и мой аккаунт. Legal & tax
+ * здесь намеренно нет — модели юрлиц не существует (Release B), а пустая
+ * вкладка обещала бы её наличие.
+ */
+export const SETTINGS_TABS = [
+  { key: 'business', label: 'Business' },
+  { key: 'products', label: 'Products' },
+  { key: 'account', label: 'Account & security' },
+]
+
+export function visibleSettingsTabs() {
+  return SETTINGS_TABS
 }
 
 export function isDeveloperAccount(context) {
@@ -147,7 +193,7 @@ export function visibleNavigation(context) {
     if (id === 'orders') return can('orders_desk')
     // Веб-стол хостес (102): reservations_desk, работает и у POS-точек
     if (id === 'reservations') return can('reservations_desk')
-    if (id === 'sales') return can('pos_reports')
+    if (id === 'reports') return can('pos_reports')
     // activity/team/devices/guests — POS-контур
     return can('pos_operate')
   })

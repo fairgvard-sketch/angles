@@ -301,7 +301,15 @@ function Breakdown({ icon: Icon, title, rows, meter = false, ranked = false, uni
   )
 }
 
-export default function SalesOverview({ context }) {
+/**
+ * `heading` и `tabs` — интеграция в оболочку Reports, а не новый экран.
+ * Отчёт стал вкладкой раздела, поэтому строка заголовка называет раздел,
+ * а полоса вкладок стоит сразу под ней. Действия отчёта (выгрузка CSV,
+ * обновление) остаются в той же строке — они принадлежат этому экрану.
+ *
+ * Имя `heading`, а не `title`: `title` внутри уже занят подписью графика.
+ */
+export default function SalesOverview({ context, heading = 'Sales', tabs = null }) {
   const [period, setPeriod] = useState('today')
   const [custom, setCustom] = useState({ from: '', to: '' })
   const [locationIds, setLocationIds] = useState([])
@@ -374,7 +382,7 @@ export default function SalesOverview({ context }) {
   return (
     <>
       <PageHeader
-        title="Sales"
+        title={heading}
         actions={(
           <>
             <Button
@@ -395,6 +403,8 @@ export default function SalesOverview({ context }) {
           </>
         )}
       />
+
+      {tabs}
 
       <div className="sales-controls">
         <Tabs

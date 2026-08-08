@@ -22,6 +22,14 @@ const VIEW_KEY = 'view'
 const LOCATION_KEY = 'loc'
 const TAB_KEY = 'tab'
 /**
+ * Режим внутри вкладки. Появился, когда экран дублей перестал быть
+ * вкладкой Customers: у раздела теперь две настоящие вкладки (Directory и
+ * Loyalty), а дубли — это способ смотреть на Directory, а не третья
+ * вкладка. Ссылку на них по-прежнему шлют в поддержку, поэтому состояние
+ * обязано жить в адресе.
+ */
+const MODE_KEY = 'mode'
+/**
  * Рабочий день раздела. Он общий для всех вкладок броней: полотно,
  * список и лист ожидания отвечают на вопросы про ОДИН день, и ссылка на
  * «субботу» обязана открывать субботу, а не сегодня.
@@ -73,6 +81,7 @@ export function parseRoute(search, allowedViews = null) {
     view: known ? raw : DEFAULT_VIEW,
     locationId: params.get(LOCATION_KEY) || null,
     tab: params.get(TAB_KEY) || null,
+    mode: params.get(MODE_KEY) || null,
     date: date && DATE_RE.test(date) ? date : null,
     filters: parseFilters(params),
     normalized: Boolean(raw) && !known,
@@ -80,16 +89,77 @@ export function parseRoute(search, allowedViews = null) {
 }
 
 /**
+ * Устаревшие адреса → сегодняшние.
+ *
+ * Разделы переехали: выгрузка מבנה אחיד ушла из настроек точки в отчёты,
+ * лояльность — к клиентам, Sales стал вкладкой Reports. Ссылки на прежние
+ * места лежат в закладках владельца и в переписке с поддержкой, и открывать
+ * по ним пустой экран нельзя.
+ *
+ * Функция чистая и применяется ОДИН раз при чтении адреса — до проверки
+ * доступности раздела. Дальше кабинет живёт уже в новых координатах и
+ * заменой записи истории приводит адресную строку в порядок: Назад не
+ * должен возвращать в старую ссылку и снова перебрасывать вперёд.
+ */
+const LOCATION_TAB_ALIASES = {
+  general: 'details',
+  receipt: 'receipts',
+  register: 'pos',
+}
+
+export function canonicalRoute(route) {
+  const next = { ...route }
+
+  // Аккаунт: план называет раздел `account`, в коде он `settings`.
+  // Принимаем оба, каноническим остаётся тот, что уже в закладках.
+  if (next.view === 'account') next.view = 'settings'
+
+  // Sales больше не отдельный раздел — это первая вкладка отчётов
+  if (next.view === 'sales') {
+    next.view = 'reports'
+    next.tab = next.tab || 'sales'
+  }
+
+  if (next.view === 'locations') {
+    if (next.tab === 'export') {
+      // Выгрузка — отчёт, а не настройка. Точка сохраняется: ссылка вела
+      // на выгрузку конкретной точки, и она обязана остаться выбранной.
+      next.view = 'reports'
+      next.tab = 'fiscal'
+    } else if (next.tab === 'loyalty') {
+      next.view = 'guests'
+      next.tab = 'loyalty'
+    } else if (LOCATION_TAB_ALIASES[next.tab]) {
+      next.tab = LOCATION_TAB_ALIASES[next.tab]
+    }
+  }
+
+  // Экран дублей был вкладкой, стал режимом Directory
+  if (next.view === 'guests' && next.tab === 'duplicates') {
+    next.tab = 'directory'
+    next.mode = 'duplicates'
+  }
+
+  return next
+}
+
+/** Адрес из строки запроса, уже переведённый в сегодняшние координаты */
+export function readRoute(search, allowedViews = null) {
+  return canonicalRoute(parseRoute(search, allowedViews))
+}
+
+/**
  * Адрес раздела. Dashboard остаётся без параметров: базовый адрес
  * кабинета не должен обрастать хвостом при первом же открытии.
  */
 export function routeToSearch({
-  view, locationId = null, tab = null, date = null, filters = null,
+  view, locationId = null, tab = null, mode = null, date = null, filters = null,
 } = {}) {
   const params = new URLSearchParams()
   if (view && view !== DEFAULT_VIEW) params.set(VIEW_KEY, view)
   if (locationId) params.set(LOCATION_KEY, locationId)
   if (tab) params.set(TAB_KEY, tab)
+  if (mode) params.set(MODE_KEY, mode)
   // Сегодняшний день в адрес не пишем: базовая ссылка на раздел не
   // должна протухать к завтрашнему утру.
   if (date && DATE_RE.test(date)) params.set(DATE_KEY, date)
@@ -113,6 +183,7 @@ export function sameRoute(a, b) {
   return a?.view === b?.view
     && a?.locationId === b?.locationId
     && a?.tab === b?.tab
+    && (a?.mode ?? null) === (b?.mode ?? null)
     && (a?.date ?? null) === (b?.date ?? null)
     && FILTER_KEYS.every((key) => (a?.filters?.[key] ?? null) === (b?.filters?.[key] ?? null))
 }

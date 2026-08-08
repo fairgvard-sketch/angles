@@ -1,8 +1,10 @@
 import test from 'node:test'
 import assert from 'node:assert/strict'
 import {
-  LOCATION_TABS, NAV_ITEMS, groupedNavigation, hasCapability, isLocationScoped,
-  productState, visibleLocationTabs, visibleNavigation,
+  CUSTOMER_TABS, LOCATION_TABS, NAV_ITEMS, REPORT_TABS, SETTINGS_TABS,
+  groupedNavigation, hasCapability, isLocationScoped, productState,
+  visibleCustomerTabs, visibleLocationTabs, visibleNavigation, visibleReportTabs,
+  visibleSettingsTabs,
 } from './navigation.js'
 
 /**
@@ -44,32 +46,42 @@ const DEVELOPER = {
 test('POS-only: касса, отчёты и каталог; гостевых столов заказов/броней нет', () => {
   const nav = ids(POS_ONLY)
   assert.deepEqual(nav, [
-    'overview', 'sales', 'activity', 'guests', 'menu', 'locations', 'team', 'devices',
+    'overview', 'reports', 'activity', 'guests', 'menu', 'locations', 'team', 'devices',
   ])
   assert.ok(!nav.includes('orders'))
   assert.ok(!nav.includes('reservations'))
 })
 
+test('Отдельного пункта Sales больше нет — это вкладка Reports', () => {
+  for (const shape of [POS_ONLY, MENU_ONLY, ORDERS_ONLY, RESERVE_ONLY, DEVELOPER, {}]) {
+    assert.ok(!ids(shape).includes('sales'), 'Sales остался отдельным разделом')
+  }
+  assert.ok(!NAV_ITEMS.some((item) => item.id === 'sales'))
+})
+
+test('Reports виден по pos_reports, а не по «developer»', () => {
+  assert.ok(ids(POS_ONLY).includes('reports'))
+  for (const digital of [MENU_ONLY, ORDERS_ONLY, RESERVE_ONLY]) {
+    assert.ok(!ids(digital).includes('reports'), 'Reports виден аккаунту без отчётности')
+  }
+})
+
 test('ненаписанные модули не показываются клиенту ни при каких capabilities', () => {
   for (const shape of [POS_ONLY, MENU_ONLY, ORDERS_ONLY, RESERVE_ONLY, {}, { products: ['pos'] }]) {
-    const nav = ids(shape)
-    assert.ok(!nav.includes('reports'), 'Reports виден клиенту')
-    assert.ok(!nav.includes('integrations'), 'Integrations виден клиенту')
+    assert.ok(!ids(shape).includes('integrations'), 'Integrations виден клиенту')
   }
 })
 
 test('developer видит ненаписанные модули — но только он', () => {
-  const nav = ids(DEVELOPER)
-  assert.ok(nav.includes('reports'))
-  assert.ok(nav.includes('integrations'))
+  assert.ok(ids(DEVELOPER).includes('integrations'))
   const sameCapsNotDeveloper = { ...DEVELOPER, account_type: 'customer' }
-  assert.ok(!ids(sameCapsNotDeveloper).includes('reports'))
+  assert.ok(!ids(sameCapsNotDeveloper).includes('integrations'))
 })
 
 test('Menu-only: каталог и гостевые ссылки без разделов кассы', () => {
   const nav = ids(MENU_ONLY)
   assert.deepEqual(nav, ['overview', 'menu', 'locations', 'online'])
-  for (const posOnly of ['sales', 'activity', 'team', 'devices', 'reports', 'integrations']) {
+  for (const posOnly of ['reports', 'activity', 'team', 'devices', 'integrations']) {
     assert.ok(!nav.includes(posOnly), `${posOnly} не должен быть виден menu-only аккаунту`)
   }
 })
@@ -150,22 +162,30 @@ test('Разделы одной точки помечены — для них п
   assert.equal(isLocationScoped('menu'), false)
   assert.equal(isLocationScoped('team'), false)
   assert.equal(isLocationScoped('guests'), false)
-  assert.equal(isLocationScoped('sales'), false)
+  // Reports: у Sales свой выбор нескольких точек, у Fiscal — свой выбор
+  // одной. Третий переключатель в шапке обещал бы им общий скоуп.
+  assert.equal(isLocationScoped('reports'), false)
 })
 
 // ── Вкладки настроек точки ───────────────────────────────────
 
 const tabKeys = (context) => visibleLocationTabs(context).map((t) => t.key)
 
+test('Locations настраивает точку и только её: Details, Receipts & tax, POS defaults', () => {
+  assert.deepEqual(LOCATION_TABS.map((t) => t.key), ['details', 'receipts', 'pos'])
+  // Лояльность и фискальная выгрузка отсюда ушли — они не про заведение
+  assert.ok(!LOCATION_TABS.some((t) => t.key === 'loyalty' || t.key === 'export'))
+})
+
 test('Раздел Locations виден всем — но кассовые вкладки только с кассой', () => {
   assert.deepEqual(tabKeys(POS_ONLY), LOCATION_TABS.map((t) => t.key))
   for (const digital of [MENU_ONLY, ORDERS_ONLY, RESERVE_ONLY]) {
-    assert.deepEqual(tabKeys(digital), ['general'])
+    assert.deepEqual(tabKeys(digital), ['details'])
   }
 })
 
 test('Организация без продуктов настраивает только имя и режим точки', () => {
-  assert.deepEqual(tabKeys({ products: [], capabilities: [] }), ['general'])
+  assert.deepEqual(tabKeys({ products: [], capabilities: [] }), ['details'])
 })
 
 test('Старый контекст без capabilities и products показывает все вкладки', () => {
@@ -174,13 +194,36 @@ test('Старый контекст без capabilities и products показы
 
 test('Контекст до 105: кассовые вкладки приближаются по продукту pos', () => {
   assert.deepEqual(tabKeys({ products: ['pos'] }), LOCATION_TABS.map((t) => t.key))
-  assert.deepEqual(tabKeys({ products: ['menu'] }), ['general'])
+  assert.deepEqual(tabKeys({ products: ['menu'] }), ['details'])
 })
 
-test('General остаётся всегда — иначе раздел открывается пустым', () => {
+test('Details остаётся всегда — иначе раздел открывается пустым', () => {
   for (const shape of [POS_ONLY, MENU_ONLY, ORDERS_ONLY, RESERVE_ONLY, DEVELOPER, {}]) {
-    assert.equal(visibleLocationTabs(shape)[0].key, 'general')
+    assert.equal(visibleLocationTabs(shape)[0].key, 'details')
   }
+})
+
+// ── Вкладки Customers, Reports и Settings ────────────────────
+
+test('Customers: Directory всем, Loyalty — только с кассой', () => {
+  assert.deepEqual(CUSTOMER_TABS.map((t) => t.key), ['directory', 'loyalty'])
+  assert.deepEqual(visibleCustomerTabs(POS_ONLY).map((t) => t.key), ['directory', 'loyalty'])
+  // Программу исполняет касса (pay_order): без неё она ничего не начислит
+  for (const digital of [MENU_ONLY, ORDERS_ONLY, RESERVE_ONLY]) {
+    assert.deepEqual(visibleCustomerTabs(digital).map((t) => t.key), ['directory'])
+  }
+})
+
+test('Reports: продажи и фискальный набор', () => {
+  assert.deepEqual(REPORT_TABS.map((t) => t.key), ['sales', 'fiscal'])
+  assert.deepEqual(visibleReportTabs(POS_ONLY).map((t) => t.key), ['sales', 'fiscal'])
+})
+
+test('Settings: бизнес, продукты, аккаунт — и никакого Legal & tax', () => {
+  assert.deepEqual(SETTINGS_TABS.map((t) => t.key), ['business', 'products', 'account'])
+  assert.deepEqual(visibleSettingsTabs(POS_ONLY).map((t) => t.key), ['business', 'products', 'account'])
+  // Модели юрлиц ещё нет — пустая вкладка обещала бы её наличие
+  assert.ok(!SETTINGS_TABS.some((t) => t.key === 'legal'))
 })
 
 test('Состояние карточки продукта: active / developer / included / pending / addon', () => {

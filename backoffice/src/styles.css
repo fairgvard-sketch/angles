@@ -2224,6 +2224,72 @@ a { color: inherit; }
 .settings-scope { margin: 0 0 var(--sp-3); color: var(--c-text-subtle); font-size: 12px; }
 .settings-scope strong { color: var(--c-text-2); }
 
+/*
+ * Скоуп с выбором точки (программа лояльности у сети). Выбор стоит ПЕРЕД
+ * объяснением: сначала «какая точка», потом «что это значит». Строка
+ * переносится на телефоне, а не сжимает селект до нечитаемого.
+ */
+.loyalty-scope {
+  display: flex; flex-wrap: wrap; align-items: end; gap: var(--sp-3);
+  margin-bottom: var(--sp-4);
+}
+.loyalty-scope p { margin: 0; flex: 1 1 260px; }
+.loyalty-scope-picker { margin: 0; min-width: 200px; }
+
+/*
+ * Смысловая группа внутри формы (легальные реквизиты против оформления
+ * чека). Рамки нет: разделяют заголовок и воздух, а не ещё одна коробка
+ * внутри панели.
+ *
+ * Сетка живёт на ВНУТРЕННЕЙ обёртке, а не на самом fieldset: `legend` не
+ * является grid-элементом, и на `display: grid` браузер кладёт его поверх
+ * первой строки содержимого — подпись группы наезжала на её же пояснение.
+ */
+.settings-group { border: 0; padding: 0; margin: 0; min-width: 0; }
+/* Разделитель — псевдоэлемент, а не border самого fieldset: рамку
+   fieldset браузер «прорезает» под legend, и линия шла сквозь подпись. */
+.settings-group + .settings-group { position: relative; margin-top: var(--sp-5); padding-top: var(--sp-5); }
+.settings-group + .settings-group::before {
+  content: ''; position: absolute; top: 0; inset-inline: 0;
+  height: 1px; background: var(--c-border);
+}
+.settings-group > legend {
+  padding: 0; margin-bottom: var(--sp-3);
+  font-size: 13px; font-weight: 700; color: var(--c-text-2);
+  text-transform: uppercase; letter-spacing: .04em;
+}
+.settings-group-body { display: grid; gap: 18px; }
+.settings-group-body > .form-hint { margin: 0; }
+
+/*
+ * Предупреждение про необратимость. Не ошибка и не подсказка: цветом
+ * одним не обходимся — есть и рамка, и вес текста, иначе состояние
+ * читается только зрячим и только в цвете.
+ */
+.form-warning {
+  margin: 0; padding: 10px 12px; font-size: 12px; line-height: 1.5;
+  color: #7a4100; background: #fff8ef;
+  border: 1px solid #f0c99a; border-radius: var(--r-md);
+}
+
+/*
+ * Факты только для чтения: подпись и значение. Список определений, а не
+ * поля формы — у них нет ни рамки ввода, ни кнопки сохранения, и это
+ * должно быть видно до попытки в них печатать.
+ */
+.settings-facts { margin: 0; display: grid; gap: var(--sp-3); }
+.settings-facts > div {
+  display: flex; flex-wrap: wrap; align-items: baseline; gap: var(--sp-2);
+  justify-content: space-between;
+  padding-bottom: var(--sp-3); border-bottom: 1px solid var(--c-border);
+}
+.settings-facts > div:last-child { padding-bottom: 0; border-bottom: 0; }
+.settings-facts dt { font-size: 13px; font-weight: 700; color: var(--c-text-2); }
+.settings-facts dd { margin: 0; font-size: 15px; color: var(--c-text); }
+/* Приписка под формой: факты не должны читаться продолжением полей,
+   которые только что сохраняли. */
+.settings-facts.is-appendix { margin-top: var(--sp-5); padding-top: var(--sp-5); border-top: 1px solid var(--c-border); }
+
 /* Что изменило переключение права — ПОД той самой строкой, с отменой.
    Объяснение в другом конце панели не читают: к моменту, когда его
    заметят, уже не помнят, какое право нажимали. */

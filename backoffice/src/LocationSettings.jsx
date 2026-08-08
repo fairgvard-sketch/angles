@@ -1,24 +1,28 @@
-import { useCallback, useEffect, useState } from 'react'
-import { Check, Download } from 'lucide-react'
+import { useEffect, useState } from 'react'
+import { Check } from 'lucide-react'
 import {
-  fetchLocation, patchLocationSettings, updateLocationConfig, runUfExport,
+  fetchLocation, patchLocationSettings, updateLocationConfig,
 } from './settings'
-import { fetchCategories, updateCategory } from './menu'
 import { agorotToInput, inputToAgorot } from './online'
 import { hasCapability, visibleLocationTabs } from './navigation'
-import { PageHeader } from './ui/Layout'
+import { ErrorText, PageHeader } from './ui/Layout'
 import ConfirmDialog from './ui/ConfirmDialog'
 import Tabs from './ui/Tabs'
 import Skeleton, { SkeletonBar, SkeletonPanel } from './ui/Skeleton'
 
 /**
- * Настройки точки в бэкофисе — теперь единственное место, где правится
- * конфигурация уровня заведения (POS оставил себе только device-scoped:
- * печать, быстрые суммы, автоблокировку).
+ * Настройки ОДНОЙ точки: как она называется, что печатает на чеке и с
+ * какими умолчаниями работают её кассы.
  *
- * Колонки locations (имя, режим, НДС, реквизиты чека, лояльность) идут
- * через update_location_config_web (Kassa 107) — касса печатает чек из
- * колонок receipt_*, поэтому запись в settings.receipt была бы потеряна.
+ * Раздел перестал быть складом всего, у чего есть `location_id`. Отсюда
+ * ушли программа лояльности (вопрос про клиентов — `LoyaltySettings` в
+ * Customers) и фискальная выгрузка (не настройка, а отчёт —
+ * `FiscalExport` в Reports). Прежние ссылки на них продолжают работать:
+ * их переводит `canonicalRoute` в routing.js.
+ *
+ * Колонки locations (имя, режим, НДС, реквизиты чека) идут через
+ * update_location_config_web (Kassa 107) — касса печатает чек из колонок
+ * receipt_*, поэтому запись в settings.receipt была бы потеряна.
  * JSONB-настройки (смена, интерфейс, содержимое чека) — через
  * patch_location_settings_web с server-side merge, шлём только изменённое.
  */
@@ -28,14 +32,6 @@ const SERVICE_MODES = [
   { value: 'counter_tables', label: 'Counter + tables' },
   { value: 'tables', label: 'Full table service' },
 ]
-
-/** Названия типов документов Единого формата — всегда на иврите, как в документах. */
-const DOC_TYPE_NAMES = {
-  305: 'חשבונית מס',
-  320: 'חשבונית מס/קבלה',
-  330: 'חשבונית מס זיכוי',
-  400: 'קבלה',
-}
 
 function Toggle({ label, hint, checked, onChange, disabled }) {
   return (
@@ -64,20 +60,16 @@ function Field({ label, hint, children }) {
   )
 }
 
-function shekels(agorot) {
-  return `₪${(agorot / 100).toLocaleString('he-IL', { minimumFractionDigits: 2 })}`
-}
-
 export default function LocationSettings({ context, locationId, tab: tabFromUrl, onTabChange }) {
   const locations = context?.locations || []
   const activeId = locationId || locations[0]?.id || null
   /*
    * Вкладки — по продуктам аккаунта (см. navigation.js). Ссылка на скрытую
    * вкладку (закладка владельца, у которого кассу отключили) ведёт на
-   * General, а не на пустой экран.
+   * Details, а не на пустой экран.
    */
   const tabs = visibleLocationTabs(context)
-  const tab = tabs.some((t) => t.key === tabFromUrl) ? tabFromUrl : 'general'
+  const tab = tabs.some((t) => t.key === tabFromUrl) ? tabFromUrl : 'details'
   const setTab = onTabChange
   const hasRegister = hasCapability(context, 'pos_operate')
   const [location, setLocation] = useState(null)
@@ -158,7 +150,7 @@ export default function LocationSettings({ context, locationId, tab: tabFromUrl,
         {hasRegister && ' Printing and register shortcuts stay on the terminal itself.'}
       </p>
 
-      {error && <p className="form-error" role="alert">{error}</p>}
+      {error && <ErrorText>{error}</ErrorText>}
 
       {pendingTab && (
         <ConfirmDialog
@@ -187,11 +179,9 @@ export default function LocationSettings({ context, locationId, tab: tabFromUrl,
         </Skeleton>
       ) : (
         <>
-          {tab === 'general' && <GeneralTab key={location.id} location={location} onSaved={setLocation} onDirty={setDirty} />}
-          {tab === 'receipt' && <ReceiptTab key={location.id} location={location} onSaved={setLocation} onDirty={setDirty} />}
-          {tab === 'loyalty' && <LoyaltyTab key={location.id} location={location} onSaved={setLocation} onDirty={setDirty} />}
-          {tab === 'register' && <RegisterTab key={location.id} location={location} onSaved={setLocation} onDirty={setDirty} />}
-          {tab === 'export' && <ExportTab key={location.id} location={location} />}
+          {tab === 'details' && <DetailsTab key={location.id} location={location} onSaved={setLocation} onDirty={setDirty} />}
+          {tab === 'receipts' && <ReceiptsTab key={location.id} location={location} onSaved={setLocation} onDirty={setDirty} />}
+          {tab === 'pos' && <PosDefaultsTab key={location.id} location={location} onSaved={setLocation} onDirty={setDirty} />}
         </>
       )}
     </>
@@ -202,7 +192,7 @@ export default function LocationSettings({ context, locationId, tab: tabFromUrl,
 function SaveRow({ saving, saved, error }) {
   return (
     <div className="form-actions">
-      {error && <p className="form-error" role="alert">{error}</p>}
+      {error && <ErrorText>{error}</ErrorText>}
       {/* role="status" — иначе подтверждение сохранения видно только
           глазами: читалка молчит, и владелец с ней не знает, ушли
           правки на сервер или нет. */}
@@ -258,8 +248,8 @@ function useConfigForm(location, initial, onSaved, onDirty) {
   return { form, update, save, saving, saved, error, dirty }
 }
 
-// ── General: имя, витринное имя, режим обслуживания, НДС ─────
-function GeneralTab({ location, onSaved, onDirty }) {
+// ── Details: имя, витринное имя, режим обслуживания, НДС ─────
+function DetailsTab({ location, onSaved, onDirty }) {
   const { form, update, save, saving, saved, error } = useConfigForm(location, {
     name: location.name || '',
     display_name: location.settings?.display_name || '',
@@ -304,12 +294,46 @@ function GeneralTab({ location, onSaved, onDirty }) {
         </Field>
         <SaveRow saving={saving} saved={saved} error={error} />
       </form>
+
+      {/*
+        Валюта и часовой пояс показаны как факты, а не как поля: сервер их
+        не принимает (`update_location_config_web` их не знает), и
+        нарисовать здесь ввод значило бы обещать правку, которой нет.
+      */}
+      <dl className="settings-facts is-appendix">
+        <div>
+          <dt>Currency</dt>
+          <dd>{location.currency || '—'}</dd>
+        </div>
+        <div>
+          <dt>Time zone</dt>
+          <dd>{location.timezone || '—'}</dd>
+        </div>
+      </dl>
+      <p className="form-hint">
+        Currency and time zone are set when the location is created — ask your
+        ANGLE contact to change them.
+      </p>
     </section>
   )
 }
 
-// ── Receipt & tax: реквизиты хешбонита + содержимое чека ─────
-function ReceiptTab({ location, onSaved, onDirty }) {
+/**
+ * ── Receipts & tax ───────────────────────────────────────────
+ *
+ * Две разные вещи в одной вкладке, и их надо различать глазом: слева от
+ * закона — кто выпускает документ (название, ח.פ, адрес), справа от
+ * закона — как он выглядит (телефон, подпись, модификаторы, копии).
+ * Раньше все семь полей стояли одним списком, и «Receipt footer» читался
+ * так же весомо, как налоговый номер.
+ *
+ * Про неизменность выпущенных документов здесь НЕ обещается ничего.
+ * Проверено (docs/locations-settings-audit-phase0.md): чек и выгрузка
+ * מבנה אחיד читают эти колонки живыми, в момент печати и экспорта, а не
+ * из слепка документа. Значит правка задним числом меняет и уже
+ * выпущенное — и владелец обязан узнать это здесь, а не от бухгалтера.
+ */
+function ReceiptsTab({ location, onSaved, onDirty }) {
   const { form, update, save, saving, saved, error } = useConfigForm(location, {
     receipt_business_name: location.receipt_business_name || '',
     receipt_tax_id: location.receipt_tax_id || '',
@@ -337,149 +361,62 @@ function ReceiptTab({ location, onSaved, onDirty }) {
   return (
     <section className="panel form-panel">
       <form onSubmit={submit} className="settings-form">
-        <Field label="Business name (on receipt)" hint="Header of the printed receipt (חשבונית).">
-          <input value={form.receipt_business_name} onChange={(e) => update('receipt_business_name', e.target.value)} />
-        </Field>
-        <Field label="Tax ID (ח.פ / עוסק מורשה)" hint="Required for the fiscal export.">
-          <input value={form.receipt_tax_id} inputMode="numeric" onChange={(e) => update('receipt_tax_id', e.target.value)} />
-        </Field>
-        <Field label="Business address">
-          <input value={form.receipt_address} onChange={(e) => update('receipt_address', e.target.value)} />
-        </Field>
-        <Field label="Phone">
-          <input value={form.receipt_phone} onChange={(e) => update('receipt_phone', e.target.value)} />
-        </Field>
-        <Field label="Receipt footer" hint="Free text at the bottom of every receipt.">
-          <input value={form.receipt_footer} onChange={(e) => update('receipt_footer', e.target.value)} />
-        </Field>
-
-        <Toggle
-          label="Print modifiers"
-          hint="Show each item's modifiers on the receipt."
-          checked={form.print_modifiers}
-          onChange={(v) => update('print_modifiers', v)}
-        />
-        <Field label="Receipt copies">
-          <select value={form.copies} onChange={(e) => update('copies', Number(e.target.value))}>
-            <option value={1}>1</option>
-            <option value={2}>2</option>
-          </select>
-        </Field>
-        <SaveRow saving={saving} saved={saved} error={error} />
-      </form>
-    </section>
-  )
-}
-
-// ── Loyalty: механика + штампуемые категории ─────────────────
-function LoyaltyTab({ location, onSaved, onDirty }) {
-  const { form, update, save, saving, saved, error } = useConfigForm(location, {
-    loyalty_mode: location.loyalty_mode || 'off',
-    loyalty_stamps_goal: String(location.loyalty_stamps_goal ?? 10),
-    loyalty_points_percent: String(Number(location.loyalty_points_percent ?? 5)),
-    loyalty_points_min_redeem: agorotToInput(location.loyalty_points_min_redeem ?? 1000),
-  }, onSaved, onDirty)
-
-  const [categories, setCategories] = useState(null)
-  const [catError, setCatError] = useState('')
-
-  useEffect(() => {
-    let cancelled = false
-    fetchCategories()
-      .then((rows) => {
-        if (cancelled) return
-        setCategories(rows.filter((c) => c.location_id === location.id && c.is_active))
-      })
-      .catch((e) => { if (!cancelled) setCatError(e.message) })
-    return () => { cancelled = true }
-  }, [location.id])
-
-  async function toggleStamps(category) {
-    try {
-      await updateCategory(category.id, { loyalty_stamps: !category.loyalty_stamps })
-      setCategories((prev) => prev.map((c) => (
-        c.id === category.id ? { ...c, loyalty_stamps: !c.loyalty_stamps } : c
-      )))
-    } catch (e) {
-      setCatError(e.message)
-    }
-  }
-
-  function submit(event) {
-    event.preventDefault()
-    const goal = parseInt(form.loyalty_stamps_goal, 10)
-    const percent = Number(String(form.loyalty_points_percent).replace(',', '.'))
-    const minRedeem = inputToAgorot(form.loyalty_points_min_redeem)
-    if (form.loyalty_mode === 'stamps' && (!Number.isInteger(goal) || goal < 2 || goal > 50)) return
-    if (form.loyalty_mode === 'points' &&
-        (!Number.isFinite(percent) || percent < 0 || percent > 50 || minRedeem === null)) return
-    save({
-      loyalty_mode: form.loyalty_mode,
-      loyalty_stamps_goal: Number.isInteger(goal) ? goal : 10,
-      loyalty_points_percent: Number.isFinite(percent) ? percent : 5,
-      loyalty_points_min_redeem: minRedeem ?? 1000,
-    })
-  }
-
-  return (
-    <section className="panel form-panel">
-      <form onSubmit={submit} className="settings-form">
-        <Field label="Loyalty program" hint="Stamps — free item after N purchases; points — cashback in ₪.">
-          <select value={form.loyalty_mode} onChange={(e) => update('loyalty_mode', e.target.value)}>
-            <option value="off">Off</option>
-            <option value="stamps">Stamps</option>
-            <option value="points">Points</option>
-          </select>
-        </Field>
-
-        {form.loyalty_mode === 'stamps' && (
-          <>
-            <Field label="Stamps to reward" hint="How many stamped purchases earn a free item (2–50).">
-              <input
-                inputMode="numeric"
-                value={form.loyalty_stamps_goal}
-                onChange={(e) => update('loyalty_stamps_goal', e.target.value)}
-              />
+        <fieldset className="settings-group">
+          <legend>Legal details</legend>
+          <div className="settings-group-body">
+            <p className="form-hint">
+              Who issues the document. These values are printed on every
+              חשבונית and are used for the Uniform Format export.
+            </p>
+            {/*
+              Предупреждение стоит рядом с полями, а не в конце формы:
+              читают его перед правкой, а не после сохранения. Формулировка
+              описывает то, что код делает сегодня, — без обещаний.
+            */}
+            <p className="form-warning">
+              Changing these also changes how already-issued receipts print
+              when reprinted, and how past periods are exported. Correct a
+              typo freely; do not reuse this location for a different legal
+              business.
+            </p>
+            <Field label="Business name (on receipt)" hint="Header of the printed receipt (חשבונית).">
+              <input value={form.receipt_business_name} onChange={(e) => update('receipt_business_name', e.target.value)} />
             </Field>
-            <div className="qr-field">
-              <span>Categories that earn stamps</span>
-              {categories === null ? (
-                <small>Loading…</small>
-              ) : categories.length === 0 ? (
-                <small>No active categories in this location yet.</small>
-              ) : (
-                categories.map((c) => (
-                  <Toggle
-                    key={c.id}
-                    label={c.name}
-                    checked={Boolean(c.loyalty_stamps)}
-                    onChange={() => toggleStamps(c)}
-                  />
-                ))
-              )}
-              {catError && <p className="form-error" role="alert">{catError}</p>}
-            </div>
-          </>
-        )}
+            <Field label="Tax ID (ח.פ / עוסק מורשה)" hint="Required for the fiscal export.">
+              <input value={form.receipt_tax_id} inputMode="numeric" onChange={(e) => update('receipt_tax_id', e.target.value)} />
+            </Field>
+            <Field label="Business address" hint="The registered address printed on the document.">
+              <input value={form.receipt_address} onChange={(e) => update('receipt_address', e.target.value)} />
+            </Field>
+          </div>
+        </fieldset>
 
-        {form.loyalty_mode === 'points' && (
-          <>
-            <Field label="Cashback (%)" hint="Share of each purchase returned as points (0–50).">
-              <input
-                inputMode="decimal"
-                value={form.loyalty_points_percent}
-                onChange={(e) => update('loyalty_points_percent', e.target.value)}
-              />
+        <fieldset className="settings-group">
+          <legend>Receipt appearance and contact</legend>
+          <div className="settings-group-body">
+            <p className="form-hint">
+              How the receipt looks. Nothing here affects the tax figures.
+            </p>
+            <Field label="Phone" hint="Public number guests can call about an order.">
+              <input value={form.receipt_phone} onChange={(e) => update('receipt_phone', e.target.value)} />
             </Field>
-            <Field label="Minimum to redeem (₪)">
-              <input
-                inputMode="decimal"
-                value={form.loyalty_points_min_redeem}
-                onChange={(e) => update('loyalty_points_min_redeem', e.target.value)}
-              />
+            <Field label="Receipt footer" hint="Free text at the bottom of every receipt.">
+              <input value={form.receipt_footer} onChange={(e) => update('receipt_footer', e.target.value)} />
             </Field>
-          </>
-        )}
+            <Toggle
+              label="Print modifiers"
+              hint="Show each item's modifiers on the receipt."
+              checked={form.print_modifiers}
+              onChange={(v) => update('print_modifiers', v)}
+            />
+            <Field label="Receipt copies">
+              <select value={form.copies} onChange={(e) => update('copies', Number(e.target.value))}>
+                <option value={1}>1</option>
+                <option value={2}>2</option>
+              </select>
+            </Field>
+          </div>
+        </fieldset>
 
         <SaveRow saving={saving} saved={saved} error={error} />
       </form>
@@ -487,8 +424,15 @@ function LoyaltyTab({ location, onSaved, onDirty }) {
   )
 }
 
-// ── Register defaults: смена и видимость элементов POS ───────
-function RegisterTab({ location, onSaved, onDirty }) {
+/**
+ * ── POS defaults ─────────────────────────────────────────────
+ *
+ * Умолчания смены и видимость элементов на кассах ЭТОЙ точки. Не путать с
+ * настройками терминала: принтер, ширина ленты, быстрые суммы, экран
+ * клиента и автоблокировка живут на самой кассе (Kassa 107) — они разные
+ * у двух аппаратов одной стойки, и место им не здесь.
+ */
+function PosDefaultsTab({ location, onSaved, onDirty }) {
   const shift = location.settings?.shift || {}
   const ui = location.settings?.interface || {}
   const { form, update, save, saving, saved, error } = useConfigForm(location, {
@@ -522,6 +466,10 @@ function RegisterTab({ location, onSaved, onDirty }) {
   return (
     <section className="panel form-panel">
       <form onSubmit={submit} className="settings-form">
+        <p className="form-hint">
+          Applies to every register at this location. Printer, receipt width,
+          quick amounts and auto-lock are set on each terminal itself.
+        </p>
         <Field label="Default opening float (₪)" hint="Suggested cash amount when a shift opens. Empty — off.">
           <input
             inputMode="decimal"
@@ -557,121 +505,6 @@ function RegisterTab({ location, onSaved, onDirty }) {
         />
         <SaveRow saving={saving} saved={saved} error={error} />
       </form>
-    </section>
-  )
-}
-
-// ── Fiscal export: Единый формат 1.31 ────────────────────────
-/** Прошлый календарный месяц — типовой отчётный период по умолчанию. */
-function previousMonthRange() {
-  const now = new Date()
-  const first = new Date(now.getFullYear(), now.getMonth() - 1, 1)
-  const last = new Date(now.getFullYear(), now.getMonth(), 0)
-  const iso = (d) =>
-    `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`
-  return { from: iso(first), to: iso(last) }
-}
-
-function downloadBase64(filename, base64, mime) {
-  const bytes = Uint8Array.from(atob(base64), (c) => c.charCodeAt(0))
-  const url = URL.createObjectURL(new Blob([bytes], { type: mime }))
-  const a = document.createElement('a')
-  a.href = url
-  a.download = filename
-  a.click()
-  URL.revokeObjectURL(url)
-}
-
-function ExportTab({ location }) {
-  const defaults = previousMonthRange()
-  const [from, setFrom] = useState(defaults.from)
-  const [to, setTo] = useState(defaults.to)
-  const [busy, setBusy] = useState(false)
-  const [error, setError] = useState('')
-  const [result, setResult] = useState(null)
-
-  async function generate() {
-    setBusy(true)
-    setError('')
-    setResult(null)
-    try {
-      setResult(await runUfExport(location.id, from, to))
-    } catch (e) {
-      setError(e.message === 'missing_tax_id'
-        ? 'Tax ID is missing — fill it in on the Receipt & tax tab first.'
-        : 'Export failed. Try again or narrow the period.')
-    } finally {
-      setBusy(false)
-    }
-  }
-
-  return (
-    <section className="panel form-panel">
-      <div className="settings-form">
-        <p className="hint">
-          Uniform Format 1.31 (מבנה אחיד) for the Israeli Tax Authority: INI.TXT and
-          BKMVDATA.zip for the selected period, generated server-side from fiscal documents.
-        </p>
-        <Field label="From">
-          <input type="date" value={from} onChange={(e) => setFrom(e.target.value)} />
-        </Field>
-        <Field label="To">
-          <input type="date" value={to} onChange={(e) => setTo(e.target.value)} />
-        </Field>
-        <div className="form-actions">
-          {error && <p className="form-error" role="alert">{error}</p>}
-          <button
-            type="button"
-            className="primary-button narrow"
-            disabled={busy || !from || !to || from > to}
-            onClick={generate}
-          >
-            {busy ? 'Generating…' : 'Generate export'}
-          </button>
-        </div>
-
-        {result && (
-          <>
-            <div className="form-actions export-downloads">
-              <button
-                type="button"
-                className="secondary-button"
-                onClick={() => downloadBase64('INI.TXT', result.ini_base64, 'text/plain')}
-              >
-                <Download /> INI.TXT
-              </button>
-              <button
-                type="button"
-                className="secondary-button"
-                onClick={() => downloadBase64('BKMVDATA.zip', result.bkmvdata_zip_base64, 'application/zip')}
-              >
-                <Download /> BKMVDATA.zip
-              </button>
-              <span className="hint">
-                Records: {result.total_records} · {result.range?.from} — {result.range?.to}
-              </span>
-            </div>
-
-            <table className="export-report">
-              <thead>
-                <tr><th>Document type</th><th>Count</th><th>Total inc. VAT</th></tr>
-              </thead>
-              <tbody>
-                {result.control_report.map((row) => (
-                  <tr key={row.docTypeCode}>
-                    <td>{row.docTypeCode} · {DOC_TYPE_NAMES[row.docTypeCode] ?? ''}</td>
-                    <td>{row.count}</td>
-                    <td>{shekels(row.totalIncVat)}</td>
-                  </tr>
-                ))}
-                {result.control_report.length === 0 && (
-                  <tr><td colSpan={3}>No fiscal documents in this period.</td></tr>
-                )}
-              </tbody>
-            </table>
-          </>
-        )}
-      </div>
     </section>
   )
 }

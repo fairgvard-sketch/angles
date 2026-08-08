@@ -6,6 +6,8 @@ import MenuManager from './MenuManager.jsx'
 import TeamManager from './TeamManager.jsx'
 import GuestsManager from './GuestsManager.jsx'
 import LocationSettings from './LocationSettings.jsx'
+import ReportsSection from './ReportsSection.jsx'
+import SettingsPage from './SettingsPage.jsx'
 
 /**
  * Вкладка раздела живёт в адресе.
@@ -68,19 +70,57 @@ describe('вкладка приходит из адреса', () => {
     const hours = renderToStaticMarkup(h(TeamManager, { context, tab: 'hours', onTabChange: noop }))
     assert.equal(selectedTab(hours), 'Hours')
 
-    const receipt = renderToStaticMarkup(
-      h(LocationSettings, { context, locationId: 'loc-1', tab: 'receipt', onTabChange: noop })
+    const receipts = renderToStaticMarkup(
+      h(LocationSettings, { context, locationId: 'loc-1', tab: 'receipts', onTabChange: noop })
     )
-    assert.match(receipt, /aria-selected="true"/)
+    assert.equal(selectedTab(receipts), 'Receipts &amp; tax')
+
+    const pos = renderToStaticMarkup(
+      h(LocationSettings, { context, locationId: 'loc-1', tab: 'pos', onTabChange: noop })
+    )
+    assert.equal(selectedTab(pos), 'POS defaults')
   })
 
-  it('экран дублей клиентов открывается по ссылке', () => {
+  it('настройки точки: мусор в адресе открывает Details', () => {
+    for (const tab of [null, 'nope', 'loyalty', 'export']) {
+      const html = renderToStaticMarkup(
+        h(LocationSettings, { context, locationId: 'loc-1', tab, onTabChange: noop })
+      )
+      assert.equal(selectedTab(html), 'Details', `tab=${String(tab)}`)
+    }
+  })
+
+  it('экран дублей клиентов открывается по ссылке — теперь режимом', () => {
     const dupes = renderToStaticMarkup(
-      h(GuestsManager, { context, tab: 'duplicates', onTabChange: noop })
+      h(GuestsManager, { context, tab: 'directory', mode: 'duplicates', onTabChange: noop })
     )
     assert.match(dupes, /Back to list/)
 
     const list = renderToStaticMarkup(h(GuestsManager, { context, tab: null, onTabChange: noop }))
     assert.doesNotMatch(list, /Back to list/)
+  })
+
+  it('клиенты и отчёты открываются на вкладке из ссылки', () => {
+    const loyalty = renderToStaticMarkup(
+      h(GuestsManager, { context, tab: 'loyalty', locationId: 'loc-1', onTabChange: noop })
+    )
+    assert.equal(selectedTab(loyalty), 'Loyalty')
+    // Скоуп назван прямо: правила лежат на точке, а не на организации
+    assert.match(loyalty, /Applies to/)
+
+    const directory = renderToStaticMarkup(
+      h(GuestsManager, { context, tab: 'directory', onTabChange: noop })
+    )
+    assert.equal(selectedTab(directory), 'Directory')
+
+    const fiscal = renderToStaticMarkup(
+      h(ReportsSection, { context, tab: 'fiscal', locationId: 'loc-1', onTabChange: noop })
+    )
+    assert.equal(selectedTab(fiscal), 'Fiscal')
+
+    const settings = renderToStaticMarkup(
+      h(SettingsPage, { context, tab: 'products', email: 'a@b.c', onTabChange: noop })
+    )
+    assert.equal(selectedTab(settings), 'Products')
   })
 })

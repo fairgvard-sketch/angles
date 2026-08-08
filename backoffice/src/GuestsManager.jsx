@@ -12,6 +12,8 @@ import {
   guestsToCsv, csvFileName, duplicateReason, mergeConfirmText, mergePreview, mergeSources,
   customerErrorText,
 } from './guests'
+import { visibleCustomerTabs } from './navigation'
+import LoyaltySettings from './LoyaltySettings'
 import { EmptyPanel, ErrorText, PageHeader, SearchField } from './ui/Layout'
 import Drawer from './ui/Drawer'
 import Tabs from './ui/Tabs'
@@ -591,7 +593,13 @@ function DuplicateGroup({ group, busy, onMerge }) {
   )
 }
 
-export default function GuestsManager({ context, tab: tabFromUrl, onTabChange }) {
+/**
+ * Directory — сам список клиентов, дубли и профиль. Это прежний экран
+ * целиком: он лишь стал вкладкой раздела, поэтому получает полосу вкладок
+ * (`tabs`) в свою строку заголовка, а экран дублей переехал из вкладки в
+ * режим (`duplicates`) — вкладок у раздела теперь две настоящие.
+ */
+function CustomerDirectory({ context, duplicates: showDuplicates, onDuplicatesChange, tabs: tabStrip }) {
   const [guests, setGuests] = useState(null)
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState('')
@@ -604,8 +612,8 @@ export default function GuestsManager({ context, tab: tabFromUrl, onTabChange })
   const [duplicates, setDuplicates] = useState([])
   // Экран дублей — тоже адресуемое состояние: ссылку на него шлют в
   // поддержку, и перезагрузка не должна возвращать в общий список.
-  const view = tabFromUrl === 'duplicates' ? 'duplicates' : 'list'
-  const setView = (next) => onTabChange?.(next === 'list' ? null : next)
+  const view = showDuplicates ? 'duplicates' : 'list'
+  const setView = (next) => onDuplicatesChange?.(next === 'duplicates')
   const [merging, setMerging] = useState(null)
   const [selected, setSelected] = useState(null)
 
@@ -713,6 +721,8 @@ export default function GuestsManager({ context, tab: tabFromUrl, onTabChange })
           </>
         )}
       />
+
+      {tabStrip}
 
       <div className="cus-toolbar">
         <SearchField
@@ -893,6 +903,97 @@ export default function GuestsManager({ context, tab: tabFromUrl, onTabChange })
           onClose={() => setSelected(null)}
         />
       )}
+    </>
+  )
+}
+
+/**
+ * «Customers» отвечает на два вопроса: кто эти люди (Directory) и как
+ * устроена программа лояльности (Loyalty).
+ *
+ * Программа переехала сюда из настроек точки — см. `LoyaltySettings`.
+ * Хранение и сервер не изменились; изменилось место, где её ищут.
+ */
+export default function GuestsManager({
+  context, tab: tabFromUrl, onTabChange, mode, onModeChange, locationId, onLocationChange,
+}) {
+  const tabs = visibleCustomerTabs(context)
+  /*
+   * Ссылка на скрытую вкладку (закладка владельца, у которого отключили
+   * кассу) ведёт в Directory, а не на пустой экран.
+   */
+  const tab = tabs.some((t) => t.key === tabFromUrl) ? tabFromUrl : 'directory'
+
+  /*
+   * Несохранённые правила программы. Ровно та же защита, что была в
+   * настройках точки: уход с вкладки спрашивает, закрытие вкладки браузера
+   * предупреждает. Потерять набранный процент кэшбэка молча нельзя.
+   */
+  const [dirty, setDirty] = useState(false)
+  const [pendingTab, setPendingTab] = useState(null)
+
+  useEffect(() => {
+    if (!dirty) return undefined
+    function onBeforeUnload(event) {
+      event.preventDefault()
+      event.returnValue = ''
+    }
+    window.addEventListener('beforeunload', onBeforeUnload)
+    return () => window.removeEventListener('beforeunload', onBeforeUnload)
+  }, [dirty])
+
+  function askTab(next) {
+    if (!dirty || next === tab) { onTabChange?.(next); return }
+    setPendingTab(next)
+  }
+
+  const tabStrip = tabs.length > 1 ? (
+    <Tabs
+      className="location-tabs settings-topic-tabs"
+      label="Customers topic"
+      items={tabs.map((t) => ({ key: t.key, label: t.label }))}
+      value={tab}
+      onChange={askTab}
+    />
+  ) : null
+
+  const leaveGuard = pendingTab && (
+    <ConfirmDialog
+      title="Leave without saving?"
+      description="The loyalty changes are not saved yet. Leaving loses them."
+      confirmLabel="Discard changes"
+      cancelLabel="Keep editing"
+      tone="danger"
+      onCancel={() => setPendingTab(null)}
+      onConfirm={() => { setDirty(false); onTabChange?.(pendingTab); setPendingTab(null) }}
+    />
+  )
+
+  if (tab === 'loyalty') {
+    return (
+      <>
+        <PageHeader title="Customers" />
+        {tabStrip}
+        {leaveGuard}
+        <LoyaltySettings
+          locations={context?.locations || []}
+          locationId={locationId}
+          onLocationChange={onLocationChange}
+          onDirty={setDirty}
+        />
+      </>
+    )
+  }
+
+  return (
+    <>
+      {leaveGuard}
+      <CustomerDirectory
+        context={context}
+        duplicates={mode === 'duplicates'}
+        onDuplicatesChange={(on) => onModeChange?.(on ? 'duplicates' : null)}
+        tabs={tabStrip}
+      />
     </>
   )
 }

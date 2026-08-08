@@ -17,10 +17,18 @@ import { describe, it } from 'node:test'
 
 const APP = readFileSync(new URL('./App.jsx', import.meta.url), 'utf8')
 
-/** Разделы, которые обязаны приезжать своим чанком */
+/**
+ * Разделы, которые обязаны приезжать своим чанком.
+ *
+ * `SalesOverview` в списке больше нет: он перестал быть разделом и стал
+ * вкладкой внутри `ReportsSection` — по требованию приезжает раздел, а
+ * отчёт едет вместе с ним. `SettingsPage` появился: экран аккаунта
+ * дорос до трёх вкладок и в первом чанке ему делать нечего.
+ */
 const LAZY_VIEWS = [
-  'SalesOverview', 'LocationSettings', 'MenuManager', 'TeamManager', 'QrChannels',
-  'OrdersInbox', 'ReservationsDesk', 'DevicesManager', 'GuestsManager', 'ActivityManager',
+  'ReportsSection', 'SettingsPage', 'LocationSettings', 'MenuManager', 'TeamManager',
+  'QrChannels', 'OrdersInbox', 'ReservationsDesk', 'DevicesManager', 'GuestsManager',
+  'ActivityManager',
 ]
 
 describe('разделение бандла', () => {
