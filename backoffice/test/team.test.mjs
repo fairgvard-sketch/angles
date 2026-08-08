@@ -454,7 +454,7 @@ describe('команда: карточка человека', { skip }, () => {
 })
 
 describe('команда: доступ одной поверхностью', { skip }, () => {
-  it('правило точки и роль-исключение стоят в одной строке', async () => {
+  it('строка права — действие, подсказка и выбор из двух уровней', async () => {
     const page = await open('tab=access')
     await page.waitForSelector('.tm-matrix-row')
     const state = await page.evaluate(() => {
@@ -462,24 +462,25 @@ describe('команда: доступ одной поверхностью', { s
       const refund = rows.find((r) => r.textContent.startsWith('Refunds'))
       return {
         level: refund.querySelector('[aria-checked="true"]').textContent,
-        exceptions: [...refund.querySelectorAll('.tm-role-chip')].map((c) => c.textContent),
-        // Действие, которого нет ни в одной роли, честно пустует
-        emptyRow: rows.find((r) => r.textContent.startsWith('Close shift'))
-          .querySelector('.tm-none')?.textContent,
+        hint: refund.querySelector('.tm-matrix-name small').textContent,
+        // Выбор один из двух, а не две независимые кнопки
+        group: refund.querySelector('[role="radiogroup"]') !== null,
+        options: refund.querySelectorAll('[role="radio"]').length,
         rows: rows.length,
       }
     })
     assert.equal(state.level, 'Manager')
-    assert.deepEqual(state.exceptions, ['Senior barista'])
-    assert.equal(state.emptyRow, '—')
+    assert.match(state.hint, /money back/)
+    assert.ok(state.group, 'уровень обязан быть radiogroup')
+    assert.equal(state.options, 2)
     assert.equal(state.rows, 9)
     await page.close()
   })
 
-  it('роль открывается прямо из строки права', async () => {
+  it('роль открывается из списка ролей рядом', async () => {
     const page = await open('tab=access')
-    await page.waitForSelector('.tm-role-chip')
-    await page.click('.tm-role-chip')
+    await page.waitForSelector('.tm-role-row')
+    await page.click('.tm-role-row')
     await page.waitForSelector('.drawer')
     const state = await page.evaluate(() => ({
       title: document.querySelector('.drawer-head h3').textContent,

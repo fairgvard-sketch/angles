@@ -1,7 +1,7 @@
 import assert from 'node:assert/strict'
 import { describe, it } from 'node:test'
 import {
-  can, accessSummary, accessScope, accessSource, rolesAllowing,
+  can, accessSummary, accessScope, accessSource,
   filterRoster, sortRoster, lastShiftLabel, shiftIndex, statusOf,
   personRowLabel, resolveTab, resolveTeamRoute, staffErrorText, hasRecords,
   locationLabel, rosterCounts, filterRoles,
@@ -105,14 +105,6 @@ describe('откуда взялось право', () => {
     assert.match(accessSource(barista, null, 'Main'), /Barista/)
   })
 
-  it('роли-исключения находятся по действию', () => {
-    const roles = [
-      { id: 'r1', name: 'Senior', perms: ['refund'] },
-      { id: 'r2', name: 'Runner', perms: ['void_order'] },
-    ]
-    assert.deepEqual(rolesAllowing(roles, 'refund').map((r) => r.name), ['Senior'])
-    assert.deepEqual(rolesAllowing(roles, 'close_shift'), [])
-  })
 })
 
 describe('список команды', () => {

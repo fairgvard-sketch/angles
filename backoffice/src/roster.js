@@ -177,11 +177,6 @@ export function accessSummary(member, role, settingsByLocation, locations) {
   return { label: first === total ? `All ${total}` : `${first} of ${total}`, allowed: first, total }
 }
 
-/** Роли, которые разрешают действие, — колонка «Exceptions» в матрице */
-export function rolesAllowing(roles, key) {
-  return (roles ?? []).filter((r) => (r.perms ?? []).includes(key))
-}
-
 /** Сколько человек носит роль — чтобы удаление роли не было вслепую */
 export function roleHolders(staff, roleId) {
   return (staff ?? []).filter((s) => s.role_id === roleId).length

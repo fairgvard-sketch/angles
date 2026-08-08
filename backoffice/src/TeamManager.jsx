@@ -6,7 +6,7 @@ import {
   fetchRoles, saveRole, deleteRole,
   PERM_KEYS, PERM_LABELS, PERM_HINTS, permLevel,
   roleOf, accessRows, accessSource, accessScope, accessSummary,
-  rolesAllowing, roleHolders, locationLabel, roleTitle,
+  roleHolders, locationLabel, roleTitle,
   lastShiftLabel, SHIFT_WINDOW_DAYS, shiftIndex, statusOf, personRowLabel,
   sortRoster, filterRoster, rosterCounts, filterRoles,
   ROLE_SEARCH_FROM, PEOPLE_PAGE, ROLE_PAGE,
@@ -897,7 +897,7 @@ function RolesPanel({ roles, staff, narrow, sectionRef, onOpen }) {
  * как было — искать объяснение в другом конце панели никто не станет.
  */
 function PermissionsPanel({
-  locations, roles, staff, settingsByLocation, sectionRef, onSettingsChanged, onOpenRole,
+  locations, roles, staff, settingsByLocation, sectionRef, onSettingsChanged,
 }) {
   const [locationId, setLocationId] = useState(locations[0]?.id || '')
   const [saving, setSaving] = useState('')
@@ -993,11 +993,9 @@ function PermissionsPanel({
             <div className="tm-matrix-head" aria-hidden="true">
               <span>Action</span>
               <span>Allowed for</span>
-              <span>Roles that allow it</span>
             </div>
             {PERM_KEYS.map((key) => {
               const level = permLevel(settings, key)
-              const exceptions = rolesAllowing(roles ?? [], key)
               return (
                 <div className="tm-matrix-group" key={key}>
                   <div className="tm-matrix-row">
@@ -1032,20 +1030,6 @@ function PermissionsPanel({
                       >
                         Manager
                       </button>
-                    </span>
-                    <span className="tm-matrix-roles">
-                      {exceptions.length === 0
-                        ? <span className="tm-none">—</span>
-                        : exceptions.map((r) => (
-                          <button
-                            type="button"
-                            className="tm-role-chip"
-                            key={r.id}
-                            onClick={() => onOpenRole(r)}
-                          >
-                            {r.name}
-                          </button>
-                        ))}
                     </span>
                   </div>
 
@@ -1153,7 +1137,6 @@ function PeopleAndAccess({
             settingsByLocation={settingsByLocation}
             sectionRef={permsRef}
             onSettingsChanged={onSettingsChanged}
-            onOpenRole={setEditing}
           />
         </div>
       )}

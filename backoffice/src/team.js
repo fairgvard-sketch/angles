@@ -5,7 +5,7 @@ export {
   PERM_KEYS, PERM_DEFAULTS, PERM_LABELS, PERM_HINTS, permLevel,
   roleAccessDiff, levelChangeEffect,
   can, roleOf, accessRows, accessSource, accessScope, accessSummary,
-  rolesAllowing, roleHolders,
+  roleHolders,
   locationLabel, roleTitle, lastShiftLabel, daysBetween,
   SHIFT_WINDOW_DAYS, shiftIndex, statusOf, personRowLabel,
   sortRoster, filterRoster, rosterCounts, filterRoles,
