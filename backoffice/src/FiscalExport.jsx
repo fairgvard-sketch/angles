@@ -77,6 +77,19 @@ export default function FiscalExport({ locations = [], locationId, onLocationCha
       if (e.message === 'missing_tax_id') {
         setMissingTaxId(true)
         setError(`Tax ID is missing for ${active?.name ?? 'this location'} — fill it in first.`)
+      } else if (e.message === 'issuer_changed_in_period') {
+        /*
+         * Реквизиты бизнеса менялись внутри периода. Заголовок набора
+         * несёт один ח.פ, поэтому такой период невозможно отдать одним
+         * файлом — и «усреднить» его нельзя. Владельцу нужно не
+         * «попробовать ещё раз», а сузить даты до отрезка с одними
+         * реквизитами, поэтому текст говорит именно это.
+         */
+        setError(
+          'The business details changed during this period, so it cannot be '
+          + 'exported as one set — each set carries a single Tax ID. Split the '
+          + 'period at the date the details changed and export each part.',
+        )
       } else {
         setError('Export failed. Try again or narrow the period.')
       }

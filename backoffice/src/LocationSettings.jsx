@@ -373,11 +373,14 @@ function ReceiptsTab({ location, onSaved, onDirty }) {
               читают его перед правкой, а не после сохранения. Формулировка
               описывает то, что код делает сегодня, — без обещаний.
             */}
-            <p className="form-warning">
-              Changing these also changes how already-issued receipts print
-              when reprinted, and how past periods are exported. Correct a
-              typo freely; do not reuse this location for a different legal
-              business.
+            {/*
+              Обещание, которое теперь ПРАВДА: документ запоминает эмитента
+              в момент выпуска (Kassa 150), печать и выгрузка читают слепок
+              (Kassa 151). До этого здесь стояло предупреждение об обратном.
+            */}
+            <p className="form-hint">
+              Changes apply to future documents only. Receipts and tax exports
+              already issued keep the details they were issued with.
             </p>
             <Field label="Business name (on receipt)" hint="Header of the printed receipt (חשבונית).">
               <input value={form.receipt_business_name} onChange={(e) => update('receipt_business_name', e.target.value)} />
