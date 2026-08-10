@@ -453,7 +453,7 @@ export default function HoursManager({ context, initialStaffId = null }) {
         </Button>
 
         <p className="hrs-total">
-          <strong>{formatHm(totalSeconds)} worked</strong>
+          <strong>{formatHm(totalSeconds)} worked in total</strong>
           <span>{decimalHours(totalSeconds)} decimal for payroll</span>
         </p>
       </div>

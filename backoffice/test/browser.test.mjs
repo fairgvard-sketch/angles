@@ -958,6 +958,33 @@ describe('mobile navigation drawer', { skip }, () => {
     return page
   }
 
+  it('скрытый сайдбар не отнимает ширину у страницы', async () => {
+    const page = await browser.newPage()
+    await page.setViewport({ width: 390, height: 844 })
+    await page.goto(`${appOrigin}/shell`, { waitUntil: 'networkidle0' })
+
+    const state = await page.evaluate(() => {
+      const shell = document.querySelector('.app-shell').getBoundingClientRect()
+      const main = document.querySelector('.app-main').getBoundingClientRect()
+      const content = document.querySelector('.content').getBoundingClientRect()
+      return {
+        viewport: window.innerWidth,
+        shell: Math.round(shell.width),
+        main: Math.round(main.width),
+        contentRight: Math.round(content.right),
+        columns: getComputedStyle(document.querySelector('.app-shell')).gridTemplateColumns,
+        overflow: document.documentElement.scrollWidth - document.documentElement.clientWidth,
+      }
+    })
+
+    assert.equal(state.shell, state.viewport, 'оболочка должна занимать весь экран')
+    assert.equal(state.main, state.viewport, 'рабочая область не резервирует скрытую колонку')
+    assert.ok(state.contentRight <= state.viewport, 'контент не выходит за правый край')
+    assert.equal(state.columns, `${state.viewport}px`, 'на телефоне у оболочки одна колонка')
+    assert.equal(state.overflow, 0, 'страница не должна прокручиваться вбок')
+    await page.close()
+  })
+
   it('все разделы достижимы, а край подсказывает прокрутку', async () => {
     const page = await openDrawer()
     const before = await page.evaluate(() => {
