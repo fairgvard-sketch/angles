@@ -168,7 +168,7 @@ function StaffCard({ person, from, to, locations, locationId, onClose, onChanged
           locationName,
           // Часы и десятичные рядом: первое читает сотрудник, второе идёт
           // в зарплату, и пересчитывать «8:30 → 8.5» руками никто не должен
-          `${formatHm(person.seconds)} · ${decimalHours(person.seconds)}`,
+          `${formatHm(person.seconds)} worked · ${decimalHours(person.seconds)} decimal hours`,
         ].filter(Boolean).join(' · ')}
         onClose={onClose}
         /* Панель стоит рядом с таблицей: щелчок по соседнему сотруднику
@@ -218,7 +218,7 @@ function StaffCard({ person, from, to, locations, locationId, onClose, onChanged
                   <span className={gap > 0 ? 'hrs-day-time' : 'hrs-day-time is-none'}>{formatHm(gap)}</span>
                   <span className={day.hasOpen ? 'hrs-day-hours is-open' : 'hrs-day-hours'}>
                     {formatHm(day.seconds)}
-                    <small>{decimalHours(day.seconds)}</small>
+                    <small>{decimalHours(day.seconds)} decimal</small>
                   </span>
                   <span className="hrs-day-actions">
                     {day.entries.map((entry) => (
@@ -245,7 +245,7 @@ function StaffCard({ person, from, to, locations, locationId, onClose, onChanged
               <span>{breakSeconds > 0 ? formatHm(breakSeconds) : ''}</span>
               <span className="hrs-day-hours">
                 {formatHm(person.seconds)}
-                <small>{decimalHours(person.seconds)}</small>
+                <small>{decimalHours(person.seconds)} decimal</small>
               </span>
               <span />
             </div>
@@ -452,8 +452,16 @@ export default function HoursManager({ context, initialStaffId = null }) {
           <Download aria-hidden /> Excel
         </Button>
 
-        <p className="hrs-total">{formatHm(totalSeconds)} · {decimalHours(totalSeconds)} in total</p>
+        <p className="hrs-total">
+          <strong>{formatHm(totalSeconds)} worked</strong>
+          <span>{decimalHours(totalSeconds)} decimal for payroll</span>
+        </p>
       </div>
+
+      <p className="hrs-format-note">
+        Time is shown as hours:minutes. Decimal hours are included for payroll and Excel
+        (for example, 8:30 equals 8,50).
+      </p>
 
       {error && <p className="form-error" role="alert">{error}</p>}
 
@@ -502,7 +510,7 @@ export default function HoursManager({ context, initialStaffId = null }) {
                     <span className="hrs-cell-num">{row.shifts || '—'}</span>
                     <span className={row.shifts ? 'hrs-cell-num is-strong' : 'hrs-cell-num'}>
                       {row.shifts ? formatHm(row.seconds) : '—'}
-                      {row.shifts > 0 && <small>{decimalHours(row.seconds)}</small>}
+                      {row.shifts > 0 && <small>{decimalHours(row.seconds)} decimal</small>}
                     </span>
                   </button>
                 ))}

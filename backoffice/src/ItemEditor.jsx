@@ -1,11 +1,12 @@
 import { useEffect, useState } from 'react'
-import { ImageOff, Plus, Trash2 } from 'lucide-react'
+import { ChevronDown, ImageOff, Plus, Trash2 } from 'lucide-react'
 import { agorotToShekels, shekelsToAgorot, bulkErrorText } from './menu'
 import { GAP_LABELS, itemGaps, money, priceLabel, sizesLabel } from './catalog'
 import Drawer from './ui/Drawer'
 import ConfirmDialog from './ui/ConfirmDialog'
 import { Button } from './ui/Button'
 import { RowMenu } from './ui/RowMenu'
+import useNarrow from './ui/useNarrow'
 
 /**
  * Карточка позиции: сначала показать, потом править.
@@ -23,6 +24,32 @@ import { RowMenu } from './ui/RowMenu'
 
 function priceInput(agorot) {
   return agorot != null ? String(agorotToShekels(agorot)) : ''
+}
+
+/** Optional item settings collapse on a phone, but stay visible on desktop. */
+function EditorSection({ title, summary, open, collapsible, onToggle, action, children }) {
+  return (
+    <section className={`editor-block cat-form-section${open ? ' is-open' : ''}`}>
+      <div className="editor-block-head">
+        {collapsible ? (
+          <button
+            type="button"
+            className="cat-form-section-toggle"
+            aria-expanded={open}
+            onClick={onToggle}
+          >
+            <span>{title}</span>
+            <small>{summary}</small>
+            <ChevronDown aria-hidden />
+          </button>
+        ) : (
+          <span>{title}</span>
+        )}
+        {open && action}
+      </div>
+      {open && <div className="cat-form-section-body">{children}</div>}
+    </section>
+  )
 }
 
 /** Что видно в позиции до того, как её открыли на правку */
@@ -136,6 +163,14 @@ export default function ItemEditor({
   const [error, setError] = useState('')
   const [confirming, setConfirming] = useState(false)
   const [deleting, setDeleting] = useState(false)
+  const narrow = useNarrow()
+  const [optionalOpen, setOptionalOpen] = useState({ photo: false, sizes: false, modifiers: false })
+
+  const sectionOpen = (key) => !narrow || optionalOpen[key]
+  const toggleSection = (key) => setOptionalOpen((current) => ({
+    ...current,
+    [key]: !current[key],
+  }))
 
   /*
    * Форма перезаряжается, когда открыли ДРУГУЮ позицию: панель
@@ -155,6 +190,7 @@ export default function ItemEditor({
     setVariants((item.item_variants || []).slice().sort((a, b) => a.sort_order - b.sort_order)
       .map((v) => ({ name: v.name, price: priceInput(v.price), is_default: v.is_default })))
     setGroupIds((item.menu_item_modifier_groups || []).map((g) => g.group_id))
+    setOptionalOpen({ photo: false, sizes: false, modifiers: false })
     setError('')
   }, [item.id]) // eslint-disable-line react-hooks/exhaustive-deps
 
@@ -344,8 +380,13 @@ export default function ItemEditor({
             <input value={description} onChange={(e) => setDescription(e.target.value)} />
           </label>
 
-          <div className="editor-block">
-            <div className="editor-block-head"><span>Photo</span></div>
+          <EditorSection
+            title="Photo"
+            summary={imageUrl ? 'Photo added' : 'No photo'}
+            open={sectionOpen('photo')}
+            collapsible={narrow}
+            onToggle={() => toggleSection('photo')}
+          >
             <div className="photo-row">
               {imageUrl && <img className="photo-preview" src={imageUrl} alt="" />}
               <label className="file-button">
@@ -356,13 +397,20 @@ export default function ItemEditor({
                 <Button onClick={() => setImageUrl('')} disabled={uploading}>Remove</Button>
               )}
             </div>
-          </div>
+          </EditorSection>
 
-          <div className="editor-block">
-            <div className="editor-block-head">
-              <span>Sizes</span>
+          <EditorSection
+            title="Sizes"
+            summary={variants.length > 0
+              ? `${variants.length} size${variants.length === 1 ? '' : 's'}`
+              : 'Base price only'}
+            open={sectionOpen('sizes')}
+            collapsible={narrow}
+            onToggle={() => toggleSection('sizes')}
+            action={(
               <button type="button" className="text-button" onClick={addVariant}><Plus /> Add</button>
-            </div>
+            )}
+          >
             {variants.length === 0 && <p className="hint">No sizes — the item sells at its base price.</p>}
             {variants.map((v, i) => (
               <div className="variant-row" key={i}>
@@ -398,11 +446,18 @@ export default function ItemEditor({
                 </button>
               </div>
             ))}
-          </div>
+          </EditorSection>
 
           {modifierGroups.length > 0 && (
-            <div className="editor-block">
-              <div className="editor-block-head"><span>Modifier groups</span></div>
+            <EditorSection
+              title="Modifier groups"
+              summary={groupIds.length > 0
+                ? `${groupIds.length} selected`
+                : 'None selected'}
+              open={sectionOpen('modifiers')}
+              collapsible={narrow}
+              onToggle={() => toggleSection('modifiers')}
+            >
               <div className="group-checks">
                 {modifierGroups.map((g) => (
                   <label key={g.id} className="check-field">
@@ -423,7 +478,7 @@ export default function ItemEditor({
                 />
                 <span>Ask for modifiers as soon as the item is added</span>
               </label>
-            </div>
+            </EditorSection>
           )}
 
           {!isNew && (

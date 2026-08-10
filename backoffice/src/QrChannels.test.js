@@ -189,6 +189,8 @@ describe('QR-меню: настройки на месте', () => {
 describe('Брони: настройки на месте', () => {
   it('канал брони выключается тумблером', () => {
     assert.match(renderReserve(), /Reservations are open/)
+    assert.match(renderReserve({ blockerCount: 2 }), /Enabled — setup incomplete/)
+    assert.doesNotMatch(renderReserve({ blockerCount: 2 }), /Reservations are open/)
     const off = renderReserve({ settings: { reservations: { enabled: false } } })
     assert.match(off, /Reservations are paused/)
     assert.match(off, /the guest page tells visitors reservations are closed/)

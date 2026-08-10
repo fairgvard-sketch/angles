@@ -27,6 +27,7 @@ export default function BookingForm({
   const [at, setAt] = useState(() => toLocalInput(Date.now() + 60 * 60_000, tz))
   const [note, setNote] = useState('')
   const [picked, setPicked] = useState([])
+  const [manualTables, setManualTables] = useState(false)
   const [busy, setBusy] = useState(false)
   const [error, setError] = useState('')
   // Ошибка поля живёт рядом с полем: «Enter the guest name» под кнопкой
@@ -204,39 +205,50 @@ export default function BookingForm({
             type="button"
             className={`table-choice table-choice-auto${picked.length === 0 ? ' is-active' : ''}`}
             aria-pressed={picked.length === 0}
-            onClick={() => { setPicked([]); clearConflict() }}
+            onClick={() => { setPicked([]); setManualTables(false); clearConflict() }}
           >
             <strong>Automatic</strong>
             <small>Best available table</small>
           </button>
-          <div className="booking-table-groups">
-            {tableGroups.map((group) => (
-              <section className="booking-table-group" key={group.id}>
-                <span className="booking-zone-name">{group.name}</span>
-                <div className="booking-table-pick">
-                  {group.tables.map((table) => (
-                    <button
-                      key={table.id}
-                      type="button"
-                      className={`table-choice${picked.includes(table.id) ? ' is-active' : ''}`}
-                      aria-pressed={picked.includes(table.id)}
-                      onClick={() => {
-                        setPicked((cur) => (
-                          cur.includes(table.id)
-                            ? cur.filter((id) => id !== table.id)
-                            : [...cur, table.id]
-                        ))
-                        clearConflict()
-                      }}
-                    >
-                      <strong>{table.label}</strong>
-                      <small>{table.seats} seats</small>
-                    </button>
-                  ))}
-                </div>
-              </section>
-            ))}
-          </div>
+          <button
+            type="button"
+            className={`table-choice table-choice-manual${picked.length > 0 ? ' is-active' : ''}`}
+            aria-expanded={manualTables}
+            onClick={() => setManualTables((open) => !open)}
+          >
+            <strong>Choose tables manually</strong>
+            <small>{picked.length > 0 ? `${picked.length} selected` : 'Only when a specific table is needed'}</small>
+          </button>
+          {manualTables && (
+            <div className="booking-table-groups">
+              {tableGroups.map((group) => (
+                <section className="booking-table-group" key={group.id}>
+                  <span className="booking-zone-name">{group.name}</span>
+                  <div className="booking-table-pick">
+                    {group.tables.map((table) => (
+                      <button
+                        key={table.id}
+                        type="button"
+                        className={`table-choice${picked.includes(table.id) ? ' is-active' : ''}`}
+                        aria-pressed={picked.includes(table.id)}
+                        onClick={() => {
+                          setPicked((cur) => (
+                            cur.includes(table.id)
+                              ? cur.filter((id) => id !== table.id)
+                              : [...cur, table.id]
+                          ))
+                          clearConflict()
+                        }}
+                      >
+                        <strong>{table.label}</strong>
+                        <small>{table.seats} seats</small>
+                      </button>
+                    ))}
+                  </div>
+                </section>
+              ))}
+            </div>
+          )}
         </div>
 
         {error && <p className="form-error" role="alert">{error}</p>}
@@ -252,7 +264,7 @@ export default function BookingForm({
                   {conflict.tables.slice(0, 6).map((table) => (
                     <Button
                       key={table.id}
-                      onClick={() => { setPicked([table.id]); clearConflict() }}
+                      onClick={() => { setPicked([table.id]); setManualTables(true); clearConflict() }}
                     >
                       {table.label} · {table.seats} seats
                     </Button>

@@ -60,9 +60,9 @@ export default function ReservationsDesk({
   const knownIds = useRef(new Set())
 
   /*
-   * День и поиск принадлежат разделу, а не одной вкладке: полотно,
-   * список и лист ожидания отвечают на вопросы про ОДИН день, и
-   * переключение вкладки не должно возвращать хостес в «сегодня».
+   * День и поиск принадлежат трём рабочим видам: полотно, список и лист
+   * ожидания отвечают на вопросы про ОДИН день. Настройка зала и отчёт
+   * не наследуют эту строку — там дата, поиск и создание визита лишние.
    *
    * День живёт в адресе (`?d=`), поиск — нет: ссылку присылают на день,
    * а не на набранную в поле строку.
@@ -71,6 +71,7 @@ export default function ReservationsDesk({
   const day = date || today
   const setDay = (next) => onDateChange?.(next === today ? null : next)
   const [query, setQuery] = useState('')
+  const worksWithDay = view === 'timeline' || view === 'list' || view === 'waitlist'
 
   useEffect(() => {
     if (!locationId) return
@@ -145,57 +146,61 @@ export default function ReservationsDesk({
         Гость по телефону и гость с улицы — обычная работа хостес, а не
         повод идти к кассе, поэтому оба действия стоят здесь.
       */}
-      <div className="rsv-header">
+      <div className={`rsv-header${worksWithDay ? '' : ' is-contextual'}`}>
         <h1>Reservations</h1>
 
-        <div className="rsv-daynav">
-          <IconButton label="Previous day" onClick={() => setDay(shiftDate(day, -1))}>
-            <ChevronLeft />
-          </IconButton>
-          <input
-            type="date"
-            aria-label="Reservations day"
-            value={day}
-            onChange={(e) => e.target.value && setDay(e.target.value)}
-          />
-          <IconButton label="Next day" onClick={() => setDay(shiftDate(day, 1))}>
-            <ChevronRight />
-          </IconButton>
-          {/* «Today» — способ вернуться, а не подпись к дате. Когда в
-              селекторе и так сегодняшний день, кнопка ничего не сообщает
-              и только занимает место в рабочей строке. */}
-          {day !== today && (
-            <button type="button" className="rsv-today" onClick={() => setDay(today)}>
-              Today
-            </button>
-          )}
-        </div>
+        {worksWithDay && (
+          <>
+            <div className="rsv-daynav">
+              <IconButton label="Previous day" onClick={() => setDay(shiftDate(day, -1))}>
+                <ChevronLeft />
+              </IconButton>
+              <input
+                type="date"
+                aria-label="Reservations day"
+                value={day}
+                onChange={(e) => e.target.value && setDay(e.target.value)}
+              />
+              <IconButton label="Next day" onClick={() => setDay(shiftDate(day, 1))}>
+                <ChevronRight />
+              </IconButton>
+              {/* «Today» — способ вернуться, а не подпись к дате. Когда в
+                  селекторе и так сегодняшний день, кнопка ничего не сообщает
+                  и только занимает место в рабочей строке. */}
+              {day !== today && (
+                <button type="button" className="rsv-today" onClick={() => setDay(today)}>
+                  Today
+                </button>
+              )}
+            </div>
 
-        <SearchField
-          label="Search reservations"
-          value={query}
-          onChange={setQuery}
-          placeholder="Guest name or phone"
-        />
+            <SearchField
+              label="Search reservations"
+              value={query}
+              onChange={setQuery}
+              placeholder="Guest name or phone"
+            />
 
-        <div className="rsv-header-actions">
-          <button
-            type="button"
-            className="secondary-button"
-            disabled={!locationId}
-            onClick={() => setCreating('walk-in')}
-          >
-            <DoorOpen /> Walk-in
-          </button>
-          <button
-            type="button"
-            className="primary-button compact"
-            disabled={!locationId}
-            onClick={() => setCreating('booking')}
-          >
-            <Plus /> New reservation
-          </button>
-        </div>
+            <div className="rsv-header-actions">
+              <button
+                type="button"
+                className="secondary-button"
+                disabled={!locationId}
+                onClick={() => setCreating('walk-in')}
+              >
+                <DoorOpen /> Walk-in
+              </button>
+              <button
+                type="button"
+                className="primary-button compact"
+                disabled={!locationId}
+                onClick={() => setCreating('booking')}
+              >
+                <Plus /> New reservation
+              </button>
+            </div>
+          </>
+        )}
       </div>
 
       {/* Пять вкладок на 390px переносились в две строки, и активная
@@ -210,10 +215,10 @@ export default function ReservationsDesk({
 
       {error && <p className="form-error" role="alert">{error}</p>}
 
-      {/* Готовность к запуску — над всем остальным и только пока не
-          готово: ненастроенная точка не должна выглядеть работающей.
-          На аналитике не показываем: там нечего настраивать. */}
-      {locationId && view !== 'analytics' && (
+      {/* Чеклист относится к запуску публичной брони, а не к ежедневной
+          работе со списком, очередью или планом зала. На других вкладках
+          он уводил рабочий экран ниже первого экрана телефона. */}
+      {locationId && view === 'timeline' && (
         <LaunchChecklist
           locationId={locationId}
           locationSlug={slug}

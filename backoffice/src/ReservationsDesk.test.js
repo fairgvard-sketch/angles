@@ -84,6 +84,17 @@ describe('раздел броней', () => {
     assert.match(broken, /aria-selected="true"[^>]*>Timeline/)
   })
 
+  it('настройка зала и аналитика не наследуют рабочую строку дня', () => {
+    for (const tab of ['floor', 'analytics']) {
+      const html = render({ tab })
+      assert.match(html, /<h1>Reservations<\/h1>/)
+      assert.doesNotMatch(html, /aria-label="Reservations day"/)
+      assert.doesNotMatch(html, /Search reservations/)
+      assert.doesNotMatch(html, />Walk-in</)
+      assert.doesNotMatch(html, />New reservation</)
+    }
+  })
+
   it('полотно на загрузке держит геометрию, а не схлопывается в строку', () => {
     const html = render()
     assert.match(html, /timeline-skeleton/)

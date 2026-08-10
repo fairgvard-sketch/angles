@@ -776,7 +776,7 @@ function ItemsTable({
             {reorderable && <th scope="col" className="cat-col-order">Order</th>}
             <th scope="col" className="cat-col-thumb"><span className="visually-hidden">Photo</span></th>
             <th scope="col">Item</th>
-            <th scope="col">Category</th>
+            <th scope="col" className="cat-col-category">Category</th>
             <th scope="col" className={SECONDARY}>SKU</th>
             <th scope="col" className="cat-col-price">Price</th>
             <th scope="col">Availability</th>
@@ -823,7 +823,7 @@ function ItemsTable({
                     {item.name}
                   </button>
                 </td>
-                <td className="cat-cell-muted">{catNames.get(item.category_id) ?? 'Uncategorised'}</td>
+                <td className="cat-cell-muted cat-col-category">{catNames.get(item.category_id) ?? 'Uncategorised'}</td>
                 <td className={`${SECONDARY} cat-cell-sku`}>{item.sku || '—'}</td>
                 <td className="cat-col-price">
                   {priceLabel(item, money)}

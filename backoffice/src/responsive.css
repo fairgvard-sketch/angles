@@ -225,6 +225,96 @@ button[aria-busy='true'] {
   height: var(--bo-control);
 }
 
+.rsv-header.is-contextual {
+  margin-bottom: 12px;
+}
+
+.rsv-view-intro {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 16px;
+  margin: 18px 0 12px;
+}
+
+.rsv-view-intro h2 {
+  margin: 0;
+  font-size: 20px;
+  line-height: 1.2;
+}
+
+.rsv-view-intro p {
+  margin: 4px 0 0;
+  color: var(--c-text-muted);
+  font-size: 13px;
+}
+
+.table-choice-manual {
+  width: 100%;
+  min-height: 50px;
+  margin-top: 8px;
+  padding-inline: 12px;
+}
+
+.cat-form-section-body {
+  display: grid;
+  gap: 10px;
+}
+
+.cat-form-section-toggle {
+  min-width: 0;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 0;
+  border: 0;
+  background: transparent;
+  color: var(--c-text);
+  font: inherit;
+  text-align: start;
+}
+
+.cat-form-section-toggle small {
+  color: var(--c-text-subtle);
+  font-size: 12px;
+  font-weight: 500;
+}
+
+.cat-form-section-toggle svg {
+  width: 16px;
+  height: 16px;
+  flex: none;
+  color: var(--c-icon-faint);
+  transition: transform 120ms ease;
+}
+
+.cat-form-section.is-open .cat-form-section-toggle svg {
+  transform: rotate(180deg);
+}
+
+.hrs-total {
+  display: grid;
+  justify-items: end;
+  gap: 2px;
+}
+
+.hrs-total strong {
+  color: var(--c-text-2);
+  font-size: 13px;
+}
+
+.hrs-total span {
+  color: var(--c-text-subtle);
+  font-size: 11px;
+}
+
+.hrs-format-note {
+  margin: -4px 0 12px;
+  color: var(--c-text-muted);
+  font-size: 12px;
+  line-height: 1.45;
+}
+
 .timeline-filter-button {
   height: var(--bo-control);
 }
@@ -460,6 +550,24 @@ button[aria-busy='true'] {
   }
 }
 
+/* A tablet gets the useful catalogue columns without requiring a sideways
+   swipe. SKU and station are already secondary; category also lives in the
+   item card and gives its space to price, availability and status here. */
+@media (min-width: 721px) and (max-width: 1024px) {
+  .cat-table .cat-col-category {
+    display: none;
+  }
+
+  .cat-table th,
+  .cat-table td {
+    padding-inline: 10px;
+  }
+
+  .cat-open {
+    max-width: 210px;
+  }
+}
+
 /* ── Phone ───────────────────────────────────────────────── */
 @media (max-width: 720px) {
   :root { --bo-page-pad: 16px; }
@@ -565,6 +673,18 @@ button[aria-busy='true'] {
   .rsv-header-actions {
     width: 100%;
     min-width: 0;
+  }
+
+  .rsv-header.is-contextual {
+    display: block;
+  }
+
+  .rsv-view-intro {
+    margin-top: 14px;
+  }
+
+  .rsv-view-intro h2 {
+    font-size: 18px;
   }
 
   .rsv-daynav {
@@ -684,6 +804,98 @@ button[aria-busy='true'] {
 
   .cat-toolbar-modifiers > .cat-toolbar-meta {
     justify-content: flex-end;
+  }
+
+  /* Basic item data stays visible. Photo, sizes and modifiers are optional
+     steps and open only when the owner needs them. */
+  .cat-form-section {
+    padding: 0;
+    gap: 0;
+    overflow: hidden;
+  }
+
+  .cat-form-section .editor-block-head {
+    min-height: 52px;
+    padding: 0 12px;
+  }
+
+  .cat-form-section-toggle {
+    flex: 1 1 auto;
+    min-height: 52px;
+  }
+
+  .cat-form-section-toggle > span {
+    flex: 1 1 auto;
+  }
+
+  .cat-form-section-body {
+    padding: 0 12px 12px;
+  }
+
+  .hrs-total {
+    justify-items: start;
+  }
+
+  .hrs-format-note {
+    margin-top: 0;
+  }
+
+  .tm-mobile-access {
+    display: grid;
+    gap: 8px;
+    margin-bottom: 12px;
+  }
+
+  .tm-mobile-access > button {
+    width: 100%;
+    min-height: 58px;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 12px;
+    padding: 8px 14px;
+    border: 1px solid var(--c-border-panel);
+    border-radius: var(--r-md);
+    background: var(--c-surface);
+    color: var(--c-text);
+    font: inherit;
+    text-align: start;
+  }
+
+  .tm-mobile-access > button[aria-expanded='true'] {
+    border-color: var(--c-ink);
+    background: var(--c-surface-muted);
+  }
+
+  .tm-mobile-access span {
+    min-width: 0;
+    display: grid;
+    gap: 2px;
+  }
+
+  .tm-mobile-access strong {
+    font-size: 14px;
+  }
+
+  .tm-mobile-access small {
+    color: var(--c-text-muted);
+    font-size: 12px;
+  }
+
+  .tm-mobile-access svg {
+    width: 18px;
+    height: 18px;
+    flex: none;
+    transition: transform 120ms ease;
+  }
+
+  .tm-mobile-access > button[aria-expanded='true'] svg {
+    transform: rotate(90deg);
+  }
+
+  .settings-topic-tabs button,
+  .product-row .text-button {
+    min-height: var(--bo-touch);
   }
 
   .form-panel > .panel-heading {

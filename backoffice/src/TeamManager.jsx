@@ -1082,8 +1082,17 @@ function PeopleAndAccess({
   const permsRef = useRef(null)
   const rolesRef = useRef(null)
   const focused = useRef(null)
+  const [mobileAccess, setMobileAccess] = useState(() => (
+    focus === 'roles' ? 'roles' : (focus === 'access' || focus === 'perms' ? 'permissions' : null)
+  ))
 
   const ready = staff !== null && roles !== null
+
+  useEffect(() => {
+    if (!narrow || !focus) return
+    if (focus === 'roles') setMobileAccess('roles')
+    if (focus === 'access' || focus === 'perms') setMobileAccess('permissions')
+  }, [focus, narrow])
 
   /*
    * Прежний адрес ведёт к своей секции.
@@ -1096,11 +1105,11 @@ function PeopleAndAccess({
   useEffect(() => {
     if (!focus || !ready || focused.current === focus) return
     const target = { access: permsRef, perms: permsRef, roles: rolesRef }[focus]?.current
-    focused.current = focus
     if (!target) return
+    focused.current = focus
     target.scrollIntoView({ block: 'start', behavior: scrollBehavior() })
     target.focus({ preventScroll: true })
-  }, [focus, ready])
+  }, [focus, ready, mobileAccess])
 
   return (
     <>
@@ -1122,23 +1131,49 @@ function PeopleAndAccess({
       {locations.length === 0 ? (
         <EmptyState>No locations are linked to this account.</EmptyState>
       ) : (
-        <div className="tm-access-grid">
-          <RolesPanel
-            roles={roles}
-            staff={staff}
-            narrow={narrow}
-            sectionRef={rolesRef}
-            onOpen={setEditing}
-          />
-          <PermissionsPanel
-            locations={locations}
-            roles={roles}
-            staff={staff}
-            settingsByLocation={settingsByLocation}
-            sectionRef={permsRef}
-            onSettingsChanged={onSettingsChanged}
-          />
-        </div>
+        <>
+          {narrow && (
+            <div className="tm-mobile-access" aria-label="Roles and access settings">
+              <button
+                type="button"
+                aria-expanded={mobileAccess === 'roles'}
+                onClick={() => setMobileAccess((current) => current === 'roles' ? null : 'roles')}
+              >
+                <span><strong>Custom roles</strong><small>{roles?.length ?? 0} configured</small></span>
+                <ChevronRight aria-hidden />
+              </button>
+              <button
+                type="button"
+                aria-expanded={mobileAccess === 'permissions'}
+                onClick={() => setMobileAccess((current) => current === 'permissions' ? null : 'permissions')}
+              >
+                <span><strong>Default access</strong><small>{PERM_KEYS.length} actions per location</small></span>
+                <ChevronRight aria-hidden />
+              </button>
+            </div>
+          )}
+          <div className="tm-access-grid">
+            {(!narrow || mobileAccess === 'roles') && (
+              <RolesPanel
+                roles={roles}
+                staff={staff}
+                narrow={narrow}
+                sectionRef={rolesRef}
+                onOpen={setEditing}
+              />
+            )}
+            {(!narrow || mobileAccess === 'permissions') && (
+              <PermissionsPanel
+                locations={locations}
+                roles={roles}
+                staff={staff}
+                settingsByLocation={settingsByLocation}
+                sectionRef={permsRef}
+                onSettingsChanged={onSettingsChanged}
+              />
+            )}
+          </div>
+        </>
       )}
 
       {editing && (

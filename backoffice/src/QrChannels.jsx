@@ -1351,7 +1351,10 @@ function AddressField({ override, businessAddress, onChange }) {
   )
 }
 
-export function ReserveTab({ locationId, settings, patch, slug, tz, businessAddress, url, openGroup, onOpenGroup }) {
+export function ReserveTab({
+  locationId, settings, patch, slug, tz, businessAddress, url,
+  openGroup, onOpenGroup, blockerCount = 0,
+}) {
   const enabled = reservationsEnabled(settings)
   const rsv = settings.reservations || {}
   const instant = rsv.instant === true
@@ -1374,7 +1377,7 @@ export function ReserveTab({ locationId, settings, patch, slug, tz, businessAddr
         title="Table reservations"
         enabled={enabled}
         onToggle={(v) => patch({ enabled: v })}
-        onLabel="Reservations are open"
+        onLabel={blockerCount > 0 ? 'Enabled — setup incomplete' : 'Reservations are open'}
         offLabel="Reservations are paused"
         url={url}
         qrUrl={reserveUrl(locationId, slug, 'qr')}
@@ -1752,6 +1755,15 @@ export default function QrChannels({ context, locationId, tab: tabFromUrl, onTab
   // Адрес гостевой страницы считается один раз на экран: его показывает
   // шапка канала И грузит превью, и разойтись они не имеют права.
   const guestUrl = tab === 'online' ? orderUrl(activeId, slug) : reserveUrl(activeId, slug)
+  const blockers = tab === 'online'
+    ? menuBlockers({
+      categories: catalogue?.categories,
+      items: catalogue?.items,
+      locationId: activeId,
+      tables,
+      settings: settings?.online_orders,
+    })
+    : reserveBlockers(checklist)
   // Каталог редактируется в своём разделе. Ярлык показываем только
   // тому, у кого этот раздел вообще есть: ссылка в никуда хуже её
   // отсутствия.
@@ -1808,15 +1820,7 @@ export default function QrChannels({ context, locationId, tab: tabFromUrl, onTab
                 страницы, на которой гостю нечего заказать. */}
             <ChannelBlockers
               channel={tab}
-              blockers={tab === 'online'
-                ? menuBlockers({
-                  categories: catalogue?.categories,
-                  items: catalogue?.items,
-                  locationId: activeId,
-                  tables,
-                  settings: settings.online_orders,
-                })
-                : reserveBlockers(checklist)}
+              blockers={blockers}
               onGo={(action) => {
                 // Блокер ведёт либо в другой раздел, либо в группу
                 // настроек этого же экрана — второе не должно уводить
@@ -1857,6 +1861,7 @@ export default function QrChannels({ context, locationId, tab: tabFromUrl, onTab
                 url={guestUrl}
                 openGroup={openGroup}
                 onOpenGroup={setOpenGroup}
+                blockerCount={blockers.length}
               />
             )}
           </div>

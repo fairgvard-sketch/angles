@@ -379,7 +379,7 @@ export default function HomeDashboard({ context, locationId, onNavigate, childre
             {can('orders_desk') && orders && (
               <Panel
                 title="Orders"
-                actions={<Button variant="text" onClick={() => onNavigate('orders')}>Open <ChevronRight /></Button>}
+                actions={<Button variant="text" onClick={() => onNavigate('orders')}>View orders <ChevronRight /></Button>}
               >
                 <div className="data-list">
                   <div className="data-row">
@@ -399,7 +399,7 @@ export default function HomeDashboard({ context, locationId, onNavigate, childre
             {can('reservations_desk') && bookings && (
               <Panel
                 title="Reservations"
-                actions={<Button variant="text" onClick={() => onNavigate('reservations')}>Open <ChevronRight /></Button>}
+                actions={<Button variant="text" onClick={() => onNavigate('reservations')}>View timeline <ChevronRight /></Button>}
               >
                 {bookings.upcoming.length === 0 ? (
                   <EmptyState>
@@ -437,7 +437,7 @@ export default function HomeDashboard({ context, locationId, onNavigate, childre
             {can('pos_operate') && fleet && (
               <Panel
                 title="Devices"
-                actions={<Button variant="text" onClick={() => onNavigate('devices')}>Open <ChevronRight /></Button>}
+                actions={<Button variant="text" onClick={() => onNavigate('devices')}>Manage devices <ChevronRight /></Button>}
               >
                 <div className="data-list">
                   <div className="data-row">
@@ -472,7 +472,7 @@ export default function HomeDashboard({ context, locationId, onNavigate, childre
             {data?.channels && (
               <Panel
                 title="Online channels"
-                actions={<Button variant="text" onClick={() => onNavigate('online')}>Open <ChevronRight /></Button>}
+                actions={<Button variant="text" onClick={() => onNavigate('online')}>Manage channels <ChevronRight /></Button>}
               >
                 <div className="data-list">
                   {can('online_orders') && (

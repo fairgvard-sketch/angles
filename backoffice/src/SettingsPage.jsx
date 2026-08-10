@@ -97,7 +97,7 @@ function BusinessTab({ context, onNavigate }) {
                   className="text-button"
                   onClick={() => onNavigate?.('locations', l.id, 'details')}
                 >
-                  Open settings
+                  Configure {l.name}
                 </button>
               </div>
             ))}

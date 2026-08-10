@@ -185,6 +185,12 @@ export default function ReserveAnalytics({ locations }) {
 
   return (
     <>
+      <div className="rsv-view-intro">
+        <div>
+          <h2>Reservation performance</h2>
+          <p>Demand, conversion and completed visits for the selected period.</p>
+        </div>
+      </div>
       <div className="overview-toolbar">
         {/* Последняя самодельная полоса вкладок в кабинете — на общий
             примитив: стрелки, Home/End и одна точка входа в группу. */}
