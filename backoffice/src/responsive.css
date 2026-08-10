@@ -708,7 +708,7 @@ button[aria-busy='true'] {
   .rsv-daynav {
     display: grid;
     grid-template-columns: var(--bo-touch) minmax(0, 1fr) var(--bo-touch) auto;
-    gap: 6px;
+    column-gap: 8px;
   }
 
   .rsv-daynav input[type='date'],
@@ -719,6 +719,14 @@ button[aria-busy='true'] {
   }
 
   .rsv-daynav input[type='date'] {
+    /* iOS Safari can keep the native date field's intrinsic width when
+       `width: 100%` is used inside a minmax grid track. It then spills into
+       the next cell and the Next button appears on top of the field. `auto`
+       lets grid stretching define the used width without that intrinsic
+       overflow. */
+    width: auto;
+    max-width: 100%;
+    justify-self: stretch;
     min-width: 0;
     font-size: 16px;
   }

@@ -1147,7 +1147,13 @@ describe('responsive control foundation', { skip }, () => {
     const state = await page.evaluate(() => {
       const boxes = (selector) => [...document.querySelectorAll(selector)].map((element) => {
         const box = element.getBoundingClientRect()
-        return { width: Math.round(box.width), height: Math.round(box.height), y: Math.round(box.y) }
+        return {
+          width: Math.round(box.width),
+          height: Math.round(box.height),
+          x: Math.round(box.x),
+          right: Math.round(box.right),
+          y: Math.round(box.y),
+        }
       })
       return {
         overflow: document.documentElement.scrollWidth - document.documentElement.clientWidth,
@@ -1161,6 +1167,12 @@ describe('responsive control foundation', { skip }, () => {
 
     assert.equal(state.overflow, 0)
     assert.ok(state.day.every((box) => box.height === 44), 'вся строка даты — ровно 44px')
+    for (let index = 0; index < state.day.length - 1; index += 1) {
+      assert.ok(
+        state.day[index].right < state.day[index + 1].x,
+        `элементы даты ${index} и ${index + 1} не должны пересекаться`,
+      )
+    }
     assert.deepEqual(state.actions.map((box) => box.height), [44, 44])
     assert.ok(Math.abs(state.actions[0].width - state.actions[1].width) <= 1)
     assert.equal(state.zones[0].width, state.controls[0].width, 'зоны занимают полную строку')
