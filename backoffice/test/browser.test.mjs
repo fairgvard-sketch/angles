@@ -26,7 +26,10 @@ const HTML = (script) => `<!doctype html><html><head><meta charset="utf-8">
 <style>.tall{height:1800px}</style></head>
 <body><div id="root"></div><script type="module">${script}</script></body></html>`
 
-const STYLES = readFileSync(new URL('../src/styles.css', import.meta.url), 'utf8')
+const STYLES = [
+  readFileSync(new URL('../src/styles.css', import.meta.url), 'utf8'),
+  readFileSync(new URL('../src/responsive.css', import.meta.url), 'utf8'),
+].join('\n')
 
 /**
  * Подставная гостевая страница: делает ровно то, из-за чего кабинет
@@ -454,6 +457,60 @@ before(async () => {
               </label>
             </FormDialog>
           )}
+        </main>
+      )
+    }
+    createRoot(document.getElementById('root')).render(<Page />)
+  `)
+
+  await bundle('responsive-workflows', `
+    import { createRoot } from 'react-dom/client'
+
+    function Page() {
+      return (
+        <main className="content">
+          <div className="rsv-header">
+            <h1>Reservations</h1>
+            <div className="rsv-daynav">
+              <button className="icon-button" aria-label="Previous day">‹</button>
+              <input type="date" aria-label="Reservations day" defaultValue="2026-08-09" />
+              <button className="icon-button" aria-label="Next day">›</button>
+              <button className="rsv-today">Today</button>
+            </div>
+            <label className="order-search">
+              <span className="visually-hidden">Search reservations</span>
+              <input aria-label="Search reservations" />
+            </label>
+            <div className="rsv-header-actions">
+              <button className="secondary-button">Walk-in</button>
+              <button className="primary-button compact">New reservation</button>
+            </div>
+          </div>
+
+          <section className="panel form-panel timeline-panel">
+            <div className="timeline-controls">
+              <div className="timeline-zones" aria-label="Zone filter">
+                <button className="timeline-filter-button is-active">All zones</button>
+                <button className="timeline-filter-button">Terrace</button>
+                <button className="timeline-filter-button">Street</button>
+                <button className="timeline-filter-button">Veranda</button>
+              </div>
+              <div className="timeline-pan" aria-label="Move through timeline">
+                <button className="text-button">Earlier</button>
+                <button className="text-button">Later</button>
+                <button className="icon-button" aria-label="Refresh timeline">↻</button>
+              </div>
+            </div>
+            <div className="timeline-guide">
+              <div className="timeline-legend">
+                <span><i className="is-pending" />Pending</span>
+                <span><i className="is-confirmed" />Confirmed</span>
+                <span><i className="is-arrived" />Seated</span>
+                <span><i className="is-done" />Completed</span>
+                <span><i className="is-conflict" />Conflict</span>
+              </div>
+            </div>
+          </section>
         </main>
       )
     }
@@ -983,6 +1040,133 @@ describe('mobile navigation drawer', { skip }, () => {
     assert.equal(after.open, false)
     assert.equal(after.marker, 'kept', 'сайдбар не должен пересоздаваться при смене раздела')
     assert.equal(after.current, 'Catalogue', 'текущий раздел объявлен как aria-current')
+    await page.close()
+  })
+
+  it('на планшете меню остаётся боковой панелью с подложкой', async () => {
+    const page = await browser.newPage()
+    await page.setViewport({ width: 768, height: 1024 })
+    await page.goto(`${appOrigin}/shell`, { waitUntil: 'networkidle0' })
+    await page.click('.mobile-menu')
+    await page.waitForFunction(() => document.querySelector('.sidebar')?.classList.contains('is-open'))
+
+    const state = await page.evaluate(() => {
+      const sidebar = document.querySelector('.sidebar').getBoundingClientRect()
+      const scrim = document.querySelector('.drawer-scrim')
+      return {
+        sidebarWidth: Math.round(sidebar.width),
+        viewportWidth: window.innerWidth,
+        scrimVisible: getComputedStyle(scrim).display !== 'none',
+        scrimStartsBehindPanel: Math.round(scrim.getBoundingClientRect().width) === window.innerWidth,
+        overflow: document.documentElement.scrollWidth - document.documentElement.clientWidth,
+      }
+    })
+
+    assert.ok(state.sidebarWidth < state.viewportWidth, 'планшет не должен получать пустую полноэкранную шторку')
+    assert.ok(state.sidebarWidth >= 320, 'панель должна оставаться удобной для чтения')
+    assert.ok(state.scrimVisible, 'контекст страницы за панелью отделён подложкой')
+    assert.ok(state.scrimStartsBehindPanel)
+    assert.equal(state.overflow, 0)
+    await page.close()
+  })
+})
+
+describe('responsive control foundation', { skip }, () => {
+  async function measure(viewport) {
+    const page = await browser.newPage()
+    await page.setViewport(viewport)
+    await page.goto(`${appOrigin}/form-dialog`, { waitUntil: 'networkidle0' })
+    await page.waitForSelector('.form-dialog')
+    const result = await page.evaluate(() => {
+      const rect = (selector) => {
+        const element = document.querySelector(selector)
+        const box = element.getBoundingClientRect()
+        return { height: Math.round(box.height), width: Math.round(box.width) }
+      }
+      const field = document.querySelector('.qr-field input')
+      return {
+        primary: rect('.form-dialog .primary-button'),
+        secondary: rect('.form-dialog .secondary-button'),
+        field: rect('.qr-field input'),
+        fieldFont: parseFloat(getComputedStyle(field).fontSize),
+        overflow: document.documentElement.scrollWidth - document.documentElement.clientWidth,
+      }
+    })
+    await page.close()
+    return result
+  }
+
+  it('на десктопе действия рабочие, а не размером с промо-CTA', async () => {
+    const state = await measure({ width: 1440, height: 900 })
+    assert.ok(state.primary.height <= 40, `primary раздута до ${state.primary.height}px`)
+    assert.ok(state.secondary.height <= 40, `secondary раздута до ${state.secondary.height}px`)
+    assert.equal(state.field.height, 40)
+    assert.equal(state.overflow, 0)
+  })
+
+  it('на телефоне кнопки и поле остаются целями 44px без iOS zoom', async () => {
+    const state = await measure({ width: 390, height: 740, hasTouch: true, isMobile: true })
+    assert.ok(state.primary.height >= 44)
+    assert.ok(state.secondary.height >= 44)
+    assert.ok(state.field.height >= 44)
+    assert.ok(state.fieldFont >= 16)
+    assert.equal(state.overflow, 0)
+  })
+
+  it('бронь на телефоне держит одинаковые кнопки и не выталкивает экран', async () => {
+    const page = await browser.newPage()
+    await page.setViewport({ width: 390, height: 844, hasTouch: true, isMobile: true })
+    await page.goto(`${appOrigin}/responsive-workflows`, { waitUntil: 'networkidle0' })
+    const state = await page.evaluate(() => {
+      const boxes = (selector) => [...document.querySelectorAll(selector)].map((element) => {
+        const box = element.getBoundingClientRect()
+        return { width: Math.round(box.width), height: Math.round(box.height), y: Math.round(box.y) }
+      })
+      return {
+        overflow: document.documentElement.scrollWidth - document.documentElement.clientWidth,
+        day: boxes('.rsv-daynav > *'),
+        actions: boxes('.rsv-header-actions > button'),
+        controls: boxes('.timeline-controls'),
+        zones: boxes('.timeline-zones'),
+        pan: boxes('.timeline-pan > button'),
+      }
+    })
+
+    assert.equal(state.overflow, 0)
+    assert.ok(state.day.every((box) => box.height === 44), 'вся строка даты — ровно 44px')
+    assert.deepEqual(state.actions.map((box) => box.height), [44, 44])
+    assert.ok(Math.abs(state.actions[0].width - state.actions[1].width) <= 1)
+    assert.equal(state.zones[0].width, state.controls[0].width, 'зоны занимают полную строку')
+    assert.deepEqual(state.pan.map((box) => box.height), [44, 44, 44])
+    assert.ok(Math.abs(state.pan[0].width - state.pan[1].width) <= 1)
+
+    await page.setViewport({ width: 320, height: 720, hasTouch: true, isMobile: true })
+    const narrow = await page.evaluate(() => ({
+      overflow: document.documentElement.scrollWidth - document.documentElement.clientWidth,
+      actions: [...document.querySelectorAll('.rsv-header-actions > button')].map((element) => (
+        Math.round(element.getBoundingClientRect().width)
+      )),
+    }))
+    assert.equal(narrow.overflow, 0, 'даже 320px не получает боковую прокрутку')
+    assert.ok(narrow.actions.every((width) => width > 0), 'обе кнопки остаются видимыми')
+    await page.close()
+  })
+
+  it('на планшете зоны и навигация таймлайна стоят отдельными рядами', async () => {
+    const page = await browser.newPage()
+    await page.setViewport({ width: 768, height: 1024, hasTouch: true })
+    await page.goto(`${appOrigin}/responsive-workflows`, { waitUntil: 'networkidle0' })
+    const state = await page.evaluate(() => {
+      const zones = document.querySelector('.timeline-zones').getBoundingClientRect()
+      const pan = document.querySelector('.timeline-pan').getBoundingClientRect()
+      return {
+        zonesBottom: Math.round(zones.bottom),
+        panTop: Math.round(pan.top),
+        overflow: document.documentElement.scrollWidth - document.documentElement.clientWidth,
+      }
+    })
+    assert.ok(state.panTop >= state.zonesBottom, 'панель времени не сжимает фильтр зон')
+    assert.equal(state.overflow, 0)
     await page.close()
   })
 })

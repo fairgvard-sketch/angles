@@ -161,7 +161,10 @@ before(async () => {
     logLevel: 'silent',
   })
   const js = bundle.outputFiles[0].text
-  const css = readFileSync(new URL('../src/styles.css', import.meta.url), 'utf8')
+  const css = [
+    readFileSync(new URL('../src/styles.css', import.meta.url), 'utf8'),
+    readFileSync(new URL('../src/responsive.css', import.meta.url), 'utf8'),
+  ].join('\n')
   const html = `<!doctype html><html lang="en"><head><meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1"><style>${css}</style></head>
 <body><div id="root"></div><script type="module">${js}</script></body></html>`
@@ -204,6 +207,36 @@ async function setNumber(handle, value) {
   await handle.evaluate((el) => el.select())
   await handle.type(value)
 }
+
+describe('каталог: мобильная панель модификаторов', { skip }, () => {
+  it('фильтры образуют две ровные колонки и не растягивают экран', async () => {
+    const page = await open('modifiers', 390)
+    const state = await page.evaluate(() => {
+      const controls = [...document.querySelectorAll(
+        '.cat-toolbar-modifiers > .cat-select-filter, .cat-toolbar-modifiers > .cat-chip, .cat-toolbar-modifiers > .cat-toolbar-meta'
+      )].map((element) => {
+        const box = element.getBoundingClientRect()
+        return { width: Math.round(box.width), height: Math.round(box.height), x: Math.round(box.x) }
+      })
+      return {
+        controls,
+        overflow: document.documentElement.scrollWidth - document.documentElement.clientWidth,
+      }
+    })
+
+    assert.equal(state.overflow, 0)
+    assert.equal(state.controls.length, 4)
+    assert.ok(state.controls.every((box) => box.height === 44))
+    assert.ok(Math.abs(state.controls[0].width - state.controls[1].width) <= 1)
+    assert.ok(Math.abs(state.controls[2].width - state.controls[3].width) <= 1)
+
+    await page.setViewport({ width: 320, height: 720, hasTouch: true, isMobile: true })
+    assert.equal(await page.evaluate(
+      () => document.documentElement.scrollWidth - document.documentElement.clientWidth
+    ), 0, 'панель фильтров помещается и на 320px')
+    await page.close()
+  })
+})
 
 describe('каталог: панель позиции', { skip }, () => {
   it('открывается кнопкой на имени и держит таблицу на месте', async () => {

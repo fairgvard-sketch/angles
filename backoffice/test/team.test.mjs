@@ -191,7 +191,10 @@ before(async () => {
     logLevel: 'silent',
   })
   const js = bundle.outputFiles[0].text
-  const css = readFileSync(new URL('../src/styles.css', import.meta.url), 'utf8')
+  const css = [
+    readFileSync(new URL('../src/styles.css', import.meta.url), 'utf8'),
+    readFileSync(new URL('../src/responsive.css', import.meta.url), 'utf8'),
+  ].join('\n')
   const html = `<!doctype html><html lang="en"><head><meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1"><style>${css}</style></head>
 <body><div id="root"></div><script type="module">${js}</script></body></html>`

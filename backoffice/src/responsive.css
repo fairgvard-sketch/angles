@@ -1,0 +1,852 @@
+/*
+ * Back-office responsive foundation
+ * =================================
+ *
+ * `styles.css` contains the layouts that belong to individual workflows.
+ * This file is deliberately loaded last and owns the rules that must not
+ * change from page to page: density, control states, form rhythm, the shell
+ * and the three responsive modes (desktop, tablet and phone).
+ *
+ * Keeping this layer separate prevents a new feature from fixing a shared
+ * button or input locally and creating a fifth almost-identical size.
+ */
+
+:root {
+  --bo-content-max: 1400px;
+  --bo-sidebar: 232px;
+  --bo-page-pad: 32px;
+  --bo-control: 40px;
+  --bo-control-compact: 36px;
+  --bo-touch: 44px;
+  --bo-field-border: #c9cdd4;
+  --bo-field-hover: #aeb4bd;
+  --bo-disabled-bg: #f2f3f5;
+}
+
+/* Native controls otherwise inherit different fonts and colours in Safari. */
+button,
+input,
+select,
+textarea {
+  font: inherit;
+  letter-spacing: 0;
+}
+
+select,
+textarea,
+input {
+  color: var(--c-text);
+}
+
+/* ── Actions ─────────────────────────────────────────────── */
+.primary-button,
+.secondary-button,
+.text-button,
+.icon-button {
+  flex: 0 0 auto;
+  transition:
+    background-color 120ms ease,
+    border-color 120ms ease,
+    color 120ms ease,
+    box-shadow 120ms ease,
+    opacity 120ms ease;
+}
+
+.primary-button,
+.secondary-button {
+  height: var(--bo-control);
+  min-height: var(--bo-control);
+  padding: 0 14px;
+  border-radius: var(--r-md);
+  font-size: 14px;
+  font-weight: 680;
+  line-height: 1.15;
+  white-space: nowrap;
+}
+
+.primary-button {
+  min-height: var(--bo-control);
+  background: var(--c-ink);
+}
+
+.primary-button.compact,
+.secondary-button.compact {
+  min-height: var(--bo-control-compact);
+  height: var(--bo-control-compact);
+  padding-inline: 12px;
+  font-size: 13px;
+}
+
+.primary-button.narrow {
+  width: auto;
+  margin-top: 0;
+}
+
+.secondary-button {
+  border-color: var(--bo-field-border);
+  color: var(--c-text-2);
+}
+
+.secondary-button:hover:not(:disabled) {
+  border-color: var(--bo-field-hover);
+  background: var(--c-surface-muted);
+  color: var(--c-text);
+}
+
+.text-button {
+  min-height: 32px;
+  gap: 6px;
+  padding: 0 4px;
+  border-radius: var(--r-sm);
+  font-size: 13px;
+  text-decoration: none;
+}
+
+.icon-button {
+  width: var(--bo-control);
+  height: var(--bo-control);
+  min-width: var(--bo-control);
+  border-radius: var(--r-md);
+}
+
+.primary-button:disabled,
+.secondary-button:disabled,
+.text-button:disabled,
+.icon-button:disabled,
+button[aria-disabled='true'] {
+  cursor: not-allowed;
+  opacity: .52;
+}
+
+button[aria-busy='true'] {
+  cursor: progress;
+}
+
+.button-label {
+  min-width: 0;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+}
+
+.button-label > svg {
+  width: 16px;
+  height: 16px;
+  flex: none;
+}
+
+.button-spinner {
+  width: 14px;
+  height: 14px;
+  flex: none;
+  border: 2px solid currentColor;
+  border-inline-end-color: transparent;
+  border-radius: 50%;
+  animation: bo-button-spin .7s linear infinite;
+}
+
+@keyframes bo-button-spin {
+  to { transform: rotate(360deg); }
+}
+
+/* Authentication is the one flow where a deliberately large primary CTA
+   is useful; operational screens stay compact. */
+.auth-form .primary-button {
+  min-height: 54px;
+  font-size: 16px;
+}
+
+/* ── Shell and page rhythm ───────────────────────────────── */
+.app-shell {
+  grid-template-columns: var(--bo-sidebar) minmax(0, 1fr);
+}
+
+.sidebar {
+  padding: 18px 14px 14px;
+}
+
+.sidebar-top {
+  padding-inline: 8px;
+}
+
+.side-nav {
+  margin-top: 22px;
+}
+
+.side-nav-group {
+  margin-top: 14px;
+}
+
+.side-nav button {
+  min-height: 40px;
+  padding-inline: 10px;
+  border-radius: var(--r-md);
+}
+
+.topbar {
+  height: 64px;
+  padding-inline: var(--bo-page-pad);
+}
+
+.content {
+  width: min(var(--bo-content-max), 100%);
+  padding: 32px var(--bo-page-pad) 64px;
+}
+
+.page-heading,
+.ord-header,
+.cat-header,
+.rsv-header {
+  gap: 10px 12px;
+  margin-bottom: 20px;
+}
+
+.page-heading h1,
+.ord-header h1,
+.cat-header h1,
+.rsv-header h1 {
+  font-size: clamp(24px, 2vw, 28px);
+  line-height: 1.12;
+  letter-spacing: -.02em;
+}
+
+.page-heading-actions,
+.cat-header-actions,
+.rsv-header-actions {
+  min-width: 0;
+  flex-wrap: wrap;
+  justify-content: flex-end;
+}
+
+/* Operational controls keep one rhythm even when a page uses the compact
+   Button variant beside a regular secondary action. */
+.rsv-header-actions > button {
+  height: var(--bo-control);
+}
+
+.timeline-filter-button {
+  height: var(--bo-control);
+}
+
+.cat-toolbar-meta {
+  min-width: 0;
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 8px;
+}
+
+.cat-toolbar-meta .cat-count {
+  margin-inline-start: 0;
+}
+
+/* ── Panels, lists and tables ────────────────────────────── */
+.panel {
+  overflow-wrap: anywhere;
+  border-radius: var(--r-lg);
+}
+
+.panel-heading {
+  min-height: 64px;
+  padding: 16px 20px;
+}
+
+.panel-heading h2 {
+  font-size: 16px;
+  line-height: 1.25;
+}
+
+.panel-heading p {
+  max-width: 72ch;
+  font-size: 13px;
+  line-height: 1.4;
+}
+
+.form-panel {
+  padding: 22px 20px;
+}
+
+.data-row {
+  min-height: 48px;
+  padding-inline: 20px;
+}
+
+:where(
+  .rsv-table-scroll,
+  .sales-table-wrap,
+  .export-report-wrap,
+  .cat-table-wrap,
+  .cus-table-wrap,
+  .hrs-table-wrap
+) {
+  max-width: 100%;
+  overflow-x: auto;
+  overscroll-behavior-x: contain;
+  -webkit-overflow-scrolling: touch;
+}
+
+/* ── Forms ───────────────────────────────────────────────── */
+.settings-form,
+.drawer-form,
+.form-dialog-body {
+  gap: 16px;
+}
+
+.settings-form label,
+.qr-field {
+  gap: 6px;
+}
+
+.settings-form label > span,
+.qr-field > span {
+  color: var(--c-text-2);
+  font-size: 13px;
+  font-weight: 680;
+  line-height: 1.3;
+}
+
+.settings-form input,
+.qr-field input,
+.qr-field select,
+.date-range input,
+.hours-window input,
+.floor-add-options input,
+.floor-add-options select,
+.modal-body input:not([type='checkbox']):not([type='radio']),
+.modal-body select,
+.ord-select select,
+.cat-select-filter select,
+.act-select select,
+.cus-select select,
+.hrs-select select,
+.tm-select select {
+  min-height: var(--bo-control);
+  height: var(--bo-control);
+  border-color: var(--bo-field-border);
+  border-radius: var(--r-md);
+  background-color: var(--c-surface);
+}
+
+.qr-field textarea,
+.modal-body textarea {
+  min-height: 96px;
+  border-color: var(--bo-field-border);
+  border-radius: var(--r-md);
+  line-height: 1.45;
+}
+
+:where(input, select, textarea):hover:not(:disabled):not(:focus) {
+  border-color: var(--bo-field-hover);
+}
+
+:where(input, select, textarea):disabled {
+  cursor: not-allowed;
+  background: var(--bo-disabled-bg);
+  color: var(--c-text-muted);
+  opacity: 1;
+}
+
+:where(input, select, textarea)[aria-invalid='true'] {
+  border-color: var(--c-danger);
+  box-shadow: 0 0 0 1px rgb(180 69 60 / 12%);
+}
+
+.form-hint,
+.qr-field > small {
+  color: var(--c-text-muted);
+  font-size: 12px;
+  line-height: 1.45;
+}
+
+.form-error,
+.field-error {
+  margin: 0;
+  line-height: 1.4;
+}
+
+.form-actions,
+.order-actions,
+.booking-form-actions,
+.drawer-foot {
+  gap: 8px;
+}
+
+.form-actions {
+  margin-top: 4px;
+}
+
+/* Dialog actions keep the primary decision at the logical end. */
+.sheet .order-actions {
+  justify-content: flex-end;
+  margin-top: 6px;
+}
+
+.drawer-head {
+  min-height: 64px;
+  padding: 14px 16px;
+}
+
+.drawer-body {
+  padding: 16px;
+}
+
+.drawer-foot {
+  padding: 12px 16px;
+}
+
+.sheet {
+  gap: 12px;
+  padding: 20px;
+}
+
+/* ── Tablet: navigation is a side sheet, not a 100% blank wall ─── */
+@media (max-width: 1180px) {
+  :root { --bo-page-pad: 24px; }
+
+  .content {
+    padding-top: 28px;
+  }
+
+  .page-heading h1,
+  .ord-header h1,
+  .cat-header h1,
+  .rsv-header h1 {
+    font-size: 25px;
+  }
+}
+
+@media (min-width: 721px) and (max-width: 980px) {
+  .sidebar {
+    width: min(380px, 82vw);
+    border-inline-end: 1px solid var(--c-border-panel);
+    box-shadow: var(--shadow-pop);
+  }
+
+  .drawer-scrim {
+    position: fixed;
+    inset: 0;
+    z-index: 29;
+    display: block;
+    width: 100%;
+    height: 100%;
+    padding: 0;
+    border: 0;
+    border-radius: 0;
+    background: rgb(17 19 23 / 32%);
+  }
+
+  .sidebar .side-nav button,
+  .account-popover button {
+    min-height: var(--bo-touch);
+    font-size: 15px;
+  }
+
+  /* The timeline has two distinct tasks. Keeping them on separate rows
+     prevents the zone pills from squeezing the time controls on tablets. */
+  .timeline-controls {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr);
+    align-items: stretch;
+    gap: 10px;
+  }
+
+  .timeline-zones {
+    width: 100%;
+  }
+
+  .timeline-pan {
+    justify-self: end;
+  }
+}
+
+/* ── Phone ───────────────────────────────────────────────── */
+@media (max-width: 720px) {
+  :root { --bo-page-pad: 16px; }
+
+  .topbar {
+    height: 60px;
+    gap: 10px;
+    padding-inline: 12px;
+  }
+
+  .topbar-context {
+    gap: 6px;
+  }
+
+  .topbar-context span {
+    font-size: 13px;
+  }
+
+  /* Navigation is a different task from scanning a dense data table: its
+     rows stay generous and the list itself scrolls to the final section. */
+  .sidebar .side-nav button,
+  .sidebar .account-popover button {
+    min-height: 48px;
+    font-size: 16px;
+  }
+
+  .content {
+    padding: 22px var(--bo-page-pad) calc(48px + env(safe-area-inset-bottom));
+  }
+
+  .page-heading,
+  .ord-header,
+  .cat-header,
+  .rsv-header {
+    margin-bottom: 16px;
+  }
+
+  .page-heading h1,
+  .ord-header h1,
+  .cat-header h1,
+  .rsv-header h1 {
+    font-size: 23px;
+  }
+
+  .page-heading-actions,
+  .cat-header-actions,
+  .rsv-header-actions {
+    gap: 8px;
+  }
+
+  .primary-button,
+  .secondary-button,
+  .primary-button.compact,
+  .secondary-button.compact,
+  .icon-button,
+  .text-button {
+    min-height: var(--bo-touch);
+  }
+
+  .primary-button,
+  .secondary-button,
+  .primary-button.compact,
+  .secondary-button.compact {
+    height: var(--bo-touch);
+  }
+
+  .icon-button {
+    width: var(--bo-touch);
+    height: var(--bo-touch);
+    min-width: var(--bo-touch);
+  }
+
+  .panel-heading {
+    min-height: 58px;
+    padding: 14px 16px;
+  }
+
+  .panel-heading > * {
+    min-width: 0;
+  }
+
+  .panel-heading p {
+    font-size: 12px;
+  }
+
+  .form-panel {
+    padding: 18px 16px;
+  }
+
+  /* Reservations header: every row owns the full available width and both
+     actions are exactly equal. No control is allowed to inherit the 36px
+     compact-button height beside a 44px touch target. */
+  .rsv-header {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr);
+    align-items: stretch;
+    gap: 8px;
+  }
+
+  .rsv-header h1,
+  .rsv-header .order-search,
+  .rsv-daynav,
+  .rsv-header-actions {
+    width: 100%;
+    min-width: 0;
+  }
+
+  .rsv-daynav {
+    display: grid;
+    grid-template-columns: var(--bo-touch) minmax(0, 1fr) var(--bo-touch) auto;
+    gap: 6px;
+  }
+
+  .rsv-daynav input[type='date'],
+  .rsv-daynav .icon-button,
+  .rsv-today {
+    height: var(--bo-touch);
+    min-height: var(--bo-touch);
+  }
+
+  .rsv-daynav input[type='date'] {
+    min-width: 0;
+    font-size: 16px;
+  }
+
+  .rsv-header-actions {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 8px;
+    margin-inline-start: 0;
+  }
+
+  .rsv-header-actions > button {
+    width: 100%;
+    min-width: 0;
+    height: var(--bo-touch);
+    padding-inline: 10px;
+  }
+
+  /* This was the actual source of the broken timeline: the old rule set a
+     grid template without switching flex to grid. */
+  .timeline-controls {
+    width: 100%;
+    display: grid;
+    grid-template-columns: minmax(0, 1fr);
+    align-items: stretch;
+    gap: 8px;
+  }
+
+  .timeline-zones {
+    width: 100%;
+    padding-bottom: 2px;
+  }
+
+  .timeline-filter-button {
+    min-width: 88px;
+    height: var(--bo-touch);
+    min-height: var(--bo-touch);
+    padding-inline: 12px;
+  }
+
+  .timeline-pan {
+    width: 100%;
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr)) var(--bo-touch);
+    align-items: stretch;
+    gap: 8px;
+  }
+
+  .timeline-pan .text-button,
+  .timeline-pan .icon-button {
+    width: 100%;
+    height: var(--bo-touch);
+    min-height: var(--bo-touch);
+  }
+
+  .timeline-pan .text-button {
+    padding-inline: 10px;
+    border: 1px solid var(--bo-field-border);
+    border-radius: var(--r-md);
+    background: var(--c-surface);
+  }
+
+  .timeline-guide {
+    min-width: 0;
+  }
+
+  .timeline-legend {
+    width: 100%;
+    flex-wrap: nowrap;
+    overflow-x: auto;
+    overscroll-behavior-x: contain;
+    scrollbar-width: none;
+  }
+
+  .timeline-legend::-webkit-scrollbar {
+    display: none;
+  }
+
+  /* Modifier filters are two equal columns, not widths derived from their
+     English labels. The lower right cell holds status and Clear together. */
+  .cat-toolbar-modifiers {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    align-items: stretch;
+    gap: 8px;
+  }
+
+  .cat-toolbar-modifiers > .cat-select-filter,
+  .cat-toolbar-modifiers > .cat-select-filter select,
+  .cat-toolbar-modifiers > .cat-chip,
+  .cat-toolbar-modifiers > .cat-toolbar-meta {
+    width: 100%;
+    min-width: 0;
+    height: var(--bo-touch);
+    min-height: var(--bo-touch);
+  }
+
+  .cat-toolbar-modifiers > .cat-chip {
+    justify-content: space-between;
+  }
+
+  .cat-toolbar-modifiers > .cat-toolbar-meta {
+    justify-content: flex-end;
+  }
+
+  .form-panel > .panel-heading {
+    margin: -18px -16px 16px;
+    padding: 14px 16px;
+  }
+
+  .data-row {
+    padding-inline: 16px;
+  }
+
+  .settings-form input,
+  .qr-field input,
+  .qr-field select,
+  .date-range input,
+  .hours-window input,
+  .floor-add-options input,
+  .floor-add-options select,
+  .modal-body input:not([type='checkbox']):not([type='radio']),
+  .modal-body select,
+  .ord-select select,
+  .cat-select-filter select,
+  .act-select select,
+  .cus-select select,
+  .hrs-select select,
+  .tm-select select {
+    min-height: var(--bo-touch);
+    height: var(--bo-touch);
+    font-size: 16px;
+  }
+
+  /* Save/cancel pairs are stable and reachable above the home indicator. */
+  .form-actions,
+  .sheet .order-actions,
+  .booking-form-actions {
+    width: 100%;
+  }
+
+  .form-actions > button,
+  .sheet .order-actions > button,
+  .booking-form-actions > button {
+    flex: 1 1 0;
+    min-width: 0;
+  }
+
+  .drawer-head {
+    min-height: 60px;
+    padding: 12px 16px;
+  }
+
+  .drawer-body {
+    padding: 16px;
+  }
+
+  .drawer-foot {
+    padding: 10px 16px calc(10px + env(safe-area-inset-bottom));
+  }
+
+  .drawer-foot > button {
+    flex: 1 1 0;
+    min-width: 0;
+  }
+
+  .sheet {
+    padding: 18px 16px calc(18px + env(safe-area-inset-bottom));
+  }
+
+  /* All horizontal tab/segment rows scroll in place; the document never does. */
+  :where(
+    .location-tabs,
+    .channel-tabs,
+    .desk-tabs,
+    .ord-tabs,
+    .cat-tabs,
+    .sales-periods,
+    .act-types,
+    .cus-segments
+  ) {
+    max-width: 100%;
+    flex-wrap: nowrap;
+    overflow-x: auto;
+    overscroll-behavior-x: contain;
+    scrollbar-width: none;
+  }
+
+  :where(
+    .location-tabs,
+    .channel-tabs,
+    .desk-tabs,
+    .ord-tabs,
+    .cat-tabs,
+    .sales-periods,
+    .act-types,
+    .cus-segments
+  )::-webkit-scrollbar {
+    display: none;
+  }
+
+  :where(
+    .location-tabs,
+    .channel-tabs,
+    .desk-tabs,
+    .ord-tabs,
+    .cat-tabs,
+    .sales-periods,
+    .act-types,
+    .cus-segments
+  ) > button {
+    flex: 0 0 auto;
+  }
+}
+
+@media (max-width: 420px) {
+  /* Page actions remain compact until they genuinely cannot fit. */
+  .cat-header-actions,
+  .rsv-header-actions {
+    width: 100%;
+  }
+
+  .cat-header-actions > button,
+  .rsv-header-actions > button {
+    flex: 1 1 auto;
+  }
+
+  .topbar-location {
+    max-width: 46vw;
+  }
+}
+
+@media (max-width: 350px) {
+  .rsv-header-actions {
+    grid-template-columns: minmax(0, 1fr);
+  }
+}
+
+@media (pointer: coarse) {
+  .primary-button,
+  .secondary-button,
+  .icon-button,
+  [role='tab'] {
+    min-height: var(--bo-touch);
+  }
+
+  .primary-button,
+  .secondary-button {
+    height: var(--bo-touch);
+  }
+
+  .icon-button {
+    width: var(--bo-touch);
+    height: var(--bo-touch);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .primary-button,
+  .secondary-button,
+  .text-button,
+  .icon-button {
+    transition: none;
+  }
+
+  .button-spinner {
+    animation: none;
+  }
+}

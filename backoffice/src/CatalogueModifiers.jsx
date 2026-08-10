@@ -369,7 +369,7 @@ export default function ModifiersTab({
 
   return (
     <>
-      <div className="cat-toolbar">
+      <div className="cat-toolbar cat-toolbar-modifiers">
         <label className="cat-select-filter">
           <span className="visually-hidden">Usage</span>
           <select value={usage} onChange={(e) => onFilters({ groupUsage: e.target.value })}>
@@ -392,18 +392,20 @@ export default function ModifiersTab({
             {SORTS.map((s) => <option key={s.key} value={s.key}>{s.label}</option>)}
           </select>
         </label>
-        {filtersOn && (
-          <button
-            type="button"
-            className="text-button"
-            onClick={() => onFilters({ groupUsage: 'all', groupState: 'all' })}
-          >
-            <X /> Clear
-          </button>
-        )}
-        <span className="cat-count">
-          {groups.length} group{groups.length === 1 ? '' : 's'}
-        </span>
+        <div className="cat-toolbar-meta">
+          {filtersOn && (
+            <button
+              type="button"
+              className="text-button"
+              onClick={() => onFilters({ groupUsage: 'all', groupState: 'all' })}
+            >
+              <X /> Clear
+            </button>
+          )}
+          <span className="cat-count">
+            {groups.length} group{groups.length === 1 ? '' : 's'}
+          </span>
+        </div>
       </div>
 
       {error && <p className="form-error" role="alert">{error}</p>}
