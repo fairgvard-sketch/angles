@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import {
-  ChevronLeft, ChevronRight, MoreHorizontal, RefreshCw, SlidersHorizontal,
+  ChevronLeft, ChevronRight, MoreHorizontal, SlidersHorizontal,
   Store, X,
 } from 'lucide-react'
 import { supabase } from './supabase'
@@ -622,9 +622,6 @@ export default function OrdersInbox({
               stale: 'Data may be stale',
             }[realtime]}
           </span>
-          <IconButton label="Refresh orders" onClick={() => refresh()}>
-            <RefreshCw />
-          </IconButton>
         </div>
       </div>
 

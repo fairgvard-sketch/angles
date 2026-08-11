@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
-import { ChevronDown, ChevronUp, Plus, RefreshCw } from 'lucide-react'
+import { ChevronDown, ChevronUp, Plus } from 'lucide-react'
 import {
   addWaitlistEntry, fetchWaitlistQueue, fetchTimelineTables, reorderWaitlist,
   seatWaitlistEntry, setWaitlistStatus, offerWaitlistSlot,
@@ -79,7 +79,11 @@ export default function WaitlistPanel({ locationId, date, query = '' }) {
         { event: '*', schema: 'public', table: 'waitlist_entries', filter: `location_id=eq.${locationId}` },
         () => load())
       .subscribe()
-    return () => { supabase.removeChannel(channel) }
+    const timer = setInterval(load, 30_000)
+    return () => {
+      supabase.removeChannel(channel)
+      clearInterval(timer)
+    }
   }, [locationId, load])
 
   const needle = query.trim().toLowerCase()
@@ -143,9 +147,6 @@ export default function WaitlistPanel({ locationId, date, query = '' }) {
             ? 'Nobody is waiting'
             : `${openRows.length} waiting`}
         </span>
-        <button type="button" className="icon-button" aria-label="Refresh queue" onClick={load}>
-          <RefreshCw />
-        </button>
       </div>
 
       {error && <p className="form-error" role="alert">{error}</p>}

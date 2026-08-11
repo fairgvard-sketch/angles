@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
 import {
-  Archive, ArchiveRestore, MonitorSmartphone, Pencil, RefreshCw, AlertTriangle,
+  Archive, ArchiveRestore, MonitorSmartphone, Pencil, AlertTriangle,
   Trash2, Wifi, X,
 } from 'lucide-react'
 import {
@@ -271,7 +271,6 @@ export default function DevicesManager({ context }) {
           <span><Wifi /> {total} device{total === 1 ? '' : 's'}</span>
           {attention > 0 && <span className="is-negative"><AlertTriangle /> {attention} need attention</span>}
         </div>
-        <IconButton onClick={() => load()} label="Refresh devices" disabled={loading}><RefreshCw /></IconButton>
       </div>
 
       {error && <ErrorText>{error}</ErrorText>}

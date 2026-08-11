@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import {
   AlertTriangle, ArrowDownRight, ArrowUpRight, CalendarDays, ChevronRight, Info,
-  Minus, MonitorSmartphone, QrCode, RefreshCw, ShoppingBag, Wifi,
+  Minus, MonitorSmartphone, QrCode, ShoppingBag, Wifi,
 } from 'lucide-react'
 import {
   attentionItems, chartSummary, dayStamp, fetchDaySales, fleetSummary, heroKind,
@@ -13,7 +13,7 @@ import { elapsedLabel } from './orders-inbox'
 import { formatMoney } from './sales'
 import { hasCapability } from './navigation'
 import { PUBLIC_MENU_ORIGIN } from './online'
-import { Button, IconButton } from './ui/Button'
+import { Button } from './ui/Button'
 import { EmptyState, PageHeader, Panel, StatusBadge } from './ui/Layout'
 import PartyCount from './ui/PartyCount'
 import Skeleton, { SkeletonBar, SkeletonPanel } from './ui/Skeleton'
@@ -299,19 +299,7 @@ export default function HomeDashboard({ context, locationId, onNavigate, childre
 
   return (
     <>
-      <PageHeader
-        title="Dashboard"
-        actions={(
-          <IconButton
-            onClick={() => load()}
-            label="Refresh dashboard"
-            disabled={loading}
-            aria-busy={loading || undefined}
-          >
-            <RefreshCw />
-          </IconButton>
-        )}
-      >
+      <PageHeader title="Dashboard">
         {/* День и время последнего успешного обновления — данные, за
             которые отвечают числа ниже. Точка отсюда ушла в шапку
             кабинета, где её можно переключить. */}

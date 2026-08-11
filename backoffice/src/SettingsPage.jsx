@@ -9,8 +9,9 @@ import Tabs from './ui/Tabs'
  *
  * Раньше это был один экран с почтой, кнопкой выхода и карточкой
  * продуктов, и всё, что относилось к бизнесу, приходилось искать в
- * настройках точки. Теперь у раздела три вопроса: что за организация
- * (Business), что ей подключено (Products) и кто я в ней (Account).
+ * настройках точки. Теперь у раздела три вопроса: что за рабочее
+ * пространство (Workspace), что ему подключено (Plans & products) и
+ * кто я в нём (Account).
  *
  * Чего здесь нет и почему:
  *   • Tax ID — он хранится на точке, а не на организации; показать его
@@ -21,7 +22,7 @@ import Tabs from './ui/Tabs'
  *   • смена пароля, MFA, список сессий — таких потоков в кабинете нет, а
  *     нерабочее поле в настройках хуже, чем его отсутствие.
  *
- * Всё, что показано в Business, — read-only, и это сказано прямо: RPC на
+ * Всё, что показано в Workspace, — read-only, и это сказано прямо: RPC на
  * запись в `organizations` в схеме нет ни одного (Phase 0).
  */
 
@@ -31,80 +32,40 @@ const ACCOUNT_TYPE_LABEL = {
   customer: 'Customer workspace',
 }
 
-/** Организация: чем её знает сервер. Ровно то, что отдаёт get_backoffice_context. */
-function BusinessTab({ context, onNavigate }) {
+/** Рабочее пространство: ровно то, что отдаёт get_backoffice_context. */
+function WorkspaceTab({ context }) {
   const org = context?.organization
-  const locations = context?.locations || []
   const counts = context?.counts || {}
 
   return (
-    <>
-      <section className="panel form-panel">
-        <div className="panel-heading">
-          <div>
-            <h2>Organisation</h2>
-            <p>How ANGLE identifies your business across every product.</p>
-          </div>
+    <section className="panel form-panel">
+      <div className="panel-heading">
+        <div>
+          <h2>Workspace</h2>
+          <p>The organisation your ANGLE products and team belong to.</p>
         </div>
-        <dl className="settings-facts">
-          <div>
-            <dt>Business name</dt>
-            <dd>{org?.name || '—'}</dd>
-          </div>
-          <div>
-            <dt>Workspace</dt>
-            <dd>{ACCOUNT_TYPE_LABEL[context?.account_type] || 'Customer workspace'}</dd>
-          </div>
-          <div>
-            <dt>Locations</dt>
-            <dd>{counts.locations ?? locations.length}</dd>
-          </div>
-          <div>
-            <dt>Team members</dt>
-            <dd>{counts.staff ?? '—'}</dd>
-          </div>
-        </dl>
-        {/* Честность вместо кнопки «Save»: поля правда не редактируются,
-            и владелец должен знать, к кому идти, а не искать карандаш. */}
-        <p className="form-hint">
-          These are read-only. Ask your ANGLE contact to change the business
-          name or add a location.
-        </p>
-      </section>
-
-      <section className="panel form-panel">
-        <div className="panel-heading">
-          <div>
-            <h2>Locations</h2>
-            <p>
-              Each location is configured on its own — name, receipts, tax
-              details and register defaults.
-            </p>
-          </div>
+      </div>
+      <dl className="settings-facts">
+        <div>
+          <dt>Business name</dt>
+          <dd>{org?.name || '—'}</dd>
         </div>
-        {locations.length === 0 ? (
-          <p className="empty-state">No locations are linked to this account.</p>
-        ) : (
-          <div className="product-list">
-            {locations.map((l) => (
-              <div className="product-row" key={l.id}>
-                <span>
-                  <strong>{l.name}</strong>
-                  <small>{[l.currency, l.timezone].filter(Boolean).join(' · ')}</small>
-                </span>
-                <button
-                  type="button"
-                  className="text-button"
-                  onClick={() => onNavigate?.('locations', l.id, 'details')}
-                >
-                  Configure {l.name}
-                </button>
-              </div>
-            ))}
-          </div>
-        )}
-      </section>
-    </>
+        <div>
+          <dt>Workspace type</dt>
+          <dd>{ACCOUNT_TYPE_LABEL[context?.account_type] || 'Customer workspace'}</dd>
+        </div>
+        <div>
+          <dt>Team members</dt>
+          <dd>{counts.staff ?? '—'}</dd>
+        </div>
+      </dl>
+      {/* Честность вместо кнопки «Save»: поля правда не редактируются,
+          и владелец должен знать, к кому идти, а не искать карандаш. */}
+      <p className="form-hint">
+        Workspace identity is read-only. Location names, receipt details and
+        register defaults are managed in Locations.
+      </p>
+    </section>
   )
 }
 
@@ -142,7 +103,7 @@ function AccountTab({ email, context, onSignOut }) {
 }
 
 export default function SettingsPage({
-  email, context, tab: tabFromUrl, onTabChange, onSignOut, onReloadContext, onNavigate,
+  email, context, tab: tabFromUrl, onTabChange, onSignOut, onReloadContext,
 }) {
   const tabs = visibleSettingsTabs(context)
   const tab = tabs.some((t) => t.key === tabFromUrl) ? tabFromUrl : 'business'
@@ -158,7 +119,7 @@ export default function SettingsPage({
         onChange={onTabChange}
       />
 
-      {tab === 'business' && <BusinessTab context={context} onNavigate={onNavigate} />}
+      {tab === 'business' && <WorkspaceTab context={context} />}
       {tab === 'products' && (
         <ProductsCard context={context} onReloadContext={onReloadContext} />
       )}

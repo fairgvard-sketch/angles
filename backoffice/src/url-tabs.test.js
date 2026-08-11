@@ -121,6 +121,19 @@ describe('вкладка приходит из адреса', () => {
     const settings = renderToStaticMarkup(
       h(SettingsPage, { context, tab: 'products', email: 'a@b.c', onTabChange: noop })
     )
-    assert.equal(selectedTab(settings), 'Products')
+    assert.equal(selectedTab(settings), 'Plans &amp; products')
+  })
+
+  it('Settings не дублирует самостоятельный раздел Locations', () => {
+    const html = renderToStaticMarkup(
+      h(SettingsPage, {
+        context: { ...context, counts: { locations: 1, staff: 2 } },
+        tab: 'business', email: 'a@b.c', onTabChange: noop,
+      })
+    )
+    assert.equal(selectedTab(html), 'Workspace')
+    assert.match(html, /Workspace identity is read-only/)
+    assert.doesNotMatch(html, /<h2>Locations<\/h2>/)
+    assert.doesNotMatch(html, /Configure Main/)
   })
 })

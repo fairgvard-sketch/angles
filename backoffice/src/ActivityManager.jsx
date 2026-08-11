@@ -1,11 +1,11 @@
 import { useCallback, useEffect, useMemo, useState } from 'react'
-import { Activity, Download, RefreshCw, LogIn, LogOut, RotateCcw } from 'lucide-react'
+import { Activity, Download, LogIn, LogOut, RotateCcw } from 'lucide-react'
 import {
   fetchActivity, TYPE_META, eventTitle, eventAmount, eventDetail, timeAgo,
   ACTIVITY_TYPES, activityToCsv, activityFileName, activityDays, activityTime,
 } from './activity'
 import { ErrorText, PageHeader, SearchField } from './ui/Layout'
-import { Button, IconButton } from './ui/Button'
+import { Button } from './ui/Button'
 import Skeleton, { SkeletonBar, SkeletonPanel, SkeletonRow } from './ui/Skeleton'
 
 /**
@@ -181,8 +181,11 @@ export default function ActivityManager({ context }) {
     return { from, to, types, locationId, search: query }
   }, [range, types, locationId, query])
 
-  const load = useCallback(async (reset = true, tail = null) => {
-    if (reset) { setLoading(true); setDone(false) }
+  const load = useCallback(async (reset = true, tail = null, silent = false) => {
+    if (reset) {
+      if (!silent) setLoading(true)
+      setDone(false)
+    }
     setError('')
     try {
       const batch = await fetchActivity({ ...filters, limit: PAGE, before: tail })
@@ -195,7 +198,11 @@ export default function ActivityManager({ context }) {
     }
   }, [filters])
 
-  useEffect(() => { load(true) }, [load])
+  useEffect(() => {
+    load(true)
+    const timer = setInterval(() => load(true, null, true), 60_000)
+    return () => clearInterval(timer)
+  }, [load])
 
   function exportCsv() {
     const csv = activityToCsv(events ?? [], { timeZone })
@@ -235,24 +242,13 @@ export default function ActivityManager({ context }) {
       <PageHeader
         title="Activity"
         actions={(
-          <>
-            <Button
-              disabled={!total}
-              onClick={exportCsv}
-              title="Download exactly what is on screen"
-            >
-              <Download aria-hidden /> Export CSV
-            </Button>
-            <IconButton
-              className="act-refresh"
-              label="Refresh activity"
-              onClick={() => load(true)}
-              disabled={loading}
-              aria-busy={loading || undefined}
-            >
-              <RefreshCw />
-            </IconButton>
-          </>
+          <Button
+            disabled={!total}
+            onClick={exportCsv}
+            title="Download exactly what is on screen"
+          >
+            <Download aria-hidden /> Export CSV
+          </Button>
         )}
       />
 

@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
 import {
-  ArrowDown, ArrowUp, ChevronDown, CreditCard, Download, Minus, RefreshCw,
+  ArrowDown, ArrowUp, ChevronDown, CreditCard, Download, Minus,
   ShoppingBag, Store, Users, Utensils,
 } from 'lucide-react'
 import {
@@ -10,7 +10,7 @@ import {
   orderTypeLabel, salesToCsv, salesFileName,
 } from './sales'
 import { ErrorText, PageHeader } from './ui/Layout'
-import { Button, IconButton } from './ui/Button'
+import { Button } from './ui/Button'
 import Tabs from './ui/Tabs'
 import Skeleton, { SkeletonBar, SkeletonPanel } from './ui/Skeleton'
 
@@ -384,23 +384,13 @@ export default function SalesOverview({ context, heading = 'Sales', tabs = null 
       <PageHeader
         title={heading}
         actions={(
-          <>
-            <Button
-              disabled={!report}
-              onClick={exportCsv}
-              title="Download exactly what is on screen"
-            >
-              <Download aria-hidden /> Export CSV
-            </Button>
-            <IconButton
-              label="Refresh sales"
-              onClick={() => load()}
-              disabled={loading}
-              aria-busy={loading || undefined}
-            >
-              <RefreshCw />
-            </IconButton>
-          </>
+          <Button
+            disabled={!report}
+            onClick={exportCsv}
+            title="Download exactly what is on screen"
+          >
+            <Download aria-hidden /> Export CSV
+          </Button>
         )}
       />
 

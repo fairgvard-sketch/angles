@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
-import { ChevronLeft, ChevronRight, RefreshCw } from 'lucide-react'
+import { ChevronLeft, ChevronRight } from 'lucide-react'
 import {
   fetchReservationRange, fetchReservationSettings, fetchTimelineTables,
   markReservationArrived, setReservationStatus, setReservationTables,
@@ -128,7 +128,11 @@ export default function ReservationList({ locationId, date, query = '', filters,
         { event: '*', schema: 'public', table: 'reservations', filter: `location_id=eq.${locationId}` },
         () => load())
       .subscribe()
-    return () => { supabase.removeChannel(channel) }
+    const timer = setInterval(load, 60_000)
+    return () => {
+      supabase.removeChannel(channel)
+      clearInterval(timer)
+    }
   }, [locationId, load])
 
   const tableById = useMemo(() => new Map(tables.map((t) => [t.id, t])), [tables])
@@ -233,9 +237,6 @@ export default function ReservationList({ locationId, date, query = '', filters,
             ))}
           </select>
         </label>
-        <button type="button" className="icon-button" aria-label="Refresh list" onClick={load}>
-          <RefreshCw />
-        </button>
       </div>
 
       {error && <p className="form-error" role="alert">{error}</p>}

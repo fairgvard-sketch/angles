@@ -126,9 +126,9 @@ describe('раздел Activity', () => {
     assert.match(many, /Pinsker/)
   })
 
-  it('обновление названо словом, выгружать нечего — кнопка выключена', () => {
+  it('ручное обновление не дублирует автообновление, выгружать нечего — кнопка выключена', () => {
     const html = render(h(ActivityManager, { context: context(ONE) }))
-    assert.match(html, /aria-label="Refresh activity"/)
+    assert.doesNotMatch(html, /Refresh activity/)
     assert.match(html, /<button type="button" class="secondary-button" disabled=""/)
     assert.match(html, /Export CSV/)
   })

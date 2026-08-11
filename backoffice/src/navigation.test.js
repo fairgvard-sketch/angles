@@ -219,8 +219,9 @@ test('Reports: продажи и фискальный набор', () => {
   assert.deepEqual(visibleReportTabs(POS_ONLY).map((t) => t.key), ['sales', 'fiscal'])
 })
 
-test('Settings: бизнес, продукты, аккаунт — и никакого Legal & tax', () => {
+test('Settings: workspace, продукты, аккаунт — и никакого Legal & tax', () => {
   assert.deepEqual(SETTINGS_TABS.map((t) => t.key), ['business', 'products', 'account'])
+  assert.deepEqual(SETTINGS_TABS.map((t) => t.label), ['Workspace', 'Plans & products', 'Account'])
   assert.deepEqual(visibleSettingsTabs(POS_ONLY).map((t) => t.key), ['business', 'products', 'account'])
   // Модели юрлиц ещё нет — пустая вкладка обещала бы её наличие
   assert.ok(!SETTINGS_TABS.some((t) => t.key === 'legal'))

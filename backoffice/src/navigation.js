@@ -122,14 +122,14 @@ export function visibleReportTabs(context) {
 }
 
 /**
- * Вкладки Settings: как устроены организация и мой аккаунт. Legal & tax
+ * Вкладки Settings: рабочее пространство, продукты и мой аккаунт. Legal & tax
  * здесь намеренно нет — модели юрлиц не существует (Release B), а пустая
  * вкладка обещала бы её наличие.
  */
 export const SETTINGS_TABS = [
-  { key: 'business', label: 'Business' },
-  { key: 'products', label: 'Products' },
-  { key: 'account', label: 'Account & security' },
+  { key: 'business', label: 'Workspace' },
+  { key: 'products', label: 'Plans & products' },
+  { key: 'account', label: 'Account' },
 ]
 
 export function visibleSettingsTabs() {

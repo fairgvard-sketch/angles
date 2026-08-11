@@ -1,7 +1,5 @@
 import { useEffect, useMemo, useState } from 'react'
-import {
-  CalendarDays, Clock, RefreshCw, Search, TrendingUp, Users, UserX,
-} from 'lucide-react'
+import { CalendarDays, Clock, Search, TrendingUp, Users, UserX } from 'lucide-react'
 import {
   PERIODS, WEEKDAYS, MIN_SESSIONS_FOR_RATE,
   analyticsRange, fetchReserveAnalytics, analyticsErrorText,
@@ -125,10 +123,6 @@ export default function ReserveAnalytics({ locations }) {
   const [report, setReport] = useState(null)
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState('')
-  // Кнопка «обновить» меняет nonce: тот же период с тем же диапазоном
-  // иначе не перезапросился бы — эффект не увидел бы разницы.
-  const [nonce, setNonce] = useState(0)
-
   const ready = period !== 'custom' || (custom.from && custom.to)
   const { from, to } = useMemo(() => analyticsRange(period, custom), [period, custom])
   const pickedKey = picked.join(',')
@@ -143,7 +137,7 @@ export default function ReserveAnalytics({ locations }) {
       .catch((e) => { if (alive) setError(analyticsErrorText(e.message)) })
       .finally(() => { if (alive) setLoading(false) })
     return () => { alive = false }
-  }, [ready, from, to, pickedKey, nonce]) // eslint-disable-line react-hooks/exhaustive-deps
+  }, [ready, from, to, pickedKey]) // eslint-disable-line react-hooks/exhaustive-deps
 
   function toggleLocation(id) {
     setPicked((prev) => (prev.includes(id) ? prev.filter((x) => x !== id) : [...prev, id]))
@@ -201,14 +195,6 @@ export default function ReserveAnalytics({ locations }) {
           value={period}
           onChange={setPeriod}
         />
-        <button
-          className="icon-button"
-          onClick={() => setNonce((n) => n + 1)}
-          title="Refresh"
-          disabled={loading}
-        >
-          <RefreshCw />
-        </button>
       </div>
 
       {period === 'custom' && (

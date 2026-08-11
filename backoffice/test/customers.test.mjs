@@ -772,7 +772,9 @@ describe('клиенты: телефон и планшет', { skip }, () => {
       chip: document.querySelector('.cus-tag-chip').getBoundingClientRect().height,
       segment: document.querySelector('.segment-chip').getBoundingClientRect().height,
       search: document.querySelector('.cus-search').getBoundingClientRect().height,
-      refresh: document.querySelector('.cus-refresh').getBoundingClientRect().height,
+      export: [...document.querySelectorAll('button')]
+        .find((button) => button.textContent.includes('Export CSV'))
+        .getBoundingClientRect().height,
     }))
     for (const [what, height] of Object.entries(heights)) {
       assert.ok(height >= 44, `${what}: ${height}px — меньше 44px под палец`)

@@ -487,6 +487,11 @@ before(async () => {
             </div>
           </div>
 
+          <div className="location-tabs settings-topic-tabs report-tabs" role="tablist">
+            <button className="is-active" role="tab">Sales</button>
+            <button role="tab">Fiscal</button>
+          </div>
+
           <section className="panel form-panel timeline-panel">
             <div className="timeline-controls">
               <div className="timeline-zones" aria-label="Zone filter">
@@ -498,7 +503,6 @@ before(async () => {
               <div className="timeline-pan" aria-label="Move through timeline">
                 <button className="text-button">Earlier</button>
                 <button className="text-button">Later</button>
-                <button className="icon-button" aria-label="Refresh timeline">↻</button>
               </div>
             </div>
             <div className="timeline-guide">
@@ -1162,6 +1166,7 @@ describe('responsive control foundation', { skip }, () => {
         controls: boxes('.timeline-controls'),
         zones: boxes('.timeline-zones'),
         pan: boxes('.timeline-pan > button'),
+        reportTabs: boxes('.report-tabs > button'),
       }
     })
 
@@ -1176,8 +1181,11 @@ describe('responsive control foundation', { skip }, () => {
     assert.deepEqual(state.actions.map((box) => box.height), [44, 44])
     assert.ok(Math.abs(state.actions[0].width - state.actions[1].width) <= 1)
     assert.equal(state.zones[0].width, state.controls[0].width, 'зоны занимают полную строку')
-    assert.deepEqual(state.pan.map((box) => box.height), [44, 44, 44])
+    assert.deepEqual(state.pan.map((box) => box.height), [44, 44])
     assert.ok(Math.abs(state.pan[0].width - state.pan[1].width) <= 1)
+    assert.deepEqual(state.reportTabs.map((box) => box.height), [44, 44])
+    assert.ok(state.reportTabs.every((box) => box.width >= 116), 'капсулы отчётов достаточно длинные')
+    assert.ok(Math.abs(state.reportTabs[0].width - state.reportTabs[1].width) <= 1)
 
     await page.setViewport({ width: 320, height: 720, hasTouch: true, isMobile: true })
     const narrow = await page.evaluate(() => ({

@@ -1683,6 +1683,13 @@ a { color: inherit; }
   .settings-topic-tabs button { flex: 0 0 auto; }
 }
 .settings-topic-tabs button { min-height: 34px; padding: 0 13px; font-size: 12px; border-radius: var(--r-pill); }
+/* Sales / Fiscal остаются отдельными капсулами. Они длиннее обычных
+   служебных табов, чтобы короткое слово не превращало кнопку в кружок. */
+.report-tabs button {
+  min-inline-size: 108px;
+  padding-inline: 24px;
+  justify-content: center;
+}
 .export-downloads { justify-content: flex-start; flex-wrap: wrap; }
 .export-report { width: 100%; border-collapse: collapse; font-size: 14px; }
 .export-report th { text-align: start; padding: 8px 10px; font-size: 11px; font-weight: 750; letter-spacing: 0.04em; text-transform: uppercase; color: var(--c-text-subtle); }
@@ -3781,10 +3788,6 @@ a { color: inherit; }
 /* «Load more» — под панелью, как продолжение журнала, а не строка внутри него */
 .act-more { display: flex; justify-content: center; margin-top: var(--sp-4); }
 
-@media (prefers-reduced-motion: no-preference) {
-  .act-refresh[aria-busy='true'] svg { animation: spin .9s linear infinite; }
-}
-
 /* Планшет: те же элементы, но целями под палец */
 @media (max-width: 1024px) {
   .act-toolbar .act-search { min-height: 44px; }
@@ -3854,10 +3857,6 @@ a { color: inherit; }
   color: var(--c-text-muted); font-size: 13px;
   font-variant-numeric: tabular-nums; white-space: nowrap;
 }
-@media (prefers-reduced-motion: no-preference) {
-  .cus-refresh[aria-busy='true'] svg { animation: spin .9s linear infinite; }
-}
-
 /* ── Сегменты и метки ──────────────────────────────────────── */
 .cus-filters { display: grid; gap: var(--sp-2); margin-bottom: var(--sp-3); }
 /* Полоса чипов уезжает боком, а не переносится на четыре строки:

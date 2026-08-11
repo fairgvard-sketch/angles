@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useMemo, useState } from 'react'
 import {
-  Users, RefreshCw, Pencil, Download, GitMerge, ShieldOff, AlertTriangle,
+  Users, Pencil, Download, GitMerge, ShieldOff, AlertTriangle,
   ChevronDown, ChevronUp, Check,
 } from 'lucide-react'
 import {
@@ -18,7 +18,7 @@ import { EmptyPanel, ErrorText, PageHeader, SearchField } from './ui/Layout'
 import Drawer from './ui/Drawer'
 import Tabs from './ui/Tabs'
 import ConfirmDialog from './ui/ConfirmDialog'
-import { Button, IconButton } from './ui/Button'
+import { Button } from './ui/Button'
 import Skeleton, { SkeletonPanel, SkeletonRow } from './ui/Skeleton'
 
 /**
@@ -640,8 +640,6 @@ function CustomerDirectory({ context, duplicates: showDuplicates, onDuplicatesCh
     }
   }, [filters])
 
-  useEffect(() => { load() }, [load])
-
   // Метки и дубли считаются по всей базе, а не по срезу: они и нужны,
   // чтобы срез выбрать.
   const loadAside = useCallback(async () => {
@@ -654,7 +652,15 @@ function CustomerDirectory({ context, duplicates: showDuplicates, onDuplicatesCh
     }
   }, [])
 
-  useEffect(() => { loadAside() }, [loadAside])
+  useEffect(() => {
+    load()
+    loadAside()
+    const timer = setInterval(() => {
+      load(true)
+      loadAside()
+    }, 60_000)
+    return () => clearInterval(timer)
+  }, [load, loadAside])
 
   // Режим программы (штампы/баллы) знает только сервер — контекст
   // бэкофиса его не отдаёт. Берём из первой открытой карточки (115) и
@@ -701,24 +707,13 @@ function CustomerDirectory({ context, duplicates: showDuplicates, onDuplicatesCh
       <PageHeader
         title="Customers"
         actions={(
-          <>
-            <Button
-              disabled={!total}
-              onClick={exportCsv}
-              title="Download the customers you are looking at right now"
-            >
-              <Download aria-hidden /> Export CSV
-            </Button>
-            <IconButton
-              className="cus-refresh"
-              label="Refresh customers"
-              onClick={() => { load(); loadAside() }}
-              disabled={loading}
-              aria-busy={loading || undefined}
-            >
-              <RefreshCw />
-            </IconButton>
-          </>
+          <Button
+            disabled={!total}
+            onClick={exportCsv}
+            title="Download the customers you are looking at right now"
+          >
+            <Download aria-hidden /> Export CSV
+          </Button>
         )}
       />
 

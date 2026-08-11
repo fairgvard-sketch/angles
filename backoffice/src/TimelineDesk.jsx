@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
-import { ChevronLeft, ChevronRight, RefreshCw } from 'lucide-react'
+import { ChevronLeft, ChevronRight } from 'lucide-react'
 import {
   blockState, buildRows, groupByZone, hourTicks, nowMarkerPct,
   timelineWindow, todayInZone,
@@ -122,7 +122,11 @@ export default function TimelineDesk({ locationId, date, query = '' }) {
         { event: '*', schema: 'public', table: 'reservations', filter: `location_id=eq.${locationId}` },
         () => load())
       .subscribe()
-    return () => { supabase.removeChannel(channel) }
+    const timer = setInterval(load, 60_000)
+    return () => {
+      supabase.removeChannel(channel)
+      clearInterval(timer)
+    }
   }, [locationId, load])
 
   const bookings = useMemo(() => (raw ?? []).map((r) => {
@@ -287,9 +291,6 @@ export default function TimelineDesk({ locationId, date, query = '' }) {
           )}
           <button type="button" className="text-button" onClick={() => panTimeline(1)}>
             Later <ChevronRight />
-          </button>
-          <button type="button" className="icon-button" aria-label="Refresh timeline" onClick={load}>
-            <RefreshCw />
           </button>
         </div>
       </div>

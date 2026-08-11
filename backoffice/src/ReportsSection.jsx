@@ -25,7 +25,7 @@ export default function ReportsSection({
 
   const strip = tabs.length > 1 ? (
     <Tabs
-      className="location-tabs settings-topic-tabs"
+      className="location-tabs settings-topic-tabs report-tabs"
       label="Report"
       items={tabs.map((t) => ({ key: t.key, label: t.label }))}
       value={tab}
@@ -50,8 +50,8 @@ export default function ReportsSection({
   }
 
   /*
-   * Sales рисует собственную шапку — вместе с выгрузкой CSV и обновлением,
-   * которые в ней живут. Отдавать ему заголовок раздела и полосу вкладок
+   * Sales рисует собственную шапку вместе с выгрузкой CSV. Отдавать ему
+   * заголовок раздела и полосу вкладок
    * дешевле, чем дублировать его действия здесь: экран не переписан, у
    * него лишь сменилось название строки.
    */
