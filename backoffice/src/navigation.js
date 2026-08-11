@@ -54,7 +54,9 @@ export const NAV_ITEMS = [
   // как значение по умолчанию для новой категории — переключатель в шапке
   // обещал бы фильтрацию, которой нет.
   { id: 'menu', label: 'Catalogue', group: 'manage' },
-  { id: 'locations', label: 'Locations', group: 'manage', scoped: true },
+  // Locations выбирает точку внутри собственного экрана. Дублировать тот
+  // же селект в общей шапке — две одинаковые точки входа рядом.
+  { id: 'locations', label: 'Locations', group: 'manage' },
   { id: 'team', label: 'Team', group: 'manage' },
   { id: 'online', label: 'QR Menu & Online', group: 'channels', scoped: true },
   { id: 'integrations', label: 'Integrations', group: 'channels', planned: true },

@@ -74,6 +74,9 @@ describe('вкладка приходит из адреса', () => {
       h(LocationSettings, { context, locationId: 'loc-1', tab: 'receipts', onTabChange: noop })
     )
     assert.equal(selectedTab(receipts), 'Receipts &amp; tax')
+    assert.match(receipts, /location-settings-picker/)
+    assert.match(receipts, /location-settings-tabs/)
+    assert.match(receipts, />Main<\/option>/)
 
     const pos = renderToStaticMarkup(
       h(LocationSettings, { context, locationId: 'loc-1', tab: 'pos', onTabChange: noop })

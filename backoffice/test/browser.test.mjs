@@ -492,6 +492,43 @@ before(async () => {
             <button role="tab">Fiscal</button>
           </div>
 
+          <section className="locations-workflow">
+            <label className="qr-field location-settings-picker">
+              <span>Location</span>
+              <select defaultValue="pinsker">
+                <option value="pinsker">Snif Pinsker 29</option>
+              </select>
+            </label>
+            <div className="location-tabs settings-topic-tabs location-settings-tabs" role="tablist">
+              <button className="is-active" role="tab">Details</button>
+              <button role="tab">Receipts &amp; tax</button>
+              <button role="tab">POS defaults</button>
+            </div>
+            <p className="settings-scope">Applies to <strong>Snif Pinsker 29</strong> only.</p>
+            <section className="panel form-panel location-settings-panel">
+              <div className="location-settings-panel-heading">
+                <h2>Location details</h2>
+                <p>Identity and operating defaults for this location.</p>
+              </div>
+              <form className="settings-form location-details-form">
+                <div className="location-details-grid">
+                  <label className="qr-field"><span>Location name</span><input defaultValue="Snif Pinsker 29" /></label>
+                  <label className="qr-field"><span>Display name</span><input defaultValue="Bulochka" /></label>
+                  <label className="qr-field"><span>Service mode</span><select defaultValue="tables"><option value="tables">Counter + tables</option></select></label>
+                  <label className="qr-field"><span>VAT rate (%)</span><input defaultValue="18" /></label>
+                </div>
+                <dl className="settings-facts location-details-facts">
+                  <div><dt>Currency</dt><dd>ILS</dd></div>
+                  <div><dt>Time zone</dt><dd>Asia/Jerusalem</dd></div>
+                </dl>
+                <p className="form-hint location-settings-lock">Currency and time zone are set when the location is created.</p>
+                <div className="form-actions">
+                  <button className="primary-button narrow location-save-button">Save changes</button>
+                </div>
+              </form>
+            </section>
+          </section>
+
           <section className="panel form-panel timeline-panel">
             <div className="timeline-controls">
               <div className="timeline-zones" aria-label="Zone filter">
@@ -1214,6 +1251,47 @@ describe('responsive control foundation', { skip }, () => {
     })
     assert.ok(state.panTop >= state.zonesBottom, 'панель времени не сжимает фильтр зон')
     assert.equal(state.overflow, 0)
+    await page.close()
+  })
+
+  it('Locations держит капсулы и адаптивную форму без боковой прокрутки', async () => {
+    const page = await browser.newPage()
+    await page.setViewport({ width: 1440, height: 1100 })
+    await page.goto(`${appOrigin}/responsive-workflows`, { waitUntil: 'networkidle0' })
+
+    const desktop = await page.evaluate(() => ({
+      columns: getComputedStyle(document.querySelector('.location-details-grid')).gridTemplateColumns.split(' ').length,
+      tabRadii: [...document.querySelectorAll('.location-settings-tabs > button')]
+        .map((button) => parseFloat(getComputedStyle(button).borderTopLeftRadius)),
+      saveRadius: parseFloat(getComputedStyle(document.querySelector('.location-save-button')).borderTopLeftRadius),
+      saveHeight: Math.round(document.querySelector('.location-save-button').getBoundingClientRect().height),
+      overflow: document.documentElement.scrollWidth - document.documentElement.clientWidth,
+    }))
+    assert.equal(desktop.columns, 2)
+    assert.ok(desktop.tabRadii.every((radius) => radius >= 20), 'вкладки должны быть капсулами')
+    assert.ok(desktop.saveRadius >= 20, 'Save changes должна быть капсулой')
+    assert.ok(desktop.saveHeight <= 44, 'рабочая кнопка не превращается в промо-CTA')
+    assert.equal(desktop.overflow, 0)
+
+    await page.setViewport({ width: 390, height: 844, hasTouch: true, isMobile: true })
+    const mobile = await page.evaluate(() => {
+      const picker = document.querySelector('.location-settings-picker').getBoundingClientRect()
+      const panel = document.querySelector('.location-settings-panel').getBoundingClientRect()
+      const save = document.querySelector('.location-save-button').getBoundingClientRect()
+      return {
+        columns: getComputedStyle(document.querySelector('.location-details-grid')).gridTemplateColumns.split(' ').length,
+        pickerWidth: Math.round(picker.width),
+        panelWidth: Math.round(panel.width),
+        saveWidth: Math.round(save.width),
+        saveHeight: Math.round(save.height),
+        overflow: document.documentElement.scrollWidth - document.documentElement.clientWidth,
+      }
+    })
+    assert.equal(mobile.columns, 1)
+    assert.ok(mobile.pickerWidth > 340, 'выбор точки занимает мобильную строку')
+    assert.ok(mobile.saveWidth >= mobile.panelWidth - 34, 'сохранение доступно полной шириной')
+    assert.equal(mobile.saveHeight, 44)
+    assert.equal(mobile.overflow, 0)
     await page.close()
   })
 })

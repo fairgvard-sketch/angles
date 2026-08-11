@@ -675,6 +675,39 @@ button[aria-busy='true'] {
     padding: 18px 16px;
   }
 
+  .location-settings-picker {
+    width: 100%;
+  }
+
+  .location-settings-panel {
+    padding: 18px 16px;
+  }
+
+  .location-settings-panel-heading {
+    margin-bottom: var(--sp-4);
+  }
+
+  .location-details-grid,
+  .location-details-facts {
+    grid-template-columns: minmax(0, 1fr);
+  }
+
+  .location-details-grid {
+    gap: var(--sp-4);
+  }
+
+  .location-details-facts {
+    gap: var(--sp-3);
+  }
+
+  .location-settings-panel .form-actions {
+    align-items: stretch;
+  }
+
+  .location-settings-panel .location-save-button {
+    width: 100%;
+  }
+
   /* Reservations header: every row owns the full available width and both
      actions are exactly equal. No control is allowed to inherit the 36px
      compact-button height beside a 44px touch target. */

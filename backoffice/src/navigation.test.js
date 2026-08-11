@@ -154,7 +154,8 @@ test('Разделы одной точки помечены — для них п
   assert.equal(isLocationScoped('reservations'), true)
   assert.equal(isLocationScoped('orders'), true)
   assert.equal(isLocationScoped('online'), true)
-  assert.equal(isLocationScoped('locations'), true)
+  // Locations выбирает точку внутри своего экрана настроек
+  assert.equal(isLocationScoped('locations'), false)
   // Дашборд читает продажи, заказы, брони и каналы одной точки: без
   // переключателя у сети молча выигрывала первая точка в списке
   assert.equal(isLocationScoped('overview'), true)

@@ -4,7 +4,7 @@ import {
   fetchLocation, patchLocationSettings, updateLocationConfig,
 } from './settings'
 import { agorotToInput, inputToAgorot } from './online'
-import { hasCapability, visibleLocationTabs } from './navigation'
+import { visibleLocationTabs } from './navigation'
 import { ErrorText, PageHeader } from './ui/Layout'
 import ConfirmDialog from './ui/ConfirmDialog'
 import Tabs from './ui/Tabs'
@@ -60,7 +60,18 @@ function Field({ label, hint, children }) {
   )
 }
 
-export default function LocationSettings({ context, locationId, tab: tabFromUrl, onTabChange }) {
+function LocationPanelHeading({ title, description }) {
+  return (
+    <div className="location-settings-panel-heading">
+      <h2>{title}</h2>
+      <p>{description}</p>
+    </div>
+  )
+}
+
+export default function LocationSettings({
+  context, locationId, tab: tabFromUrl, onTabChange, onLocationChange,
+}) {
   const locations = context?.locations || []
   const activeId = locationId || locations[0]?.id || null
   /*
@@ -71,7 +82,6 @@ export default function LocationSettings({ context, locationId, tab: tabFromUrl,
   const tabs = visibleLocationTabs(context)
   const tab = tabs.some((t) => t.key === tabFromUrl) ? tabFromUrl : 'details'
   const setTab = onTabChange
-  const hasRegister = hasCapability(context, 'pos_operate')
   const [location, setLocation] = useState(null)
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState('')
@@ -82,6 +92,7 @@ export default function LocationSettings({ context, locationId, tab: tabFromUrl,
    */
   const [dirty, setDirty] = useState(false)
   const [pendingTab, setPendingTab] = useState(null)
+  const [pendingLocation, setPendingLocation] = useState(null)
 
   // Закрытие вкладки браузера — тот же случай, только чинить некому
   useEffect(() => {
@@ -97,6 +108,20 @@ export default function LocationSettings({ context, locationId, tab: tabFromUrl,
   function askTab(next) {
     if (!dirty || next === tab) { setTab(next); return }
     setPendingTab(next)
+  }
+
+  function askLocation(next) {
+    if (!next || next === activeId) return
+    if (!dirty) { onLocationChange?.(next); return }
+    setPendingLocation(next)
+  }
+
+  function discardAndLeave() {
+    setDirty(false)
+    if (pendingTab) setTab(pendingTab)
+    if (pendingLocation) onLocationChange?.(pendingLocation)
+    setPendingTab(null)
+    setPendingLocation(null)
   }
 
   useEffect(() => {
@@ -124,13 +149,22 @@ export default function LocationSettings({ context, locationId, tab: tabFromUrl,
     <>
       <PageHeader title="Locations" />
 
+      <label className="qr-field location-settings-picker">
+        <span>Location</span>
+        <select value={activeId || ''} onChange={(event) => askLocation(event.target.value)}>
+          {locations.map((item) => (
+            <option key={item.id} value={item.id}>{item.name}</option>
+          ))}
+        </select>
+      </label>
+
       {/* Полоса тем — на общий примитив: до него все пять кнопок были
           отдельными остановками Tab, а стрелки не двигали ничего, хотя
           `role="tablist"` обещал читалке ровно обратное. Одна вкладка —
           полосы нет: выбор из самого себя ничего не выбирает. */}
       {tabs.length > 1 && (
         <Tabs
-          className="location-tabs settings-topic-tabs"
+          className="location-tabs settings-topic-tabs location-settings-tabs"
           label="Settings topic"
           items={tabs.map((t) => ({ key: t.key, label: t.label }))}
           value={tab}
@@ -140,27 +174,24 @@ export default function LocationSettings({ context, locationId, tab: tabFromUrl,
 
       {/*
         Область действия. У сети настройки точек не общие, и владелец
-        должен видеть это до того, как поменяет НДС «для всех». Про
-        терминал сказано отдельно: печать и быстрые суммы живут на самой
-        кассе (107), и искать их здесь бесполезно.
+        должен видеть это до того, как поменяет НДС «для всех».
       */}
       <p className="settings-scope">
         Applies to <strong>{location?.name || locations.find((l) => l.id === activeId)?.name}</strong>
-        {locations.length > 1 ? ' only — other locations are configured separately' : ''}.
-        {hasRegister && ' Printing and register shortcuts stay on the terminal itself.'}
+        {locations.length > 1 ? ' only. Other locations are configured separately.' : ' only.'}
       </p>
 
       {error && <ErrorText>{error}</ErrorText>}
 
-      {pendingTab && (
+      {(pendingTab || pendingLocation) && (
         <ConfirmDialog
           title="Leave without saving?"
           description="The changes on this tab are not saved yet. Leaving loses them."
           confirmLabel="Discard changes"
           cancelLabel="Keep editing"
           tone="danger"
-          onCancel={() => setPendingTab(null)}
-          onConfirm={() => { setDirty(false); setTab(pendingTab); setPendingTab(null) }}
+          onCancel={() => { setPendingTab(null); setPendingLocation(null) }}
+          onConfirm={discardAndLeave}
         />
       )}
 
@@ -197,7 +228,7 @@ function SaveRow({ saving, saved, error }) {
           глазами: читалка молчит, и владелец с ней не знает, ушли
           правки на сервер или нет. */}
       {saved && <span className="save-ok" role="status"><Check aria-hidden /> Saved</span>}
-      <button className="primary-button narrow" type="submit" disabled={saving}>
+      <button className="primary-button narrow location-save-button" type="submit" disabled={saving}>
         {saving ? 'Saving…' : 'Save changes'}
       </button>
     </div>
@@ -272,48 +303,49 @@ function DetailsTab({ location, onSaved, onDirty }) {
   }
 
   return (
-    <section className="panel form-panel">
-      <form onSubmit={submit} className="settings-form">
-        <Field label="Location name" hint="Internal name in lists and reports.">
-          <input value={form.name} onChange={(e) => update('name', e.target.value)} />
-        </Field>
-        <Field label="Display name" hint="Shown to guests on the public menu and ordering pages.">
-          <input value={form.display_name} onChange={(e) => update('display_name', e.target.value)} />
-        </Field>
-        <Field label="Service mode" hint="Defines what the register shows: counter flow, tables or both.">
-          <select value={form.service_mode} onChange={(e) => update('service_mode', e.target.value)}>
-            {SERVICE_MODES.map((m) => <option key={m.value} value={m.value}>{m.label}</option>)}
-          </select>
-        </Field>
-        <Field label="VAT rate (%)" hint="Applied to new orders on every register of this location.">
-          <input
-            inputMode="decimal"
-            value={form.vat_rate}
-            onChange={(e) => update('vat_rate', e.target.value)}
-          />
-        </Field>
+    <section className="panel form-panel location-settings-panel">
+      <LocationPanelHeading
+        title="Location details"
+        description="Identity and operating defaults for this location."
+      />
+      <form onSubmit={submit} className="settings-form location-details-form">
+        <div className="location-details-grid">
+          <Field label="Location name" hint="Internal name in lists and reports.">
+            <input value={form.name} onChange={(e) => update('name', e.target.value)} />
+          </Field>
+          <Field label="Display name" hint="Shown to guests on the public menu and ordering pages.">
+            <input value={form.display_name} onChange={(e) => update('display_name', e.target.value)} />
+          </Field>
+          <Field label="Service mode" hint="Defines what the register shows: counter flow, tables or both.">
+            <select value={form.service_mode} onChange={(e) => update('service_mode', e.target.value)}>
+              {SERVICE_MODES.map((m) => <option key={m.value} value={m.value}>{m.label}</option>)}
+            </select>
+          </Field>
+          <Field label="VAT rate (%)" hint="Applied to new orders on every register of this location.">
+            <input
+              inputMode="decimal"
+              value={form.vat_rate}
+              onChange={(e) => update('vat_rate', e.target.value)}
+            />
+          </Field>
+        </div>
+
+        <dl className="settings-facts location-details-facts">
+          <div>
+            <dt>Currency</dt>
+            <dd>{location.currency || '—'}</dd>
+          </div>
+          <div>
+            <dt>Time zone</dt>
+            <dd>{location.timezone || '—'}</dd>
+          </div>
+        </dl>
+        <p className="form-hint location-settings-lock">
+          Currency and time zone are set when the location is created — ask your
+          ANGLE contact to change them.
+        </p>
         <SaveRow saving={saving} saved={saved} error={error} />
       </form>
-
-      {/*
-        Валюта и часовой пояс показаны как факты, а не как поля: сервер их
-        не принимает (`update_location_config_web` их не знает), и
-        нарисовать здесь ввод значило бы обещать правку, которой нет.
-      */}
-      <dl className="settings-facts is-appendix">
-        <div>
-          <dt>Currency</dt>
-          <dd>{location.currency || '—'}</dd>
-        </div>
-        <div>
-          <dt>Time zone</dt>
-          <dd>{location.timezone || '—'}</dd>
-        </div>
-      </dl>
-      <p className="form-hint">
-        Currency and time zone are set when the location is created — ask your
-        ANGLE contact to change them.
-      </p>
     </section>
   )
 }
@@ -359,7 +391,11 @@ function ReceiptsTab({ location, onSaved, onDirty }) {
   }
 
   return (
-    <section className="panel form-panel">
+    <section className="panel form-panel location-settings-panel">
+      <LocationPanelHeading
+        title="Receipts & tax"
+        description="Legal identity and receipt appearance for this location."
+      />
       <form onSubmit={submit} className="settings-form">
         <fieldset className="settings-group">
           <legend>Legal details</legend>
@@ -467,7 +503,11 @@ function PosDefaultsTab({ location, onSaved, onDirty }) {
   }
 
   return (
-    <section className="panel form-panel">
+    <section className="panel form-panel location-settings-panel">
+      <LocationPanelHeading
+        title="POS defaults"
+        description="Shift and register defaults shared by this location."
+      />
       <form onSubmit={submit} className="settings-form">
         <p className="form-hint">
           Applies to every register at this location. Printer, receipt width,
