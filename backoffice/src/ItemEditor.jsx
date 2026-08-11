@@ -482,10 +482,10 @@ export default function ItemEditor({
           )}
 
           {!isNew && (
-            <div className="editor-block">
+            <div className="editor-block item-delete-block">
               <button
                 type="button"
-                className="menu-delete-row"
+                className="menu-delete-row item-delete-button"
                 disabled={locked}
                 onClick={() => setConfirming(true)}
               >

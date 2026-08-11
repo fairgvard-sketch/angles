@@ -464,9 +464,11 @@ before(async () => {
   `)
 
   await bundle('responsive-workflows', `
+    import { useState } from 'react'
     import { createRoot } from 'react-dom/client'
 
     function Page() {
+      const [opened, setOpened] = useState(0)
       return (
         <main className="content">
           <div className="rsv-header">
@@ -491,6 +493,27 @@ before(async () => {
             <button className="is-active" role="tab">Sales</button>
             <button role="tab">Fiscal</button>
           </div>
+
+          <section className="panel ord-panel orders-click-workflow">
+            <div className="ord-cards">
+              <ul>
+                <li>
+                  <button className="ord-card-open" onClick={() => setOpened((value) => value + 1)}>
+                    <span className="ord-card-main">
+                      <span className="ord-card-head"><strong>#1020</strong><span className="ord-card-time">5 Aug · 10:12</span></span>
+                      <span className="ord-card-body"><span className="ord-card-context">Customer</span><span className="ord-card-sum">5 items · ₪83.00</span></span>
+                    </span>
+                    <span id="accepted-status" className="ord-status is-info">Accepted</span>
+                  </button>
+                </li>
+              </ul>
+            </div>
+            <output id="order-open-count">{opened}</output>
+          </section>
+
+          <button className="menu-delete-row item-delete-button delete-item-workflow">
+            Delete item
+          </button>
 
           <section className="locations-workflow">
             <label className="qr-field location-settings-picker">
@@ -1292,6 +1315,32 @@ describe('responsive control foundation', { skip }, () => {
     assert.ok(mobile.saveWidth >= mobile.panelWidth - 34, 'сохранение доступно полной шириной')
     assert.equal(mobile.saveHeight, 44)
     assert.equal(mobile.overflow, 0)
+    await page.close()
+  })
+
+  it('статус входит в кликабельную строку заказа, а удаление товара явно опасное', async () => {
+    const page = await browser.newPage()
+    await page.setViewport({ width: 390, height: 844, hasTouch: true, isMobile: true })
+    await page.goto(`${appOrigin}/responsive-workflows`, { waitUntil: 'networkidle0' })
+
+    const geometry = await page.evaluate(() => {
+      const open = document.querySelector('.orders-click-workflow .ord-card-open').getBoundingClientRect()
+      const status = document.getElementById('accepted-status').getBoundingClientRect()
+      const danger = getComputedStyle(document.querySelector('.delete-item-workflow'))
+      return {
+        statusRightGap: Math.round(open.right - status.right),
+        dangerBackground: danger.backgroundColor,
+        dangerColor: danger.color,
+        dangerRadius: parseFloat(danger.borderTopLeftRadius),
+      }
+    })
+    assert.ok(geometry.statusRightGap <= 1, 'статус должен стоять у правого края строки')
+    assert.match(geometry.dangerBackground, /rgb\(180, 69, 60\)/)
+    assert.equal(geometry.dangerColor, 'rgb(255, 255, 255)')
+    assert.ok(geometry.dangerRadius >= 20, 'красная кнопка остаётся капсулой')
+
+    await page.click('#accepted-status')
+    assert.equal(await page.$eval('#order-open-count', (node) => node.textContent), '1')
     await page.close()
   })
 })

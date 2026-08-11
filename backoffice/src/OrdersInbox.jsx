@@ -103,7 +103,10 @@ function RowMenu({ label, items, disabled, onPick }) {
         aria-haspopup="menu"
         aria-expanded={open}
         disabled={disabled}
-        onClick={() => setOpen((v) => !v)}
+        onClick={(event) => {
+          event.stopPropagation()
+          setOpen((v) => !v)
+        }}
       >
         <MoreHorizontal />
       </IconButton>
@@ -115,7 +118,11 @@ function RowMenu({ label, items, disabled, onPick }) {
               type="button"
               role="menuitem"
               className={item.tone === 'danger' ? 'is-danger' : undefined}
-              onClick={() => { setOpen(false); onPick(item.to) }}
+              onClick={(event) => {
+                event.stopPropagation()
+                setOpen(false)
+                onPick(item.to)
+              }}
             >
               {item.label}
             </button>
@@ -177,11 +184,15 @@ function OrdersTable({
               <tr
                 key={row.id}
                 className={`ord-row${selected ? ' is-selected' : ''}`}
+                onClick={(event) => {
+                  if (event.target.closest('button, a, input, select, textarea')) return
+                  onSelect(row.id)
+                }}
               >
                 <td className="ord-cell-num">
-                  {/* Раскрывает строку отдельная кнопка, а не вся строка:
-                      role="button" на <tr> ломается, как только внутрь
-                      попадает любой другой интерактивный элемент. */}
+                  {/* Номер остаётся настоящей кнопкой для клавиатуры.
+                      Указателем открывается и остальная строка; меню
+                      действий останавливает всплытие своего клика. */}
                   <button
                     type="button"
                     className="ord-open"
@@ -241,7 +252,7 @@ function OrdersTable({
  * состоянии. Остальное — в панели: она на телефоне открывается листом
  * снизу и показывает заказ целиком.
  */
-function OrdersList({
+export function OrdersList({
   rows, groups, scope, currency, tz, dayStartMs, nowMs, selectedId, onSelect,
   canManage, busy, onAction, empty,
 }) {
@@ -275,33 +286,37 @@ function OrdersList({
                     aria-expanded={row.id === selectedId}
                     onClick={() => onSelect(row.id)}
                   >
-                    <span className="ord-card-head">
-                      <strong>{orderNumber(row)}</strong>
-                      <span className="ord-card-time">
-                        {orderTimeLabel(at, dayStartMs, tz)}
-                        {active && scope === 'active' && (
-                          <small> · {elapsedLabel(row.created_at, nowMs)}</small>
-                        )}
+                    <span className="ord-card-main">
+                      <span className="ord-card-head">
+                        <strong>{orderNumber(row)}</strong>
+                        <span className="ord-card-time">
+                          {orderTimeLabel(at, dayStartMs, tz)}
+                          {active && scope === 'active' && (
+                            <small> · {elapsedLabel(row.created_at, nowMs)}</small>
+                          )}
+                        </span>
+                      </span>
+                      <span className="ord-card-body">
+                        <span className="ord-card-context">{rowContext(row)}</span>
+                        <span className="ord-card-sum">
+                          {itemsLabel(row.item_count)} · {formatMoney(row.total, currency)}
+                        </span>
                       </span>
                     </span>
-                    <span className="ord-card-body">
-                      <span className="ord-card-context">{rowContext(row)}</span>
-                      <span className="ord-card-sum">
-                        {itemsLabel(row.item_count)} · {formatMoney(row.total, currency)}
-                      </span>
-                    </span>
-                  </button>
-                  <span className="ord-card-side">
                     <span className={`ord-status is-${STATUS_TONE[row.status] ?? 'done'}`}>
                       {STATUS_LABELS[row.status] ?? row.status}
                     </span>
-                    <RowMenu
-                      label={`Actions for order ${orderNumber(row)}`}
-                      items={actions}
-                      disabled={busy?.id === row.id}
-                      onPick={(to) => onAction(row, to)}
-                    />
-                  </span>
+                  </button>
+                  {actions.length > 0 && (
+                    <span className="ord-card-side">
+                      <RowMenu
+                        label={`Actions for order ${orderNumber(row)}`}
+                        items={actions}
+                        disabled={busy?.id === row.id}
+                        onPick={(to) => onAction(row, to)}
+                      />
+                    </span>
+                  )}
                 </li>
               )
             })}

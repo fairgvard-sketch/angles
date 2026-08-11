@@ -972,6 +972,16 @@ a { color: inherit; }
 .menu-delete-row { display: flex; align-items: center; gap: 7px; width: 100%; min-height: 46px; padding: 10px 20px; border: 0; border-top: 1px solid var(--c-surface-sunken); background: var(--c-surface); color: #97545c; font-size: 13px; font-weight: 650; text-align: left; }
 .menu-delete-row:hover { background: #fdf7f7; color: var(--c-danger); }
 .menu-delete-row svg { width: 15px; height: 15px; }
+.item-delete-block { padding: 0; border: 0; }
+.menu-delete-row.item-delete-button {
+  min-height: 48px; justify-content: center;
+  border: 1px solid var(--c-danger); border-radius: var(--r-pill);
+  background: var(--c-danger); color: #fff; font-size: 14px;
+  cursor: pointer;
+}
+.menu-delete-row.item-delete-button:hover { background: #96372f; color: #fff; }
+.menu-delete-row.item-delete-button:focus-visible { outline: none; box-shadow: var(--focus-ring); }
+.menu-delete-row.item-delete-button:disabled { cursor: not-allowed; opacity: .55; }
 .menu-groups { display: grid; gap: 10px; }
 /* ── Каталог: поиск, выбор, порядок (Phase 5) ──────────────── */
 .bulk-count { font-size: 13px; font-weight: 700; color: var(--c-text); }
@@ -3005,7 +3015,9 @@ a { color: inherit; }
   text-transform: uppercase; letter-spacing: 0.02em;
 }
 .ord-table tbody tr:last-child td { border-bottom: 0; }
+.ord-row { cursor: pointer; }
 .ord-row:hover { background: var(--c-surface-hover); }
+.ord-row .ord-cell-menu { cursor: default; }
 /* Выбранная строка — сдержанный кобальт слева, а не заливка целиком */
 .ord-row.is-selected { background: var(--st-accent-soft); }
 .ord-row.is-selected td:first-child { box-shadow: inset 3px 0 0 var(--st-accent); }
@@ -3241,10 +3253,12 @@ a { color: inherit; }
   flex: 1 1 auto; min-width: 0; min-height: 56px;
   /* minmax(0,1fr), а не 1fr: элемент грида по умолчанию не меньше своего
      содержимого, и длинное имя гостя выдавливало состояние за край. */
-  display: grid; grid-template-columns: minmax(0, 1fr); gap: 2px; padding: 6px 0;
+  display: grid; grid-template-columns: minmax(0, 1fr) auto;
+  align-items: center; gap: var(--sp-3); padding: 6px 0;
   border: 0; background: transparent; font: inherit; text-align: start;
   cursor: pointer;
 }
+.ord-card-main { display: grid; grid-template-columns: minmax(0, 1fr); gap: 2px; min-width: 0; }
 .ord-card-head { display: flex; align-items: baseline; gap: var(--sp-2); min-width: 0; }
 .ord-card-head strong {
   font-size: 15px; font-weight: 700; color: var(--c-text-strong);
@@ -3261,12 +3275,9 @@ a { color: inherit; }
   flex: none; margin-inline-start: auto;
   color: var(--c-text-2); font-size: 13px; font-variant-numeric: tabular-nums;
 }
-/* Место под меню резервируется всегда: у заказа, принятого на кассе,
-   действий нет, и без резерва его состояние уезжало в чужую колонку —
-   список переставал читаться столбиком. */
 .ord-card-side {
-  flex: none; display: grid; grid-template-columns: auto 44px;
-  align-items: center; justify-items: end; gap: var(--sp-1);
+  position: relative; z-index: 1; flex: none; display: flex;
+  align-items: center; justify-content: flex-end;
 }
 .ord-card-side .icon-button { width: 44px; height: 44px; }
 
