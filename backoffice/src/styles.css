@@ -2712,6 +2712,24 @@ a { color: inherit; }
    что в этом блоке требует внимания хостес. */
 .guest-fav.is-warn { background: #fdf1f0; color: #9b2c22; }
 
+/*
+ * Автоматический сегмент (155) отличается от ручной метки формой:
+ * метку поставил человек, сегмент посчитал сервер, и путать их нельзя.
+ * Цвет несёт только срочность — «под угрозой» и «потерян» тревожные,
+ * остальное нейтральное; слово стоит в самом чипе, а не только в цвете.
+ */
+.cus-segment {
+  padding: 3px 8px; border-radius: var(--r-sm);
+  border: 1px solid var(--c-border-panel);
+  background: var(--c-surface);
+  font-size: 11px; font-weight: 700; letter-spacing: .01em;
+  color: var(--c-text-2);
+}
+.cus-segment.is-at-risk { border-color: #dcae3e; background: #fdf6e6; color: #7a5a10; }
+.cus-segment.is-lost { border-color: #f3c4c0; background: #fdf1f0; color: #9b2c22; }
+.cus-segment.is-repeat-no-show { border-color: #f3c4c0; background: #fdf1f0; color: #9b2c22; }
+.cus-segment.is-vip { border-color: #b9c6d8; background: #eef3fa; color: #274b7a; }
+
 /* ── План зала в кабинете (Kassa 123) ────────────────────────
    Строка стола двухстрочная: имя и признак («можно объединять»,
    «не обслуживается»). `.menu-name small` здесь не годится — он

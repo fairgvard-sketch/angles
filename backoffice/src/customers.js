@@ -117,33 +117,128 @@ export function guestRowLabel(guest, mode) {
  * Готовые срезы базы. Считает их СЕРВЕР (131): фильтр по загруженной
  * странице отвечал бы на вопрос «кто из первых двухсот», а не «кто».
  */
+/**
+ * Сегменты считает СЕРВЕР (155) и присылает готовым набором вместе с
+ * доказательством. Здесь остаются только подписи и подсказки.
+ *
+ * Раньше это были фильтры по тратам — «три визита лояльности», «200 ₪»,
+ * «90 дней без покупки». Все три считались по колонкам, которые
+ * заполняет касса, поэтому у точки с одним ANGLE Reserve не работал ни
+ * один: гость, бронирующий стол каждую пятницу, не попадал никуда.
+ *
+ * Порядок — по тому, как часто владелец сюда приходит: сначала «кто
+ * придёт», потом «кого теряем», потом остальное.
+ */
 export const SEGMENTS = [
   { key: 'all', label: 'Everyone', params: {} },
   {
-    key: 'regulars',
+    key: 'upcoming',
+    label: 'Coming soon',
+    hint: 'Has a future booking',
+    params: { p_segment: 'upcoming' },
+  },
+  {
+    key: 'at_risk',
+    label: 'At risk',
+    hint: 'Overdue against their own rhythm',
+    params: { p_segment: 'at_risk' },
+  },
+  {
+    key: 'lost',
+    label: 'Lost',
+    hint: 'No visit for half a year',
+    params: { p_segment: 'lost' },
+  },
+  {
+    key: 'new',
+    label: 'New',
+    hint: 'First visit, hasn’t come back yet',
+    params: { p_segment: 'new' },
+  },
+  {
+    key: 'returning',
+    label: 'Returning',
+    hint: '2 visits or more',
+    params: { p_segment: 'returning' },
+  },
+  {
+    key: 'regular',
     label: 'Regulars',
-    hint: '3 visits or more',
-    params: { p_min_visits: 3 },
+    hint: '5 visits or more',
+    params: { p_segment: 'regular' },
   },
   {
-    key: 'top',
-    label: 'Top spenders',
-    hint: '₪200 and up',
-    params: { p_min_spent: 20000 },
+    key: 'vip',
+    label: 'VIP',
+    hint: 'Top spend, or many visits without a register',
+    params: { p_segment: 'vip' },
   },
   {
-    key: 'recent',
-    label: 'Seen this month',
-    hint: 'Last 30 days',
-    params: { p_seen_days: 30 },
-  },
-  {
-    key: 'lapsed',
-    label: 'Lapsed',
-    hint: 'Came before, not in 90 days',
-    params: { p_inactive_days: 90 },
+    key: 'repeat_no_show',
+    label: 'Repeated no-shows',
+    hint: 'Missed 2 bookings or more',
+    params: { p_segment: 'repeat_no_show' },
   },
 ]
+
+/** Подписи сегментов, приходящих в строке гостя */
+export const SEGMENT_LABEL = {
+  new: 'New',
+  returning: 'Returning',
+  regular: 'Regular',
+  vip: 'VIP',
+  at_risk: 'At risk',
+  lost: 'Lost',
+  upcoming: 'Coming soon',
+  repeat_no_show: 'Repeated no-shows',
+}
+
+/**
+ * Чем метка заслужена — словами, из чисел сервера.
+ *
+ * «Пропал» без «был 8 раз, последний — 4 месяца назад» невозможно ни
+ * проверить, ни оспорить, и владелец такой метке просто не верит.
+ */
+export function whySegment(segment, why) {
+  if (!why) return ''
+  const visits = Number(why.visits) || 0
+  const days = why.days_since == null ? null : Number(why.days_since)
+  const gap = why.avg_gap_days == null ? null : Number(why.avg_gap_days)
+  switch (segment) {
+    case 'lost':
+      return days == null ? '' : `${visits} visits, last one ${days} days ago`
+    case 'at_risk':
+      return days == null || gap == null ? ''
+        : `usually every ${Math.round(gap)} days, silent for ${days}`
+    case 'regular':
+    case 'returning':
+      return gap == null ? `${visits} visits` : `${visits} visits, about every ${Math.round(gap)} days`
+    case 'new':
+      return days == null ? 'first visit' : `first visit ${days} days ago`
+    case 'vip':
+      return Number(why.spend) > 0
+        ? `${formatMoney(why.spend)} spent over ${visits} visits`
+        : `${visits} visits`
+    case 'upcoming':
+      return Number(why.upcoming) === 1 ? '1 booking ahead' : `${why.upcoming} bookings ahead`
+    case 'repeat_no_show':
+      return `${why.no_shows} no-shows`
+    default:
+      return ''
+  }
+}
+
+/**
+ * Основная подпись строки — первый сегмент набора.
+ *
+ * У гостя их несколько («постоянный» и «с будущей бронью» — разные
+ * ответы), но в узкой колонке помещается один; остальные видны в
+ * карточке.
+ */
+export function primarySegment(segments) {
+  return Array.isArray(segments) && segments.length > 0 ? segments[0] : null
+}
+
 
 export const SORTS = [
   { key: 'recent', label: 'Last visit' },
@@ -163,6 +258,7 @@ export const ROW_LIMIT = 200
 /** Аргументы RPC из состояния фильтров. Пустые значения не отправляем. */
 export function segmentParams({
   search = '', segment = 'all', tags = [], sort = 'recent', limit = ROW_LIMIT,
+  offset = 0, locationIds = null,
 } = {}) {
   const preset = SEGMENTS.find((s) => s.key === segment) ?? SEGMENTS[0]
   return {
@@ -175,6 +271,11 @@ export function segmentParams({
     p_min_spent: null,
     p_seen_days: null,
     p_inactive_days: null,
+    p_segment: null,
+    // Точки сужают ФАКТЫ, а не гостей: база общая на организацию, и
+    // «покажи гостей этой точки» означает «считай по её визитам».
+    p_location_ids: locationIds && locationIds.length ? locationIds : null,
+    p_offset: offset,
     ...preset.params,
     p_sort: sort,
   }

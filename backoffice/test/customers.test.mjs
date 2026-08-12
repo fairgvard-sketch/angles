@@ -349,7 +349,7 @@ describe('клиенты: отбор считает сервер', { skip }, () 
       loads: window.__LOADS__,
       checked: document.querySelector('[role="radio"][aria-checked="true"]').textContent,
     }))
-    assert.equal(state.loads[0].segment, 'regulars')
+    assert.equal(state.loads[0].segment, 'regular')
     assert.equal(state.loads[1].sort, 'spend')
     assert.equal(state.checked, 'Regulars')
     await page.close()
