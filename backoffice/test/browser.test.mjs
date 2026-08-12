@@ -1162,6 +1162,32 @@ describe('mobile navigation drawer', { skip }, () => {
     await page.close()
   })
 
+  it('шторка остаётся до нижнего края при изменении высоты мобильного viewport', async () => {
+    const page = await openDrawer()
+
+    // Safari меняет доступную высоту, когда адресная панель раскрывается
+    // и сворачивается. Раньше 100svh оставлял снизу кусок таймлайна.
+    await page.setViewport({ width: 390, height: 700 })
+    await page.setViewport({ width: 390, height: 932 })
+
+    const state = await page.evaluate(() => {
+      const sidebar = document.querySelector('.sidebar').getBoundingClientRect()
+      return {
+        top: Math.round(sidebar.top),
+        bottom: Math.round(sidebar.bottom),
+        viewportBottom: window.innerHeight,
+        rootLocked: document.documentElement.style.overflow === 'hidden',
+        bodyLocked: document.body.style.overflow === 'hidden',
+      }
+    })
+
+    assert.equal(state.top, 0)
+    assert.equal(state.bottom, state.viewportBottom, 'контент под меню не должен проступать снизу')
+    assert.equal(state.rootLocked, true, 'корень страницы заблокирован вместе с body')
+    assert.equal(state.bodyLocked, true)
+    await page.close()
+  })
+
   it('Escape закрывает шторку и возвращает фокус на бургер', async () => {
     const page = await openDrawer()
     assert.equal(
@@ -1176,11 +1202,13 @@ describe('mobile navigation drawer', { skip }, () => {
       active: document.activeElement?.getAttribute('aria-label'),
       expanded: document.querySelector('.mobile-menu').getAttribute('aria-expanded'),
       bodyLocked: document.body.style.overflow === 'hidden',
+      rootLocked: document.documentElement.style.overflow === 'hidden',
     }))
     assert.equal(after.open, false)
     assert.equal(after.active, 'Open navigation', 'фокус возвращается туда, откуда пришёл')
     assert.equal(after.expanded, 'false')
     assert.equal(after.bodyLocked, false, 'страница снова прокручивается')
+    assert.equal(after.rootLocked, false, 'корень страницы снова прокручивается')
     await page.close()
   })
 
