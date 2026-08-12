@@ -798,18 +798,28 @@ button[aria-busy='true'] {
     padding-inline: 10px;
   }
 
-  /* List filters are independent controls, not table columns. On a phone
-     each keeps a full readable line instead of being squeezed two-up. */
+  /* List filters are working form fields, not tiny toolbar chips. Keep
+     the useful 2x2 layout, but give every field the same visual weight
+     as the date and primary actions. */
   .rsv-list-toolbar {
     display: grid;
-    grid-template-columns: minmax(0, 1fr);
+    grid-template-columns: repeat(2, minmax(0, 1fr));
     align-items: stretch;
+    gap: 12px;
   }
 
   .rsv-list-toolbar .rsv-select,
   .rsv-list-toolbar .rsv-select select {
     width: 100%;
     min-width: 0;
+  }
+
+  .rsv-list-toolbar .rsv-select select {
+    height: 60px;
+    min-height: 60px;
+    padding-inline: 14px 38px;
+    border-radius: 16px;
+    font-size: 16px;
   }
 
   /* This was the actual source of the broken timeline: the old rule set a
@@ -1218,6 +1228,10 @@ button[aria-busy='true'] {
 
 @media (max-width: 350px) {
   .rsv-header-actions {
+    grid-template-columns: minmax(0, 1fr);
+  }
+
+  .rsv-list-toolbar {
     grid-template-columns: minmax(0, 1fr);
   }
 }

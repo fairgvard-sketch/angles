@@ -1334,6 +1334,7 @@ describe('responsive control foundation', { skip }, () => {
         pan: boxes('.timeline-pan > button'),
         reportTabs: boxes('.report-tabs > button'),
         listFilters: boxes('.rsv-list-toolbar select'),
+        listFilterFont: parseFloat(getComputedStyle(document.querySelector('.rsv-list-toolbar select')).fontSize),
       }
     })
 
@@ -1348,7 +1349,9 @@ describe('responsive control foundation', { skip }, () => {
     assert.deepEqual(state.actions.map((box) => box.height), [44, 44])
     assert.ok(Math.abs(state.actions[0].width - state.actions[1].width) <= 1)
     assert.ok(state.actions[0].y < state.day[0].y, 'действия стоят раньше даты')
-    assert.deepEqual(state.listFilters.map((box) => box.width), [358, 358, 358, 358])
+    assert.ok(state.listFilters.every((box) => box.width >= 170), 'поля не сжимаются в узкие чипы')
+    assert.deepEqual(state.listFilters.map((box) => box.height), [60, 60, 60, 60])
+    assert.ok(state.listFilterFont >= 16, 'фильтры читаются без масштабирования iOS')
     assert.equal(state.zones[0].width, state.controls[0].width, 'зоны занимают полную строку')
     assert.deepEqual(state.pan.map((box) => box.height), [44, 44])
     assert.ok(Math.abs(state.pan[0].width - state.pan[1].width) <= 1)
