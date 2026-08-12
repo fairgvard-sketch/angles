@@ -219,6 +219,19 @@ button[aria-busy='true'] {
   justify-content: flex-end;
 }
 
+/* CSV is a utility action, not the page's primary call to action. */
+.page-heading-actions .page-export-button {
+  width: auto;
+  padding-inline: 12px;
+}
+
+@media (max-width: 1024px) {
+  .page-heading-actions .page-export-button.compact {
+    height: var(--bo-touch);
+    min-height: var(--bo-touch);
+  }
+}
+
 /* Operational controls keep one rhythm even when a page uses the compact
    Button variant beside a regular secondary action. */
 .rsv-header-actions > button {
@@ -651,6 +664,19 @@ button[aria-busy='true'] {
   .cat-header-actions,
   .rsv-header-actions {
     gap: 8px;
+  }
+
+  /* Keep the accessible 44px tap target without letting a secondary
+     download action compete with the page title on a narrow screen. */
+  .page-heading-actions .page-export-button,
+  .page-heading-actions .page-export-button.compact {
+    width: var(--bo-touch);
+    min-width: var(--bo-touch);
+    padding-inline: 0;
+  }
+
+  .page-export-button .page-export-label {
+    display: none;
   }
 
   .primary-button,

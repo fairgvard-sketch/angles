@@ -708,11 +708,14 @@ function CustomerDirectory({ context, duplicates: showDuplicates, onDuplicatesCh
         title="Customers"
         actions={(
           <Button
+            className="page-export-button"
+            size="compact"
+            aria-label="Export customers as CSV"
             disabled={!total}
             onClick={exportCsv}
             title="Download the customers you are looking at right now"
           >
-            <Download aria-hidden /> Export CSV
+            <Download aria-hidden /> <span className="page-export-label">Export CSV</span>
           </Button>
         )}
       />

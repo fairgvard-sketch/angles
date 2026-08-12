@@ -489,7 +489,7 @@ describe('продажи: телефон', { skip }, () => {
     })
     assert.ok(state.picker >= 44, `выбор точек ${state.picker}px`)
     assert.ok(state.period >= 44, `период ${state.period}px`)
-    assert.ok(state.exportWidth < 390, 'выгрузка не превращается в кнопку во всю ширину')
+    assert.ok(state.exportWidth <= 48, `на телефоне выгрузка должна быть компактной иконкой: ${state.exportWidth}px`)
     await page.close()
   })
 })

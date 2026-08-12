@@ -243,11 +243,14 @@ export default function ActivityManager({ context }) {
         title="Activity"
         actions={(
           <Button
+            className="page-export-button"
+            size="compact"
+            aria-label="Export activity as CSV"
             disabled={!total}
             onClick={exportCsv}
             title="Download exactly what is on screen"
           >
-            <Download aria-hidden /> Export CSV
+            <Download aria-hidden /> <span className="page-export-label">Export CSV</span>
           </Button>
         )}
       />

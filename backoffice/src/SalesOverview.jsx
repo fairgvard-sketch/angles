@@ -385,11 +385,14 @@ export default function SalesOverview({ context, heading = 'Sales', tabs = null 
         title={heading}
         actions={(
           <Button
+            className="page-export-button"
+            size="compact"
+            aria-label="Export sales as CSV"
             disabled={!report}
             onClick={exportCsv}
             title="Download exactly what is on screen"
           >
-            <Download aria-hidden /> Export CSV
+            <Download aria-hidden /> <span className="page-export-label">Export CSV</span>
           </Button>
         )}
       />
