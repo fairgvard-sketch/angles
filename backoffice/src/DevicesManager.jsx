@@ -48,8 +48,6 @@ export function DeviceRow({ device, busy, onRename, onArchive, onDelete }) {
 
   return (
     <div className={`data-row device-row${archived ? ' is-archived' : ''}`}>
-      <StatusBadge className="device-status" tone={status} label={STATUS_LABEL[status]} />
-
       <div className="device-name">
         {editing ? (
           <form
@@ -95,6 +93,19 @@ export function DeviceRow({ device, busy, onRename, onArchive, onDelete }) {
         )}
       </div>
 
+      <div className="device-health">
+        <StatusBadge className="device-status" tone={status} label={STATUS_LABEL[status]} />
+        <div className="device-meta">
+          {device.outbox_pending > 0 && (
+            <span className={`device-queue ${device.outbox_failed ? 'is-negative' : ''}`}>
+              {device.outbox_failed && <AlertTriangle />}
+              {device.outbox_pending} queued{outboxAge ? ` · ${outboxAge}` : ''}
+            </span>
+          )}
+          <span className="device-seen">Last seen {lastSeenLabel(device)}</span>
+        </div>
+      </div>
+
       <span className="device-version">{statusVersions(device) || 'No version reported'}</span>
 
       {/* Совет объясняет, что владельцу делать дальше: «Offline» само по
@@ -102,16 +113,6 @@ export function DeviceRow({ device, busy, onRename, onArchive, onDelete }) {
       {advice && !archived && (
         <p className="device-advice"><AlertTriangle aria-hidden /><span>{advice}</span></p>
       )}
-
-      <div className="device-meta">
-        {device.outbox_pending > 0 && (
-          <span className={`device-queue ${device.outbox_failed ? 'is-negative' : ''}`}>
-            {device.outbox_failed && <AlertTriangle />}
-            {device.outbox_pending} queued{outboxAge ? ` · ${outboxAge}` : ''}
-          </span>
-        )}
-        <span className="device-seen">Last seen {lastSeenLabel(device)}</span>
-      </div>
 
       <div className="device-actions">
         <div className="device-actions-desktop">

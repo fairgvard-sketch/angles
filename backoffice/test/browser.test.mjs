@@ -534,10 +534,10 @@ before(async () => {
                 <div className="panel-heading"><div><h2>Snif Pinsker 29</h2><p>1 device</p></div></div>
                 <div className="data-list">
                   <div className="data-row device-row">
-                    <span className="device-status is-offline"><i />Offline</span>
                     <div className="device-name"><strong>Front counter</strong></div>
+                    <div className="device-health"><span className="device-status is-offline"><i />Offline</span><div className="device-meta"><span className="device-seen">Last seen 3d ago</span></div></div>
                     <span className="device-version">v2.8.1 · bridge 1.4.0 · Chrome 126</span>
-                    <div className="device-meta"><span className="device-seen">Last seen 3d ago</span></div><div className="device-actions"><div className="device-actions-desktop"><button className="icon-button">✎</button><button className="icon-button">□</button></div><div className="device-actions-mobile"><div className="row-menu"><button className="icon-button device-overflow-action">•••</button></div></div></div>
+                    <div className="device-actions"><div className="device-actions-desktop"><button className="icon-button">✎</button><button className="icon-button">□</button></div><div className="device-actions-mobile"><div className="row-menu"><button className="icon-button device-overflow-action">•••</button></div></div></div>
                     <p className="device-advice"><span>This terminal has not reported for 3 days. Archive it if it is no longer in use.</span></p>
                   </div>
                 </div>
@@ -550,10 +550,10 @@ before(async () => {
                 <div className="data-list">
                   {['Main register', 'Terrace POS'].map((name) => (
                     <div className="data-row device-row" key={name}>
-                      <span className="device-status is-online"><i />Online</span>
                       <div className="device-name"><strong>{name}</strong></div>
+                      <div className="device-health"><span className="device-status is-online"><i />Online</span><div className="device-meta"><span className="device-seen">Last seen Just now</span></div></div>
                       <span className="device-version">v2.8.1 · bridge 1.4.0 · Chrome 126</span>
-                      <div className="device-meta"><span className="device-seen">Last seen Just now</span></div><div className="device-actions"><div className="device-actions-desktop"><button className="icon-button">✎</button><button className="icon-button">□</button></div><div className="device-actions-mobile"><div className="row-menu"><button className="icon-button device-overflow-action">•••</button></div></div></div>
+                      <div className="device-actions"><div className="device-actions-desktop"><button className="icon-button">✎</button><button className="icon-button">□</button></div><div className="device-actions-mobile"><div className="row-menu"><button className="icon-button device-overflow-action">•••</button></div></div></div>
                     </div>
                   ))}
                 </div>
@@ -1425,6 +1425,7 @@ describe('responsive control foundation', { skip }, () => {
     await page.setViewport({ width: 390, height: 844, hasTouch: true, isMobile: true })
     const mobile = await page.evaluate(() => {
       const row = document.querySelector('.devices-workflow .device-row')
+      const workingRow = document.querySelectorAll('.devices-workflow .device-row')[1]
       const status = row.querySelector('.device-status').getBoundingClientRect()
       const actionsBox = row.querySelector('.device-actions').getBoundingClientRect()
       const name = row.querySelector('.device-name').getBoundingClientRect()
@@ -1436,17 +1437,25 @@ describe('responsive control foundation', { skip }, () => {
       return {
         statusTop: Math.round(status.top), actionsTop: Math.round(actionsBox.top),
         nameTop: Math.round(name.top), versionTop: Math.round(version.top),
+        actionsCenter: Math.round(actionsBox.top + actionsBox.height / 2),
+        nameCenter: Math.round(name.top + name.height / 2),
+        workingRowHeight: Math.round(workingRow.getBoundingClientRect().height),
+        actionBackground: getComputedStyle(row.querySelector('.device-actions-mobile .icon-button')).backgroundColor,
+        actionBorderWidth: getComputedStyle(row.querySelector('.device-actions-mobile .icon-button')).borderTopWidth,
         actions, overflow: document.documentElement.scrollWidth - document.documentElement.clientWidth,
       }
     })
     assert.ok(
-      mobile.actionsTop <= mobile.statusTop + 6,
-      'действия остаются в верхней строке карточки рядом со статусом',
+      Math.abs(mobile.actionsCenter - mobile.nameCenter) <= 3,
+      'меню действий стоит в строке названия, а не висит отдельно от карточки',
     )
-    assert.ok(mobile.nameTop > mobile.statusTop)
-    assert.ok(mobile.versionTop > mobile.nameTop)
+    assert.ok(mobile.statusTop > mobile.nameTop, 'статус и время связи собраны под названием')
+    assert.ok(mobile.versionTop > mobile.statusTop)
+    assert.ok(mobile.workingRowHeight <= 130, 'рабочая касса остаётся компактной на телефоне')
     assert.equal(mobile.actions.length, 1, 'на телефоне остаётся одно меню действий')
     assert.ok(mobile.actions.every(([width, height]) => width === 44 && height === 44))
+    assert.equal(mobile.actionBorderWidth, '0px', 'у меню нет отдельной плавающей окружности')
+    assert.notEqual(mobile.actionBackground, 'rgb(255, 255, 255)')
     assert.equal(mobile.overflow, 0)
     await page.close()
   })
