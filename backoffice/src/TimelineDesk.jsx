@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
-import { ChevronDown, ChevronLeft, ChevronRight } from 'lucide-react'
+import { ChevronLeft, ChevronRight } from 'lucide-react'
 import {
   blockState, buildRows, groupByZone, hourTicks, nowMarkerPct,
   timelineWindow, todayInZone,
@@ -94,7 +94,6 @@ export default function TimelineDesk({ locationId, date, query = '' }) {
   // Занятость — единственный отказ, к которому есть что добавить
   const [sheetConflict, setSheetConflict] = useState(false)
   const [zoneFilter, setZoneFilter] = useState(null)
-  const [legendOpen, setLegendOpen] = useState(false)
 
   const tz = meta.timezone
   const todayStr = useMemo(() => todayInZone(nowMs, tz), [nowMs, tz])
@@ -320,16 +319,8 @@ export default function TimelineDesk({ locationId, date, query = '' }) {
         </div>
       </div>
 
-      <div className="timeline-guide">
-        <button
-          type="button"
-          className="timeline-legend-toggle"
-          aria-expanded={legendOpen}
-          onClick={() => setLegendOpen((open) => !open)}
-        >
-          Status colors <ChevronDown aria-hidden />
-        </button>
-        <div className={`timeline-legend${legendOpen ? ' is-open' : ''}`} aria-label="Booking statuses">
+      <div className={`timeline-guide${found === null ? ' is-legend-only' : ''}`}>
+        <div className="timeline-legend" aria-label="Booking statuses">
           <span><i className="is-pending" />Pending</span>
           <span><i className="is-confirmed" />Confirmed</span>
           <span><i className="is-arrived" />Seated</span>

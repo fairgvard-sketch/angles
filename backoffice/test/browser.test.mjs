@@ -613,7 +613,6 @@ before(async () => {
               </div>
             </div>
             <div className="timeline-guide">
-              <button className="timeline-legend-toggle" aria-expanded="false">Status colors</button>
               <div className="timeline-legend">
                 <span><i className="is-pending" />Pending</span>
                 <span><i className="is-confirmed" />Confirmed</span>
@@ -1349,7 +1348,6 @@ describe('responsive control foundation', { skip }, () => {
       const gridBox = grid.getBoundingClientRect()
       const gridStyle = getComputedStyle(grid)
       const legend = document.querySelector('.timeline-legend')
-      const legendToggle = document.querySelector('.timeline-legend-toggle')
 
       return {
         pageOverflow: document.documentElement.scrollWidth - document.documentElement.clientWidth,
@@ -1367,13 +1365,12 @@ describe('responsive control foundation', { skip }, () => {
         rulerDisplay: getComputedStyle(ruler).display,
         embeddedRulerDisplay: getComputedStyle(grid.querySelector('.timeline-ruler')).display,
         legendDisplay: getComputedStyle(legend).display,
-        legendToggleDisplay: getComputedStyle(legendToggle).display,
       }
     })
 
     assert.equal(state.pageOverflow, 0, 'прокрутка времени не расширяет всю страницу')
     assert.equal(state.rulerWidth, state.gridWidth, 'шкала и строки используют одну видимую ширину')
-    assert.ok(state.gridWidth <= state.panelWidth, 'сетка остаётся внутри панели')
+    assert.ok(state.gridWidth >= state.panelWidth, 'сетка использует всю ширину мобильного полотна')
     assert.equal(state.labelWidth, 72, 'колонка столов компактна, но остаётся видимой')
     assert.ok(state.visibleTrackWidth >= 240, 'на iPhone видно не меньше 2.5 часов')
     assert.ok(state.trackWidth >= 720, 'время не сжимается — оно листается внутри сетки')
@@ -1384,7 +1381,6 @@ describe('responsive control foundation', { skip }, () => {
     assert.equal(state.rulerDisplay, 'block')
     assert.equal(state.embeddedRulerDisplay, 'none', 'на телефоне рисуется только одна шкала часов')
     assert.equal(state.legendDisplay, 'none', 'легенда не отнимает ширину первого экрана')
-    assert.notEqual(state.legendToggleDisplay, 'none')
     await page.close()
   })
 

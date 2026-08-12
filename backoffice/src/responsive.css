@@ -735,6 +735,9 @@ button[aria-busy='true'] {
     gap: 8px;
   }
 
+  .rsv-title-row { margin-bottom: 10px; }
+  .rsv-title-row h1 { font-size: 23px; }
+
   .rsv-header h1,
   .rsv-header .order-search,
   .rsv-daynav,
@@ -853,15 +856,9 @@ button[aria-busy='true'] {
     min-width: 0;
   }
 
-  .timeline-legend-toggle {
-    display: inline-flex; align-items: center; justify-content: center; gap: 6px;
-    min-height: var(--bo-touch); padding: 0 14px; border: 1px solid var(--bo-field-border);
-    border-radius: var(--r-pill); background: var(--c-surface); color: var(--c-text-muted);
-    font: inherit; font-size: 13px; font-weight: 700;
+  .timeline-guide.is-legend-only {
+    display: none;
   }
-
-  .timeline-legend-toggle svg { width: 15px; height: 15px; transition: transform .16s ease; }
-  .timeline-legend-toggle[aria-expanded='true'] svg { transform: rotate(180deg); }
 
   .timeline-legend {
     display: none;
@@ -872,30 +869,42 @@ button[aria-busy='true'] {
     scrollbar-width: none;
   }
 
-  .timeline-legend.is-open { display: flex; }
-
   .timeline-legend::-webkit-scrollbar {
     display: none;
   }
 
-  /* На телефоне таблица остаётся таблицей, но вертикально едет вместе со
-     страницей. Внутри неё прокручивается только время: это убирает второй
-     вертикальный scrollbar, который на iPhone перекрывал 10:00 и строки. */
+  /* На телефоне рабочее полотно становится полноширинным, как у систем
+     управления залом: номер стола закреплён слева, время листается
+     горизонтально, а все строки вертикально едут вместе со страницей. */
+  .timeline-panel {
+    margin-inline: calc(var(--bo-page-pad) * -1);
+    padding: 14px var(--bo-page-pad) 0;
+    border-inline: 0;
+    border-radius: 0;
+  }
+
   .timeline-mobile-ruler {
     position: sticky; top: 60px; z-index: 8; display: block;
-    max-width: 100%; overflow-x: auto; overflow-y: hidden;
+    width: calc(100% + (var(--bo-page-pad) * 2));
+    max-width: none; margin-inline: calc(var(--bo-page-pad) * -1);
+    overflow-x: auto; overflow-y: hidden;
     overscroll-behavior-x: contain; -webkit-overflow-scrolling: touch;
-    border: 1px solid var(--c-border-panel); border-bottom: 0;
-    border-radius: 10px 10px 0 0; background: var(--c-surface);
+    border-block: 1px solid var(--c-border-panel); border-inline: 0;
+    border-radius: 0; background: var(--c-surface);
     scrollbar-width: none;
   }
 
   .timeline-mobile-ruler::-webkit-scrollbar { display: none; }
   .timeline-mobile-ruler .timeline-ruler { position: relative; top: auto; border-bottom: 0; }
   .timeline-grid-scroll {
+    width: calc(100% + (var(--bo-page-pad) * 2));
+    max-width: none; margin-inline: calc(var(--bo-page-pad) * -1);
     max-height: none; overflow-x: auto; overflow-y: hidden;
-    border-radius: 0 0 10px 10px;
+    border-inline: 0; border-radius: 0;
+    scrollbar-width: none;
+    touch-action: pan-x pan-y;
   }
+  .timeline-grid-scroll::-webkit-scrollbar { display: none; }
   .timeline-grid-scroll > .timeline-canvas:not(.timeline-skeleton) > .timeline-ruler { display: none; }
   .timeline-canvas { --timeline-label-width: 72px; }
   .timeline-label { padding-inline: 7px; gap: 3px; }

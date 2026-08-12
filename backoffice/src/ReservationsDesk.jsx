@@ -60,18 +60,16 @@ export default function ReservationsDesk({
   const knownIds = useRef(new Set())
 
   /*
-   * День и поиск принадлежат трём рабочим видам: полотно, список и лист
-   * ожидания отвечают на вопросы про ОДИН день. Настройка зала и отчёт
-   * не наследуют эту строку — там дата, поиск и создание визита лишние.
-   *
-   * День живёт в адресе (`?d=`), поиск — нет: ссылку присылают на день,
-   * а не на набранную в поле строку.
+   * Календарный день принадлежит только полотну: там столы действительно
+   * смотрят на конкретную смену. List — ближайшие брони от сегодняшнего
+   * дня, Waitlist — живая очередь прямо сейчас. Общий календарь над
+   * всеми тремя вкладками превращал очередь в бессмысленный архив.
    */
   const today = todayInZone(Date.now(), tz)
   const day = date || today
   const setDay = (next) => onDateChange?.(next === today ? null : next)
   const [query, setQuery] = useState('')
-  const worksWithDay = view === 'timeline' || view === 'list' || view === 'waitlist'
+  const showsOperationalTools = view === 'timeline' || view === 'list' || view === 'waitlist'
 
   useEffect(() => {
     if (!locationId) return
@@ -146,11 +144,22 @@ export default function ReservationsDesk({
         Гость по телефону и гость с улицы — обычная работа хостес, а не
         повод идти к кассе, поэтому оба действия стоят здесь.
       */}
-      <div className={`rsv-header${worksWithDay ? '' : ' is-contextual'}`}>
+      <div className="rsv-title-row">
         <h1>Reservations</h1>
+      </div>
 
-        {worksWithDay && (
-          <>
+      {/* Сначала выбирают режим работы, затем видят только его инструменты. */}
+      <Tabs
+        className="desk-tabs"
+        label="Reservations view"
+        items={VIEWS}
+        value={view}
+        onChange={setView}
+      />
+
+      {showsOperationalTools && (
+        <div className="rsv-header">
+          {view === 'timeline' && (
             <div className="rsv-daynav">
               <IconButton label="Previous day" onClick={() => setDay(shiftDate(day, -1))}>
                 <ChevronLeft />
@@ -173,23 +182,29 @@ export default function ReservationsDesk({
                 </button>
               )}
             </div>
+          )}
 
+          {(view === 'timeline' || view === 'list' || view === 'waitlist') && (
             <SearchField
               label="Search reservations"
               value={query}
               onChange={setQuery}
               placeholder="Guest name or phone"
             />
+          )}
 
+          {(view === 'timeline' || view === 'list') && (
             <div className="rsv-header-actions">
-              <button
-                type="button"
-                className="secondary-button"
-                disabled={!locationId}
-                onClick={() => setCreating('walk-in')}
-              >
-                <DoorOpen /> Walk-in
-              </button>
+              {view === 'timeline' && (
+                <button
+                  type="button"
+                  className="secondary-button"
+                  disabled={!locationId}
+                  onClick={() => setCreating('walk-in')}
+                >
+                  <DoorOpen /> Walk-in
+                </button>
+              )}
               <button
                 type="button"
                 className="primary-button compact"
@@ -199,32 +214,11 @@ export default function ReservationsDesk({
                 <Plus /> New reservation
               </button>
             </div>
-          </>
-        )}
-      </div>
-
-      {/* Пять вкладок на 390px переносились в две строки, и активная
-          терялась. Полоса прокручивается, активная всегда видна. */}
-      <Tabs
-        className="desk-tabs"
-        label="Reservations view"
-        items={VIEWS}
-        value={view}
-        onChange={setView}
-      />
+          )}
+        </div>
+      )}
 
       {error && <p className="form-error" role="alert">{error}</p>}
-
-      {/* Чеклист относится к запуску публичной брони, а не к ежедневной
-          работе со списком, очередью или планом зала. На других вкладках
-          он уводил рабочий экран ниже первого экрана телефона. */}
-      {locationId && view === 'timeline' && (
-        <LaunchChecklist
-          locationId={locationId}
-          locationSlug={slug}
-          onGo={setView}
-        />
-      )}
 
       {creating && locationId && (
         <BookingForm
@@ -243,8 +237,19 @@ export default function ReservationsDesk({
       {view === 'timeline' && locationId && (
         <TimelineDesk locationId={locationId} date={day} query={query} />
       )}
+
+      {/* Настройка публичной страницы не должна стоять между хостес и
+          залом. Чеклист остаётся доступным, но идёт после рабочего
+          полотна — на телефоне первой видна именно таблица броней. */}
+      {locationId && view === 'timeline' && (
+        <LaunchChecklist
+          locationId={locationId}
+          locationSlug={slug}
+          onGo={setView}
+        />
+      )}
       {view === 'waitlist' && locationId && (
-        <WaitlistPanel locationId={locationId} date={day} query={query} />
+        <WaitlistPanel locationId={locationId} date={today} query={query} />
       )}
       {view === 'floor' && locationId && <FloorPlanEditor locationId={locationId} />}
       {/* Аналитика намеренно смотрит на всю организацию: сравнение точек
@@ -254,7 +259,7 @@ export default function ReservationsDesk({
       {view === 'list' && locationId && (
         <ReservationList
           locationId={locationId}
-          date={day}
+          date={today}
           query={query}
           filters={filters}
           onFilters={onFiltersChange}

@@ -318,6 +318,8 @@ a { color: inherit; }
 .ord-header h1,
 .cat-header h1,
 .rsv-header h1 { margin: 0; font-size: 25px; font-weight: 730; line-height: 1.1; }
+.rsv-title-row { margin-bottom: var(--sp-3); }
+.rsv-title-row h1 { margin: 0; font-size: 25px; font-weight: 730; line-height: 1.1; }
 /* Действия раздела (выгрузка, обновление) — в конце той же строки */
 .page-heading-actions { flex: 0 0 auto; display: flex; align-items: center; gap: var(--sp-2); margin-inline-start: auto; }
 /* Строка данных под названием занимает всю ширину */
@@ -1876,7 +1878,6 @@ a { color: inherit; }
   display: flex; align-items: center; justify-content: space-between;
   gap: 12px; margin-bottom: 9px;
 }
-.timeline-legend-toggle { display: none; }
 .timeline-legend { display: flex; flex-wrap: wrap; align-items: center; gap: 10px; }
 .timeline-legend span { display: inline-flex; align-items: center; gap: 5px; color: #686e77; font-size: 11px; }
 .timeline-legend i { width: 9px; height: 9px; border: 1px solid; border-radius: 3px; }
@@ -2064,9 +2065,8 @@ a { color: inherit; }
  * Раньше здесь стоял титульный заголовок в 40px с описанием на две
  * строки, под ним отдельная полоса кнопок, а день visita жил ниже — уже
  * внутри полотна. До первой брони с ноутбука доходило меньше половины
- * экрана. День и поиск принадлежат ВСЕМУ разделу, а не одной вкладке:
- * список, лист ожидания и полотно отвечают на вопросы про один и тот же
- * день.
+ * экрана. День принадлежит только Timeline: List начинается сегодня и
+ * смотрит вперёд, а Waitlist показывает живую очередь прямо сейчас.
  */
 /* Раскладка и типографика строки — общие, см. .page-heading */
 .rsv-header .order-search { flex: 1 1 220px; max-width: 340px; min-height: 40px; }
@@ -2112,7 +2112,7 @@ a { color: inherit; }
 
 /* Полоса вкладок: на телефоне прокручивается, а не переносится */
 .desk-tabs {
-  display: flex; gap: var(--sp-4); margin-bottom: var(--sp-4);
+  display: flex; gap: var(--sp-4); margin-bottom: var(--sp-3);
   border-bottom: 1px solid var(--c-border-panel);
   overflow-x: auto; overscroll-behavior-x: contain; scrollbar-width: none;
 }
@@ -2635,7 +2635,7 @@ a { color: inherit; }
   .timeline-label { padding-inline: 8px; gap: 4px; }
   .timeline-label strong { font-size: 13px; }
   .timeline-label small { font-size: 10px; }
-  .timeline-track { height: 50px; }
+  .timeline-track { height: 56px; }
   .sheet { max-width: none; padding: 18px 16px calc(18px + env(safe-area-inset-bottom)); }
   .booking-form-actions {
     bottom: calc(-18px - env(safe-area-inset-bottom)); margin: 2px -16px calc(-18px - env(safe-area-inset-bottom));

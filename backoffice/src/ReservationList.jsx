@@ -30,11 +30,10 @@ import BookingSheet from './BookingSheet'
 
 const DAY_MS = 86_400_000
 
-/** Сколько дней показывает список от выбранного дня */
+/** List — будущая работа, а не архив. Прошлые визиты ищутся в отчётах. */
 export const RANGES = [
-  { key: 'day', label: 'Selected day', days: 1 },
-  { key: 'week', label: 'Next 7 days', days: 7 },
-  { key: 'past', label: 'Past 7 days', days: -7 },
+  { key: 'week', label: 'Upcoming 7 days', days: 7 },
+  { key: 'day', label: 'Today', days: 1 },
 ]
 
 const STATUS_FILTERS = [
@@ -88,9 +87,6 @@ export default function ReservationList({ locationId, date, query = '', filters,
   // другом часовом поясе — те же семь рабочих дней его заведения.
   const window = useMemo(() => {
     const startOfDay = zonedToUtc(date, 0, tz).getTime()
-    if (range.days < 0) {
-      return { fromMs: startOfDay + range.days * DAY_MS, toMs: startOfDay + DAY_MS }
-    }
     return { fromMs: startOfDay, toMs: startOfDay + range.days * DAY_MS }
   }, [date, tz, range.days])
 
@@ -203,8 +199,8 @@ export default function ReservationList({ locationId, date, query = '', filters,
 
   return (
     <section className="panel form-panel rsv-list-panel">
-      {/* Отбор в одну строку: день уже выбран в шапке раздела, здесь —
-          глубина, состояние, зал и происхождение брони. */}
+      {/* List начинается сегодня и смотрит только вперёд. Отдельной даты
+          в шапке нет: она относится к пространственной сетке Timeline. */}
       <div className="rsv-list-toolbar">
         <label className="rsv-select">
           <span className="visually-hidden">Range</span>

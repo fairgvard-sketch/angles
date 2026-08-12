@@ -54,6 +54,18 @@ describe('раздел броней', () => {
     assert.match(html, /value="2026-05-17"/)
   })
 
+  it('дата принадлежит только timeline, а waitlist — сегодняшней живой очереди', () => {
+    const list = render({ tab: 'list', date: '2026-05-17' })
+    assert.doesNotMatch(list, /aria-label="Reservations day"/)
+    assert.match(list, />Today</)
+    assert.match(list, />Upcoming 7 days</)
+    assert.doesNotMatch(list, /Past 7 days/)
+
+    const waitlist = render({ tab: 'waitlist', date: '2026-05-17' })
+    assert.doesNotMatch(waitlist, /aria-label="Reservations day"/)
+    assert.match(waitlist, /Add to waitlist/)
+  })
+
   it('без дня в адресе открыт сегодняшний день точки, и кнопки «Today» нет', () => {
     const html = render()
     const today = todayInZone(Date.now(), 'Asia/Jerusalem')
@@ -84,14 +96,16 @@ describe('раздел броней', () => {
     assert.match(broken, /aria-selected="true"[^>]*>Timeline/)
   })
 
-  it('настройка зала и аналитика не наследуют рабочую строку дня', () => {
-    for (const tab of ['floor', 'analytics']) {
+  it('только timeline наследует рабочую строку дня', () => {
+    for (const tab of ['list', 'waitlist', 'floor', 'analytics']) {
       const html = render({ tab })
       assert.match(html, /<h1>Reservations<\/h1>/)
       assert.doesNotMatch(html, /aria-label="Reservations day"/)
-      assert.doesNotMatch(html, /Search reservations/)
-      assert.doesNotMatch(html, />Walk-in</)
-      assert.doesNotMatch(html, />New reservation</)
+      if (tab === 'floor' || tab === 'analytics') {
+        assert.doesNotMatch(html, /Search reservations/)
+        assert.doesNotMatch(html, />Walk-in</)
+        assert.doesNotMatch(html, />New reservation</)
+      }
     }
   })
 
