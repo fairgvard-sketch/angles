@@ -76,7 +76,7 @@ function TimelineRuler({ ticks, markerPct }) {
   )
 }
 
-export default function TimelineDesk({ locationId, date, query = '' }) {
+export default function TimelineDesk({ locationId, date }) {
   const [nowMs, setNowMs] = useState(() => Date.now())
   useEffect(() => {
     const id = setInterval(() => setNowMs(Date.now()), 60_000)
@@ -165,45 +165,16 @@ export default function TimelineDesk({ locationId, date, query = '' }) {
     }
   }), [raw])
 
-  /*
-   * Поиск не убирает визиты с полотна: пропавший визит хостес считает
-   * несуществующим и звонит гостю зря. Несовпавшие приглушаются, и
-   * место суток остаётся видимым.
-   */
-  const needle = query.trim().toLowerCase()
-  const matchesQuery = useCallback((booking) => {
-    if (!needle) return true
-    return `${booking.guestName ?? ''} ${booking.phone ?? ''}`.toLowerCase().includes(needle)
-  }, [needle])
-
   const win = useMemo(
     () => timelineWindow(date, tz, meta.schedule, bookings),
     [date, tz, meta.schedule, bookings]
   )
   const rows = useMemo(() => buildRows(tables, bookings, win), [tables, bookings, win])
-  // Отключённые столы не являются частью текущей работы хостес. Раньше
-  // они занимали целые пустые строки и создавали впечатление, что зал
-  // больше и свободнее, чем он есть. Строку сохраняем только если на
-  // таком столе осталась бронь выбранного дня — её нельзя потерять.
-  const operationalRows = useMemo(
-    () => rows.filter((row) => !row.table.blocked || row.blocks.length > 0),
-    [rows]
-  )
-  const hiddenTableCount = rows.length - operationalRows.length
-  const zones = useMemo(() => groupByZone(operationalRows), [operationalRows])
+  // Отключённые столы остаются на плане: владелец должен видеть полную
+  // географию зала. Серые строки и подпись «Out of service» отличают их
+  // от свободных, поэтому они не создают ложного ощущения доступности.
+  const zones = useMemo(() => groupByZone(rows), [rows])
   const visibleZones = zoneFilter === null ? zones : zones.filter((z) => z.id === zoneFilter)
-  // Сколько визитов дня отвечает поиску — иначе приглушённое полотно
-  // выглядит сломанным, а не отфильтрованным.
-  const found = useMemo(() => {
-    if (!needle) return null
-    const ids = new Set()
-    for (const row of operationalRows) {
-      for (const block of row.blocks) {
-        if (matchesQuery(block.booking)) ids.add(block.booking.id)
-      }
-    }
-    return ids.size
-  }, [needle, matchesQuery, operationalRows])
   const ticks = useMemo(() => hourTicks(win, tz), [win, tz])
   // Получас виден, но тише часа: он помогает прицелиться, а не читается
   // как отдельная отметка времени.
@@ -319,7 +290,7 @@ export default function TimelineDesk({ locationId, date, query = '' }) {
         </div>
       </div>
 
-      <div className={`timeline-guide${found === null ? ' is-legend-only' : ''}`}>
+      <div className="timeline-guide is-legend-only">
         <div className="timeline-legend" aria-label="Booking statuses">
           <span><i className="is-pending" />Pending</span>
           <span><i className="is-confirmed" />Confirmed</span>
@@ -327,20 +298,7 @@ export default function TimelineDesk({ locationId, date, query = '' }) {
           <span><i className="is-done" />Completed</span>
           <span><i className="is-conflict" />Conflict</span>
         </div>
-        {found !== null && (
-          <p className="timeline-hidden-note" role="status">
-            {found === 0
-              ? `Nothing on this day matches “${query.trim()}”.`
-              : `${found} visit${found === 1 ? '' : 's'} match “${query.trim()}” — the rest are dimmed.`}
-          </p>
-        )}
       </div>
-
-      {hiddenTableCount > 0 && (
-        <p className="timeline-hidden-note">
-          {hiddenTableCount} out-of-service table{hiddenTableCount === 1 ? '' : 's'} hidden from this operational view.
-        </p>
-      )}
 
       {error && <p className="form-error" role="alert">{error}</p>}
 
@@ -401,7 +359,7 @@ export default function TimelineDesk({ locationId, date, query = '' }) {
                       {halfMarks.map((mark) => (
                         <span key={mark.ts} className="timeline-grid is-half" style={{ left: `${mark.leftPct}%` }} />
                       ))}
-                      {row.table.blocked && <span className="timeline-blocked">disabled</span>}
+                      {row.table.blocked && <span className="timeline-blocked">Out of service</span>}
                       {markerPct !== null && (
                         <span className="timeline-now" style={{ left: `${markerPct}%` }} />
                       )}
@@ -415,8 +373,7 @@ export default function TimelineDesk({ locationId, date, query = '' }) {
                               block.conflict ? ' is-conflict' : ''}${
                               block.clipsStart ? ' is-clip-start' : ''}${
                               block.clipsEnd ? ' is-clip-end' : ''}${
-                              detail?.id === block.booking.id ? ' is-selected' : ''}${
-                              matchesQuery(block.booking) ? '' : ' is-dimmed'}`}
+                              detail?.id === block.booking.id ? ' is-selected' : ''}`}
                             style={{ left: `${block.leftPct}%`, width: `${block.widthPct}%` }}
                             // Выбранный визит — состояние кнопки, а не только
                             // рамка: читалка обязана сказать, что открыто.
@@ -476,7 +433,7 @@ export default function TimelineDesk({ locationId, date, query = '' }) {
           bookings={raw ?? []}
           // С кем именно столкнулась бронь — из тех же строк, что рисуют
           // полотно: панель и сетка не могут расходиться в этом ответе.
-          clashes={overlappingVisits(operationalRows, detail.id)}
+          clashes={overlappingVisits(rows, detail.id)}
           onClearError={() => { setSheetError(''); setSheetConflict(false) }}
           onClose={() => { setDetail(null); setSheetError(''); setSheetConflict(false) }}
           onEdit={(patch) => act(async () => {

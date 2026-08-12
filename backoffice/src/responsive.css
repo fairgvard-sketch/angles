@@ -798,6 +798,20 @@ button[aria-busy='true'] {
     padding-inline: 10px;
   }
 
+  /* List filters are independent controls, not table columns. On a phone
+     each keeps a full readable line instead of being squeezed two-up. */
+  .rsv-list-toolbar {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr);
+    align-items: stretch;
+  }
+
+  .rsv-list-toolbar .rsv-select,
+  .rsv-list-toolbar .rsv-select select {
+    width: 100%;
+    min-width: 0;
+  }
+
   /* This was the actual source of the broken timeline: the old rule set a
      grid template without switching flex to grid. */
   .timeline-controls {

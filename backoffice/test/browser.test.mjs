@@ -472,21 +472,22 @@ before(async () => {
       return (
         <main className="content">
           <div className="rsv-header">
-            <h1>Reservations</h1>
+            <div className="rsv-header-actions">
+              <button className="secondary-button">Walk-in</button>
+              <button className="primary-button compact">New reservation</button>
+            </div>
             <div className="rsv-daynav">
               <button className="icon-button" aria-label="Previous day">‹</button>
               <input type="date" aria-label="Reservations day" defaultValue="2026-08-09" />
               <button className="icon-button" aria-label="Next day">›</button>
               <button className="rsv-today">Today</button>
             </div>
-            <label className="order-search">
-              <span className="visually-hidden">Search reservations</span>
-              <input aria-label="Search reservations" />
-            </label>
-            <div className="rsv-header-actions">
-              <button className="secondary-button">Walk-in</button>
-              <button className="primary-button compact">New reservation</button>
-            </div>
+          </div>
+
+          <div className="rsv-list-toolbar">
+            {['Upcoming 7 days', 'All statuses', 'All zones', 'Any origin'].map((label) => (
+              <label className="rsv-select" key={label}><select defaultValue={label}><option>{label}</option></select></label>
+            ))}
           </div>
 
           <div className="location-tabs settings-topic-tabs report-tabs" role="tablist">
@@ -643,7 +644,10 @@ before(async () => {
                 {Array.from({ length: 12 }, (_, index) => (
                   <div className="timeline-row" key={index}>
                     <div className="timeline-label"><strong>{index + 1}</strong><small>2</small></div>
-                    <div className="timeline-track"><span className="timeline-grid" style={{ left: '13.33%' }} /></div>
+                    <div className={'timeline-track' + (index === 11 ? ' is-blocked' : '')}>
+                      <span className="timeline-grid" style={{ left: '13.33%' }} />
+                      {index === 11 && <span className="timeline-blocked">Out of service</span>}
+                    </div>
                   </div>
                 ))}
               </div>
@@ -1329,6 +1333,7 @@ describe('responsive control foundation', { skip }, () => {
         zones: boxes('.timeline-zones'),
         pan: boxes('.timeline-pan > button'),
         reportTabs: boxes('.report-tabs > button'),
+        listFilters: boxes('.rsv-list-toolbar select'),
       }
     })
 
@@ -1342,6 +1347,8 @@ describe('responsive control foundation', { skip }, () => {
     }
     assert.deepEqual(state.actions.map((box) => box.height), [44, 44])
     assert.ok(Math.abs(state.actions[0].width - state.actions[1].width) <= 1)
+    assert.ok(state.actions[0].y < state.day[0].y, 'действия стоят раньше даты')
+    assert.deepEqual(state.listFilters.map((box) => box.width), [358, 358, 358, 358])
     assert.equal(state.zones[0].width, state.controls[0].width, 'зоны занимают полную строку')
     assert.deepEqual(state.pan.map((box) => box.height), [44, 44])
     assert.ok(Math.abs(state.pan[0].width - state.pan[1].width) <= 1)
@@ -1376,6 +1383,7 @@ describe('responsive control foundation', { skip }, () => {
       const gridBox = grid.getBoundingClientRect()
       const gridStyle = getComputedStyle(grid)
       const legend = document.querySelector('.timeline-legend')
+      const outOfService = document.querySelector('.timeline-track.is-blocked .timeline-blocked')
 
       return {
         pageOverflow: document.documentElement.scrollWidth - document.documentElement.clientWidth,
@@ -1393,6 +1401,7 @@ describe('responsive control foundation', { skip }, () => {
         rulerDisplay: getComputedStyle(ruler).display,
         embeddedRulerDisplay: getComputedStyle(grid.querySelector('.timeline-ruler')).display,
         legendDisplay: getComputedStyle(legend).display,
+        outOfServiceText: outOfService?.textContent,
       }
     })
 
@@ -1409,6 +1418,7 @@ describe('responsive control foundation', { skip }, () => {
     assert.equal(state.rulerDisplay, 'block')
     assert.equal(state.embeddedRulerDisplay, 'none', 'на телефоне рисуется только одна шкала часов')
     assert.equal(state.legendDisplay, 'none', 'легенда не отнимает ширину первого экрана')
+    assert.equal(state.outOfServiceText, 'Out of service', 'отключённые столы остаются на плане')
     await page.close()
   })
 

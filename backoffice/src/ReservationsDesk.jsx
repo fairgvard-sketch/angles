@@ -159,6 +159,29 @@ export default function ReservationsDesk({
 
       {showsOperationalTools && (
         <div className="rsv-header">
+          {(view === 'timeline' || view === 'list') && (
+            <div className="rsv-header-actions">
+              {view === 'timeline' && (
+                <button
+                  type="button"
+                  className="secondary-button"
+                  disabled={!locationId}
+                  onClick={() => setCreating('walk-in')}
+                >
+                  <DoorOpen /> Walk-in
+                </button>
+              )}
+              <button
+                type="button"
+                className="primary-button compact"
+                disabled={!locationId}
+                onClick={() => setCreating('booking')}
+              >
+                <Plus /> New reservation
+              </button>
+            </div>
+          )}
+
           {view === 'timeline' && (
             <div className="rsv-daynav">
               <IconButton label="Previous day" onClick={() => setDay(shiftDate(day, -1))}>
@@ -184,7 +207,7 @@ export default function ReservationsDesk({
             </div>
           )}
 
-          {(view === 'timeline' || view === 'list' || view === 'waitlist') && (
+          {(view === 'list' || view === 'waitlist') && (
             <SearchField
               label="Search reservations"
               value={query}
@@ -193,28 +216,6 @@ export default function ReservationsDesk({
             />
           )}
 
-          {(view === 'timeline' || view === 'list') && (
-            <div className="rsv-header-actions">
-              {view === 'timeline' && (
-                <button
-                  type="button"
-                  className="secondary-button"
-                  disabled={!locationId}
-                  onClick={() => setCreating('walk-in')}
-                >
-                  <DoorOpen /> Walk-in
-                </button>
-              )}
-              <button
-                type="button"
-                className="primary-button compact"
-                disabled={!locationId}
-                onClick={() => setCreating('booking')}
-              >
-                <Plus /> New reservation
-              </button>
-            </div>
-          )}
         </div>
       )}
 
@@ -235,7 +236,7 @@ export default function ReservationsDesk({
       )}
 
       {view === 'timeline' && locationId && (
-        <TimelineDesk locationId={locationId} date={day} query={query} />
+        <TimelineDesk locationId={locationId} date={day} />
       )}
 
       {/* Настройка публичной страницы не должна стоять между хостес и

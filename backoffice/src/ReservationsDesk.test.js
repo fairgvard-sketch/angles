@@ -38,15 +38,16 @@ function render(props = {}) {
 }
 
 describe('раздел броней', () => {
-  it('шапка держит день, поиск и оба способа завести гостя', () => {
+  it('timeline держит действия раньше дня и не дублирует поиск из List', () => {
     const html = render()
     assert.match(html, /<h1>Reservations<\/h1>/)
     assert.match(html, /aria-label="Reservations day"/)
     assert.match(html, /aria-label="Previous day"/)
     assert.match(html, /aria-label="Next day"/)
-    assert.match(html, /Search reservations/)
+    assert.doesNotMatch(html, /Search reservations/)
     assert.match(html, /New reservation/)
     assert.match(html, /Walk-in/)
+    assert.ok(html.indexOf('rsv-header-actions') < html.indexOf('rsv-daynav'))
   })
 
   it('день берётся из адреса, а не из «сегодня»', () => {
@@ -60,6 +61,7 @@ describe('раздел броней', () => {
     assert.match(list, />Today</)
     assert.match(list, />Upcoming 7 days</)
     assert.doesNotMatch(list, /Past 7 days/)
+    assert.match(list, /Search reservations/)
 
     const waitlist = render({ tab: 'waitlist', date: '2026-05-17' })
     assert.doesNotMatch(waitlist, /aria-label="Reservations day"/)
