@@ -1,7 +1,6 @@
-import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
+import { useEffect, useMemo, useState } from 'react'
 import { ChevronLeft, ChevronRight } from 'lucide-react'
 import {
-  fetchReservationRange, fetchReservationSettings, fetchTimelineTables,
   markReservationArrived, setReservationStatus, setReservationTables,
   updateReservation, updateReservationGuest, deskErrorText,
 } from './reservations'
@@ -10,8 +9,8 @@ import { statusClass, statusLabel, visitState } from './reservation-status'
 import {
   PAGE_SIZE, VIA_LABEL, createdVia, filterReservations, groupByDay, paginate, sortByTime,
 } from './reservation-list'
+import { trimToWindow } from './visit'
 import { zonedToUtc } from './timeline'
-import { supabase } from './supabase'
 import PartyCount from './ui/PartyCount'
 import BookingSheet from './BookingSheet'
 
@@ -67,86 +66,52 @@ function hhmm(iso, tz) {
   }
 }
 
-export default function ReservationList({ locationId, date, query = '', filters, onFilters }) {
-  const [meta, setMeta] = useState({ timezone: 'Asia/Jerusalem' })
-  const [tables, setTables] = useState([])
-  const [raw, setRaw] = useState(null)
-  const [capped, setCapped] = useState(false)
-  const [error, setError] = useState('')
+export default function ReservationList({
+  locationId, date, query = '', filters, onFilters, desk, tables, tz, onReload,
+}) {
   const [busy, setBusy] = useState(false)
   const [detail, setDetail] = useState(null)
   const [sheetError, setSheetError] = useState('')
   const [sheetConflict, setSheetConflict] = useState(false)
   const [page, setPage] = useState(1)
 
-  const tz = meta.timezone
   const range = RANGES.find((r) => r.key === filters.rg) ?? RANGES[0]
   const sortDir = filters.so === 'desc' ? 'desc' : 'asc'
 
   // Отрезок считается в сутках ТОЧКИ: «следующие 7 дней» для владельца в
   // другом часовом поясе — те же семь рабочих дней его заведения.
+  //
+  // Запрос при этом берёт данные с запасом в сутки по краям (`visit.js`),
+  // потому что пояс приезжает в том же ответе. Лишнее отсекается здесь,
+  // а не вторым запросом: иначе список грузился бы дважды.
   const window = useMemo(() => {
     const startOfDay = zonedToUtc(date, 0, tz).getTime()
     return { fromMs: startOfDay, toMs: startOfDay + range.days * DAY_MS }
   }, [date, tz, range.days])
 
-  const requestRef = useRef(0)
+  const raw = desk?.visits ?? null
+  const capped = !!desk?.capped
+  const inWindow = useMemo(
+    () => (raw === null ? null : trimToWindow(raw, window.fromMs, window.toMs)),
+    [raw, window.fromMs, window.toMs]
+  )
 
-  const load = useCallback(async () => {
-    if (!locationId) return
-    const ticket = requestRef.current + 1
-    requestRef.current = ticket
-    try {
-      const [settings, tbls, result] = await Promise.all([
-        fetchReservationSettings(locationId),
-        fetchTimelineTables(locationId),
-        fetchReservationRange(locationId, window.fromMs, window.toMs),
-      ])
-      // Ответ на устаревший запрос не должен переписать таблицу
-      if (requestRef.current !== ticket) return
-      setMeta(settings)
-      setTables(tbls)
-      setRaw(result.rows)
-      setCapped(result.capped)
-      setError('')
-    } catch (e) {
-      if (requestRef.current !== ticket) return
-      setError(deskErrorText(e.message))
-    }
-  }, [locationId, window.fromMs, window.toMs])
-
-  useEffect(() => {
-    setRaw(null)
-    load()
-    const channel = supabase
-      .channel(`reservation-list-${locationId}`)
-      .on('postgres_changes',
-        { event: '*', schema: 'public', table: 'reservations', filter: `location_id=eq.${locationId}` },
-        () => load())
-      .subscribe()
-    const timer = setInterval(load, 60_000)
-    return () => {
-      supabase.removeChannel(channel)
-      clearInterval(timer)
-    }
-  }, [locationId, load])
-
-  const tableById = useMemo(() => new Map(tables.map((t) => [t.id, t])), [tables])
+  const tableById = useMemo(() => new Map((tables ?? []).map((t) => [t.id, t])), [tables])
   const zones = useMemo(() => {
     const seen = new Map()
-    for (const table of tables) {
+    for (const table of tables ?? []) {
       if (table.zoneId && !seen.has(table.zoneId)) seen.set(table.zoneId, table.zoneName)
     }
     return [...seen.entries()].map(([id, name]) => ({ id, name: name || 'Zone' }))
   }, [tables])
 
-  const visible = useMemo(() => sortByTime(filterReservations(raw ?? [], {
+  const visible = useMemo(() => sortByTime(filterReservations(inWindow ?? [], {
     status: filters.st ?? null,
     zone: filters.zn ?? null,
     via: filters.sr ?? null,
     query,
     tableById,
-  }), sortDir), [raw, filters.st, filters.zn, filters.sr, query, tableById, sortDir])
+  }), sortDir), [inWindow, filters.st, filters.zn, filters.sr, query, tableById, sortDir])
 
   // Сузили отбор — третья страница могла исчезнуть; возвращаемся к первой
   useEffect(() => { setPage(1) }, [filters.st, filters.zn, filters.sr, filters.rg, query, date])
@@ -168,6 +133,21 @@ export default function ReservationList({ locationId, date, query = '', filters,
 
   const setFilter = (key, value) => onFilters({ ...filters, [key]: value || null })
 
+  /*
+   * Открытая панель показывает СВЕЖУЮ бронь, а не копию строки, с
+   * которой её открыли: пока хостес читает карточку, гость отменяет
+   * бронь с телефона — и панель обязана это показать, а не оставить
+   * «Подтверждена» под кнопкой «Гость сел».
+   */
+  const detailVisit = useMemo(
+    () => (detail ? (inWindow ?? []).find((v) => v.id === detail) ?? null : null),
+    [detail, inWindow]
+  )
+
+  useEffect(() => {
+    if (detail && inWindow !== null && !detailVisit) setDetail(null)
+  }, [detail, inWindow, detailVisit])
+
   async function act(fn) {
     setBusy(true)
     setSheetError('')
@@ -175,8 +155,7 @@ export default function ReservationList({ locationId, date, query = '', filters,
     try {
       await fn()
       setDetail(null)
-      await load()
-      setError('')
+      await onReload()
     } catch (e) {
       setSheetError(deskErrorText(e.message))
       setSheetConflict(isConflict(e.message))
@@ -187,7 +166,7 @@ export default function ReservationList({ locationId, date, query = '', filters,
 
   const tablesOf = (reservation) => {
     const ids = [
-      ...(reservation.tables_link ?? []).map((l) => l.table_id),
+      ...(reservation.table_ids ?? []),
       reservation.table_id,
       ...(reservation.hold_table_ids ?? []),
     ].filter(Boolean)
@@ -235,7 +214,6 @@ export default function ReservationList({ locationId, date, query = '', filters,
         </label>
       </div>
 
-      {error && <p className="form-error" role="alert">{error}</p>}
       {capped && (
         <p className="timeline-hidden-note">
           Showing the first 500 bookings of this period — narrow the range or
@@ -243,7 +221,7 @@ export default function ReservationList({ locationId, date, query = '', filters,
         </p>
       )}
 
-      {raw === null ? (
+      {inWindow === null ? (
         <ListSkeleton />
       ) : visible.length === 0 ? (
         <p className="empty-state">
@@ -293,15 +271,15 @@ export default function ReservationList({ locationId, date, query = '', filters,
                     return (
                       <tr
                         key={r.id}
-                        className={`rsv-row${detail?.id === r.id ? ' is-selected' : ''}`}
+                        className={`rsv-row${detail === r.id ? ' is-selected' : ''}`}
                       >
                         <td className="rsv-cell-time">{hhmm(r.reserved_at, tz)}</td>
                         <td className="rsv-cell-guest">
                           <button
                             type="button"
                             className="rsv-open"
-                            aria-pressed={detail?.id === r.id}
-                            onClick={() => { setDetail(r); setSheetError(''); setSheetConflict(false) }}
+                            aria-pressed={detail === r.id}
+                            onClick={() => { setDetail(r.id); setSheetError(''); setSheetConflict(false) }}
                           >
                             <strong>{r.customer_name}</strong>
                             {r.is_test && <span className="guest-fav is-warn"> Test</span>}
@@ -358,31 +336,32 @@ export default function ReservationList({ locationId, date, query = '', filters,
 
       {/* Та же панель, что открывается с полотна: одна бронь — один
           набор сведений и действий, где бы её ни открыли. */}
-      {detail && (
+      {detailVisit && (
         <BookingSheet
-          reservation={detail}
+          locationId={locationId}
+          reservation={detailVisit}
           tables={tables}
           tz={tz}
           busy={busy}
           error={sheetError}
           conflict={sheetConflict}
-          bookings={raw ?? []}
+          bookings={inWindow ?? []}
           onClearError={() => { setSheetError(''); setSheetConflict(false) }}
           onClose={() => { setDetail(null); setSheetError(''); setSheetConflict(false) }}
           onEdit={(patch) => act(async () => {
             if (patch.name != null || patch.phone != null) {
-              await updateReservationGuest(locationId, detail.id, patch)
+              await updateReservationGuest(locationId, detailVisit.id, patch)
             }
             if (patch.at != null || patch.partySize != null || patch.note != null) {
-              await updateReservation(locationId, detail.id, patch)
+              await updateReservation(locationId, detailVisit.id, patch)
             }
           })}
           onAction={(key, reason = null) => act(() => (
             key === 'arrived'
-              ? markReservationArrived(locationId, detail.id)
-              : setReservationStatus(locationId, detail.id, key, reason)
+              ? markReservationArrived(locationId, detailVisit.id)
+              : setReservationStatus(locationId, detailVisit.id, key, reason)
           ))}
-          onTables={(ids) => act(() => setReservationTables(locationId, detail.id, ids))}
+          onTables={(ids) => act(() => setReservationTables(locationId, detailVisit.id, ids))}
         />
       )}
     </section>

@@ -956,8 +956,34 @@ button[aria-busy='true'] {
   }
   .timeline-grid-scroll::-webkit-scrollbar { display: none; }
   .timeline-grid-scroll > .timeline-canvas:not(.timeline-skeleton) > .timeline-ruler { display: none; }
-  .timeline-canvas { --timeline-label-width: 72px; }
-  .timeline-label { padding-inline: 7px; gap: 3px; }
+  /*
+   * Колонка столов на телефоне.
+   *
+   * 72 px хватало ровно на «Table 12». Настоящие залы называют столы
+   * «Терраса 3» и «Bar 12», и такое имя обрывалось на середине — хостес
+   * читал «Терра…» и не знал, тот ли это стол. 104 px берут два слова
+   * и число мест; час полотна при этом сужен до 76 px (`TimelineDesk`),
+   * поэтому видимое окно остаётся тем же — около трёх часов.
+   */
+  .timeline-canvas { --timeline-label-width: 104px; }
+  .timeline-label { padding-inline: 8px; gap: 2px; }
+  /* Имя стола и число мест — в столбик: в строку они делят 104 px
+     пополам, и опять ни одно не читается целиком. */
+  .timeline-row .timeline-label { flex-direction: column; align-items: flex-start; justify-content: center; }
+  .timeline-row .timeline-label strong {
+    max-width: 100%; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+    font-size: 13px; line-height: 1.2;
+  }
+  .timeline-row .timeline-label small { font-size: 11px; line-height: 1.1; }
+  /*
+   * Мишень визита не меньше 44 px даже у получасовой брони.
+   *
+   * Час на телефоне сужен до 76 px, поэтому получасовой визит занимает
+   * 38 px — палец в такой блок не попадает. Блок дорисовывается до
+   * 44 px: он чуть залезает на соседний час, но промах по нужной брони
+   * в час пик дороже полупустой клетки.
+   */
+  .timeline-block { min-width: 44px; }
   .timeline-zonerow .timeline-label {
     overflow: hidden; padding-inline: 7px; text-overflow: ellipsis; white-space: nowrap;
   }

@@ -11,6 +11,20 @@ import { zonedToUtc } from './timeline.js'
 /** Человеческий текст ошибок стола хостес */
 export function deskErrorText(message) {
   const m = String(message || '')
+  /*
+   * База отстала от кабинета.
+   *
+   * Порядок релиза — миграции, потом фронт (docs/deployment.md), и в
+   * это окно кабинет зовёт функцию, которой ещё нет. Без своего текста
+   * владелец видел бы сырое «Could not find the function
+   * public.get_reservation_desk_web» и решил, что сломались брони.
+   */
+  if (m.includes('get_reservation_desk_web') || m.includes('get_visit_web')
+      || m.includes('PGRST202')) {
+    return 'The database is still on an older version — apply the pending migration, then reload.'
+  }
+  if (m.includes('range_too_wide')) return 'Pick a shorter period.'
+  if (m.includes('invalid_range')) return 'That period looks wrong — check the dates.'
   if (m.includes('pos_mode')) return 'This booking is seated into a POS order — it is handled on the register.'
   if (m.includes('table_busy')) return 'That table is taken for this time — pick another table or another time.'
   if (m.includes('full_slot')) return 'No free table fits this party at that time.'

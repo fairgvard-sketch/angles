@@ -16,6 +16,10 @@ import { visitState } from './reservation-status'
 /** Зона визита: сначала по назначенным столам, потом по полю брони */
 export function zoneOf(reservation, tableById) {
   const ids = [
+    // Серверная модель (152) отдаёт столы визита готовым списком;
+    // `tables_link` — форма прежней прямой выборки, она ещё приходит из
+    // кассового зеркала и из тестов, поэтому читаются обе.
+    ...(reservation.table_ids ?? []),
     ...(reservation.tables_link ?? []).map((l) => l.table_id),
     reservation.table_id,
     ...(reservation.hold_table_ids ?? []),

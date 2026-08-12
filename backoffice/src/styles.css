@@ -2578,6 +2578,52 @@ a { color: inherit; }
 .sheet-meta { margin-top: auto; padding-top: var(--sp-2); color: var(--c-text-subtle); font-size: 12px; }
 
 .sheet-section { display: flex; flex-direction: column; gap: 6px; margin-top: 6px; }
+
+/*
+ * Одно действие, которое нужно сейчас, — во всю ширину и сразу под
+ * фактами. Раньше кнопки лежали плоским рядом под раскрытым пикером
+ * всех столов, и чтобы посадить гостя, панель прокручивали мимо
+ * двадцати кнопок.
+ */
+.sheet-next { display: flex; }
+.sheet-next > button { flex: 1 1 auto; min-height: var(--bo-touch); font-size: 15px; }
+
+/* Гость, которого здесь уже знают */
+.sheet-guest {
+  display: flex; flex-direction: column; gap: 6px;
+  padding: 10px 12px; border-radius: var(--r-md);
+  background: var(--c-surface-muted);
+}
+.sheet-guest.is-warn { background: #fdf1f0; }
+.sheet-guest-line { margin: 0; font-size: 13px; color: var(--c-text); }
+.sheet-guest-warn { margin: 0; font-size: 13px; font-weight: 650; color: #9b2c22; }
+.sheet-guest-tags { display: flex; flex-wrap: wrap; gap: 6px; margin: 0; }
+.sheet-guest-note { margin: 0; font-size: 13px; color: var(--c-text-muted); }
+
+/* Денежная часть — только там, где есть касса */
+.sheet-order {
+  display: flex; flex-direction: column; gap: 4px;
+  padding: 10px 12px; border-radius: var(--r-md);
+  border: 1px solid var(--c-border-panel);
+}
+.sheet-order-head { display: flex; align-items: center; justify-content: space-between; gap: var(--sp-2); margin: 0; font-size: 14px; }
+.sheet-order-total { margin: 0; font-size: 20px; font-weight: 750; color: var(--c-text); font-variant-numeric: tabular-nums; }
+
+/*
+ * Раскрывающийся раздел панели. Строка сама называет своё содержимое
+ * («Tables · 4 + 5»), поэтому раскрывать её ради проверки не нужно.
+ */
+.sheet-disclosure {
+  display: flex; align-items: center; justify-content: space-between; gap: var(--sp-2);
+  min-height: var(--bo-touch); padding: 0; border: 0; background: none;
+  font: inherit; text-align: start; cursor: pointer; color: inherit;
+}
+.sheet-disclosure:focus-visible { outline: 2px solid var(--c-focus); outline-offset: 2px; border-radius: var(--r-sm); }
+
+.sheet-history { display: flex; flex-direction: column; gap: 6px; margin: 0; padding: 0; list-style: none; }
+.sheet-history li { display: grid; grid-template-columns: 108px minmax(0, 1fr); gap: var(--sp-2); font-size: 13px; }
+.sheet-history time { color: var(--c-text-subtle); font-variant-numeric: tabular-nums; }
+.sheet-history span { color: var(--c-text-2); }
 .sheet-section-title { font-size: 12px; font-weight: 700; color: var(--c-text-muted); text-transform: uppercase; letter-spacing: .04em; }
 
 /* Панель помощи */

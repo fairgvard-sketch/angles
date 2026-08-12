@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { ChevronDown, ChevronUp, Plus } from 'lucide-react'
 import {
-  addWaitlistEntry, fetchWaitlistQueue, fetchTimelineTables, reorderWaitlist,
+  addWaitlistEntry, fetchWaitlistQueue, reorderWaitlist,
   seatWaitlistEntry, setWaitlistStatus, offerWaitlistSlot,
 } from './reservations'
 import {
@@ -38,10 +38,9 @@ function useMinuteTick() {
   return nowMs
 }
 
-export default function WaitlistPanel({ locationId, date, query = '' }) {
+export default function WaitlistPanel({ locationId, date, query = '', tables = [] }) {
   const nowMs = useMinuteTick()
   const [entries, setEntries] = useState(null)
-  const [tables, setTables] = useState([])
   const [error, setError] = useState('')
   const [busy, setBusy] = useState(null)
   const [detail, setDetail] = useState(null)
@@ -56,13 +55,11 @@ export default function WaitlistPanel({ locationId, date, query = '' }) {
     const ticket = requestRef.current + 1
     requestRef.current = ticket
     try {
-      const [queue, tbls] = await Promise.all([
-        fetchWaitlistQueue(locationId, date),
-        fetchTimelineTables(locationId),
-      ])
+      // Столы приходят из общей модели раздела (152) — третий запрос за
+      // тем же списком очередь больше не делает.
+      const queue = await fetchWaitlistQueue(locationId, date)
       if (requestRef.current !== ticket) return
       setEntries(queue)
-      setTables(tbls)
       setError('')
     } catch (e) {
       if (requestRef.current !== ticket) return
