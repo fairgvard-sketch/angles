@@ -1876,6 +1876,7 @@ a { color: inherit; }
   display: flex; align-items: center; justify-content: space-between;
   gap: 12px; margin-bottom: 9px;
 }
+.timeline-legend-toggle { display: none; }
 .timeline-legend { display: flex; flex-wrap: wrap; align-items: center; gap: 10px; }
 .timeline-legend span { display: inline-flex; align-items: center; gap: 5px; color: #686e77; font-size: 11px; }
 .timeline-legend i { width: 9px; height: 9px; border: 1px solid; border-radius: 3px; }
@@ -1905,6 +1906,7 @@ a { color: inherit; }
   -webkit-overflow-scrolling: touch; border: 1px solid var(--c-border-panel);
   border-radius: 10px; background: var(--c-surface); scrollbar-width: thin;
 }
+.timeline-mobile-ruler { display: none; }
 .timeline-canvas {
   --timeline-label-width: 112px;
   width: calc(var(--timeline-label-width) + var(--timeline-track-width));

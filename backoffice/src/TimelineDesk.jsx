@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
-import { ChevronLeft, ChevronRight } from 'lucide-react'
+import { ChevronDown, ChevronLeft, ChevronRight } from 'lucide-react'
 import {
   blockState, buildRows, groupByZone, hourTicks, nowMarkerPct,
   timelineWindow, todayInZone,
@@ -58,6 +58,24 @@ function blockLabel(block, table, tz) {
   return parts.join(' · ')
 }
 
+function TimelineRuler({ ticks, markerPct }) {
+  return (
+    <div className="timeline-ruler">
+      <div className="timeline-label" />
+      <div className="timeline-track">
+        {ticks.map((tick) => (
+          <span key={tick.ts} className="timeline-tick" style={{ left: `${tick.leftPct}%` }}>
+            {tick.label}
+          </span>
+        ))}
+        {markerPct !== null && (
+          <span className="timeline-now-label" style={{ left: `${markerPct}%` }}>Now</span>
+        )}
+      </div>
+    </div>
+  )
+}
+
 export default function TimelineDesk({ locationId, date, query = '' }) {
   const [nowMs, setNowMs] = useState(() => Date.now())
   useEffect(() => {
@@ -76,6 +94,7 @@ export default function TimelineDesk({ locationId, date, query = '' }) {
   // Занятость — единственный отказ, к которому есть что добавить
   const [sheetConflict, setSheetConflict] = useState(false)
   const [zoneFilter, setZoneFilter] = useState(null)
+  const [legendOpen, setLegendOpen] = useState(false)
 
   const tz = meta.timezone
   const todayStr = useMemo(() => todayInZone(nowMs, tz), [nowMs, tz])
@@ -194,6 +213,7 @@ export default function TimelineDesk({ locationId, date, query = '' }) {
   const trackWidth = Math.max(720, ((win.endMs - win.startMs) / 3_600_000) * HOUR_PX)
 
   const scrollRef = useRef(null)
+  const rulerRef = useRef(null)
   const scrolledFor = useRef(null)
   const scrollToCurrent = useCallback((smooth = true) => {
     const el = scrollRef.current
@@ -221,6 +241,11 @@ export default function TimelineDesk({ locationId, date, query = '' }) {
       left: direction * Math.max(240, scrollRef.current.clientWidth * 0.72),
       behavior: 'smooth',
     })
+  }
+
+  function syncTimelineScroll(source, target) {
+    if (!target || Math.abs(target.scrollLeft - source.scrollLeft) < 1) return
+    target.scrollLeft = source.scrollLeft
   }
 
   /*
@@ -281,22 +306,30 @@ export default function TimelineDesk({ locationId, date, query = '' }) {
         ) : <span />}
 
         <div className="timeline-pan" aria-label="Move through timeline">
-          <button type="button" className="text-button" onClick={() => panTimeline(-1)}>
-            <ChevronLeft /> Earlier
+          <button type="button" className="text-button" aria-label="Earlier" onClick={() => panTimeline(-1)}>
+            <ChevronLeft /><span className="timeline-pan-label">Earlier</span>
           </button>
           {markerPct !== null && (
-            <button type="button" className="text-button" onClick={() => scrollToCurrent()}>
+            <button type="button" className="text-button timeline-now-button" onClick={() => scrollToCurrent()}>
               Now
             </button>
           )}
-          <button type="button" className="text-button" onClick={() => panTimeline(1)}>
-            Later <ChevronRight />
+          <button type="button" className="text-button" aria-label="Later" onClick={() => panTimeline(1)}>
+            <span className="timeline-pan-label">Later</span><ChevronRight />
           </button>
         </div>
       </div>
 
       <div className="timeline-guide">
-        <div className="timeline-legend" aria-label="Booking statuses">
+        <button
+          type="button"
+          className="timeline-legend-toggle"
+          aria-expanded={legendOpen}
+          onClick={() => setLegendOpen((open) => !open)}
+        >
+          Status colors <ChevronDown aria-hidden />
+        </button>
+        <div className={`timeline-legend${legendOpen ? ' is-open' : ''}`} aria-label="Booking statuses">
           <span><i className="is-pending" />Pending</span>
           <span><i className="is-confirmed" />Confirmed</span>
           <span><i className="is-arrived" />Seated</span>
@@ -327,24 +360,30 @@ export default function TimelineDesk({ locationId, date, query = '' }) {
           No tables yet. Reserve needs a floor plan before the timeline can show anything.
         </p>
       ) : (
-        <div className="timeline-scroll" ref={scrollRef}>
+        <>
+          <div
+            className="timeline-mobile-ruler"
+            ref={rulerRef}
+            aria-hidden="true"
+            onScroll={(event) => syncTimelineScroll(event.currentTarget, scrollRef.current)}
+          >
+            <div
+              className="timeline-canvas"
+              style={{ '--timeline-track-width': `${trackWidth}px` }}
+            >
+              <TimelineRuler ticks={ticks} markerPct={markerPct} />
+            </div>
+          </div>
+          <div
+            className="timeline-scroll timeline-grid-scroll"
+            ref={scrollRef}
+            onScroll={(event) => syncTimelineScroll(event.currentTarget, rulerRef.current)}
+          >
           <div
             className="timeline-canvas"
             style={{ '--timeline-track-width': `${trackWidth}px` }}
           >
-            <div className="timeline-ruler">
-              <div className="timeline-label" />
-              <div className="timeline-track">
-                {ticks.map((tick) => (
-                  <span key={tick.ts} className="timeline-tick" style={{ left: `${tick.leftPct}%` }}>
-                    {tick.label}
-                  </span>
-                ))}
-                {markerPct !== null && (
-                  <span className="timeline-now-label" style={{ left: `${markerPct}%` }}>Now</span>
-                )}
-              </div>
-            </div>
+            <TimelineRuler ticks={ticks} markerPct={markerPct} />
 
             {visibleZones.map((zone) => (
               <div key={zone.id ?? 'none'}>
@@ -430,7 +469,8 @@ export default function TimelineDesk({ locationId, date, query = '' }) {
               </div>
             ))}
           </div>
-        </div>
+          </div>
+        </>
       )}
 
       {detail && (
@@ -488,7 +528,7 @@ function TimelineSkeleton({ rows }) {
     [4, 26], [38, 18], [12, 30], [56, 22], [24, 34], [66, 16],
   ]
   return (
-    <div className="timeline-scroll">
+    <div className="timeline-scroll timeline-grid-scroll">
       <div className="timeline-canvas timeline-skeleton" style={{ '--timeline-track-width': '100%' }}>
         <div className="timeline-ruler" aria-hidden>
           <div className="timeline-label" />

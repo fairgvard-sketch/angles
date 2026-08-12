@@ -613,12 +613,40 @@ before(async () => {
               </div>
             </div>
             <div className="timeline-guide">
+              <button className="timeline-legend-toggle" aria-expanded="false">Status colors</button>
               <div className="timeline-legend">
                 <span><i className="is-pending" />Pending</span>
                 <span><i className="is-confirmed" />Confirmed</span>
                 <span><i className="is-arrived" />Seated</span>
                 <span><i className="is-done" />Completed</span>
                 <span><i className="is-conflict" />Conflict</span>
+              </div>
+            </div>
+            <div className="timeline-mobile-ruler" aria-hidden="true">
+              <div className="timeline-canvas" style={{ '--timeline-track-width': '720px' }}>
+                <div className="timeline-ruler">
+                  <div className="timeline-label" />
+                  <div className="timeline-track">
+                    {['08:00', '09:00', '10:00', '11:00'].map((time, index) => (
+                      <span className="timeline-tick" key={time} style={{ left: (index * 13.33) + '%' }}>{time}</span>
+                    ))}
+                  </div>
+                </div>
+              </div>
+            </div>
+            <div className="timeline-scroll timeline-grid-scroll">
+              <div className="timeline-canvas" style={{ '--timeline-track-width': '720px' }}>
+                <div className="timeline-ruler">
+                  <div className="timeline-label" />
+                  <div className="timeline-track" />
+                </div>
+                <div className="timeline-zonerow"><div className="timeline-label">Terrace</div><div className="timeline-track-spacer" /></div>
+                {Array.from({ length: 12 }, (_, index) => (
+                  <div className="timeline-row" key={index}>
+                    <div className="timeline-label"><strong>{index + 1}</strong><small>2</small></div>
+                    <div className="timeline-track"><span className="timeline-grid" style={{ left: '13.33%' }} /></div>
+                  </div>
+                ))}
               </div>
             </div>
           </section>
@@ -1303,6 +1331,60 @@ describe('responsive control foundation', { skip }, () => {
     }))
     assert.equal(narrow.overflow, 0, 'даже 320px не получает боковую прокрутку')
     assert.ok(narrow.actions.every((width) => width > 0), 'обе кнопки остаются видимыми')
+    await page.close()
+  })
+
+  it('мобильная сетка броней прокручивает только время и не заводит второй вертикальный скролл', async () => {
+    const page = await browser.newPage()
+    await page.setViewport({ width: 390, height: 844, hasTouch: true, isMobile: true })
+    await page.goto(`${appOrigin}/responsive-workflows`, { waitUntil: 'networkidle0' })
+
+    const state = await page.evaluate(() => {
+      const panel = document.querySelector('.timeline-panel').getBoundingClientRect()
+      const ruler = document.querySelector('.timeline-mobile-ruler')
+      const grid = document.querySelector('.timeline-grid-scroll')
+      const label = grid.querySelector('.timeline-row .timeline-label').getBoundingClientRect()
+      const track = grid.querySelector('.timeline-row .timeline-track').getBoundingClientRect()
+      const rulerBox = ruler.getBoundingClientRect()
+      const gridBox = grid.getBoundingClientRect()
+      const gridStyle = getComputedStyle(grid)
+      const legend = document.querySelector('.timeline-legend')
+      const legendToggle = document.querySelector('.timeline-legend-toggle')
+
+      return {
+        pageOverflow: document.documentElement.scrollWidth - document.documentElement.clientWidth,
+        panelWidth: Math.round(panel.width),
+        rulerWidth: Math.round(rulerBox.width),
+        gridWidth: Math.round(gridBox.width),
+        labelWidth: Math.round(label.width),
+        visibleTrackWidth: Math.round(grid.clientWidth - label.width),
+        trackWidth: Math.round(track.width),
+        scrollWidth: Math.round(grid.scrollWidth),
+        clientWidth: Math.round(grid.clientWidth),
+        overflowX: gridStyle.overflowX,
+        overflowY: gridStyle.overflowY,
+        maxHeight: gridStyle.maxHeight,
+        rulerDisplay: getComputedStyle(ruler).display,
+        embeddedRulerDisplay: getComputedStyle(grid.querySelector('.timeline-ruler')).display,
+        legendDisplay: getComputedStyle(legend).display,
+        legendToggleDisplay: getComputedStyle(legendToggle).display,
+      }
+    })
+
+    assert.equal(state.pageOverflow, 0, 'прокрутка времени не расширяет всю страницу')
+    assert.equal(state.rulerWidth, state.gridWidth, 'шкала и строки используют одну видимую ширину')
+    assert.ok(state.gridWidth <= state.panelWidth, 'сетка остаётся внутри панели')
+    assert.equal(state.labelWidth, 72, 'колонка столов компактна, но остаётся видимой')
+    assert.ok(state.visibleTrackWidth >= 240, 'на iPhone видно не меньше 2.5 часов')
+    assert.ok(state.trackWidth >= 720, 'время не сжимается — оно листается внутри сетки')
+    assert.ok(state.scrollWidth > state.clientWidth, 'у времени есть собственная горизонтальная прокрутка')
+    assert.equal(state.overflowX, 'auto')
+    assert.equal(state.overflowY, 'hidden', 'внутреннего вертикального scrollbar больше нет')
+    assert.equal(state.maxHeight, 'none')
+    assert.equal(state.rulerDisplay, 'block')
+    assert.equal(state.embeddedRulerDisplay, 'none', 'на телефоне рисуется только одна шкала часов')
+    assert.equal(state.legendDisplay, 'none', 'легенда не отнимает ширину первого экрана')
+    assert.notEqual(state.legendToggleDisplay, 'none')
     await page.close()
   })
 
