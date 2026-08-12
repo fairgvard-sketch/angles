@@ -229,17 +229,30 @@ export function visitHistory(visit, events = []) {
   return merged
 }
 
-/** Подпись записанного перехода (153) */
+/**
+ * Подпись записанного перехода (154).
+ *
+ * Причина отказа и прежнее время — часть факта, а не украшение:
+ * «отменена» без причины и «перенесена» без «откуда» не разрешают ни
+ * одного спора, ради которых история и заводилась.
+ */
 export function eventText(event) {
   const by = event?.actor_name ? ` by ${event.actor_name}` : ''
+  const reason = event?.detail?.reason ? ` — ${event.detail.reason}` : ''
   switch (event?.type) {
     case 'confirmed': return `Confirmed${by}`
-    case 'rejected': return `Rejected${by}`
-    case 'cancelled': return `Cancelled${by}`
+    case 'rejected': return `Rejected${by}${reason}`
+    case 'cancelled': return `Cancelled${by}${reason}`
     case 'completed': return `Visit completed${by}`
     case 'no_show': return `Marked as no-show${by}`
     case 'seated': return `Guest seated${by}`
-    case 'moved': return `Moved to another time${by}`
+    case 'moved': {
+      const from = event?.detail?.from
+      const at = from ? new Date(from) : null
+      return at && Number.isFinite(at.getTime())
+        ? `Moved from ${at.toISOString().slice(11, 16)}${by}`
+        : `Moved to another time${by}`
+    }
     case 'tables': return `Tables changed${by}`
     default: return event?.type ? String(event.type) : 'Updated'
   }

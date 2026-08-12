@@ -188,7 +188,25 @@ describe('история визита', () => {
     assert.ok(!h.some((e) => e.kind === 'completed'))
   })
 
-  it('записанное событие (153) встаёт в ту же ленту', () => {
+  it('причина отмены — часть подписи, иначе спор не разрешается', () => {
+    const h = visitHistory(
+      { created_at: '2026-05-17T10:00:00Z', created_via: 'public' },
+      [{ type: 'cancelled', at: '2026-05-17T11:00:00Z', actor_name: 'Дана',
+         detail: { reason: 'Закрыто на частное мероприятие' } }],
+    )
+    assert.equal(h[1].text, 'Cancelled by Дана — Закрыто на частное мероприятие')
+  })
+
+  it('перенос называет, ОТКУДА подвинули', () => {
+    const h = visitHistory(
+      { created_at: '2026-05-17T10:00:00Z', created_via: 'public' },
+      [{ type: 'moved', at: '2026-05-17T11:00:00Z',
+         detail: { from: '2026-05-17T16:00:00Z', to: '2026-05-17T19:00:00Z' } }],
+    )
+    assert.equal(h[1].text, 'Moved from 16:00')
+  })
+
+  it('записанное событие (154) встаёт в ту же ленту', () => {
     const h = visitHistory(
       { created_at: '2026-05-17T10:00:00Z', created_via: 'pos' },
       [{ type: 'completed', at: '2026-05-17T18:00:00Z', actor_name: 'Дана' }],
