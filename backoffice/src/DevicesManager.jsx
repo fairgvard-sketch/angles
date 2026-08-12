@@ -11,6 +11,7 @@ import {
 } from './devices'
 import { Button, IconButton } from './ui/Button'
 import ConfirmDialog from './ui/ConfirmDialog'
+import { RowMenu } from './ui/RowMenu'
 import Skeleton, { SkeletonBar, SkeletonPanel, SkeletonRow } from './ui/Skeleton'
 import {
   EmptyPanel, EmptyState, ErrorText, PageHeader, Panel, SearchField, StatusBadge,
@@ -113,34 +114,56 @@ export function DeviceRow({ device, busy, onRename, onArchive, onDelete }) {
       </div>
 
       <div className="device-actions">
-        <IconButton
-          disabled={busy}
-          label={`Rename ${device.name}`}
-          onClick={() => { setName(device.name); setEditing(true) }}
-        >
-          <Pencil />
-        </IconButton>
-        <IconButton
-          disabled={busy}
-          label={archived ? `Restore ${device.name}` : `Archive ${device.name}`}
-          title={archived ? 'Back to the working list' : 'Hide from the working list — the terminal keeps working'}
-          onClick={() => onArchive(!archived)}
-        >
-          {archived ? <ArchiveRestore /> : <Archive />}
-        </IconButton>
-        {/* Удаление живёт только в архиве: сначала владелец убирает
-            кассу из работы и убеждается, что она не нужна. */}
-        {archived && (
+        <div className="device-actions-desktop">
           <IconButton
-            className="device-delete-action"
             disabled={busy}
-            label={`Delete ${device.name} permanently`}
-            title="Delete for good — the terminal loses access and disappears from the list"
-            onClick={onDelete}
+            label={`Rename ${device.name}`}
+            onClick={() => { setName(device.name); setEditing(true) }}
           >
-            <Trash2 />
+            <Pencil />
           </IconButton>
-        )}
+          <IconButton
+            disabled={busy}
+            label={archived ? `Restore ${device.name}` : `Archive ${device.name}`}
+            title={archived ? 'Back to the working list' : 'Hide from the working list — the terminal keeps working'}
+            onClick={() => onArchive(!archived)}
+          >
+            {archived ? <ArchiveRestore /> : <Archive />}
+          </IconButton>
+          {/* Удаление живёт только в архиве: сначала владелец убирает
+              кассу из работы и убеждается, что она не нужна. */}
+          {archived && (
+            <IconButton
+              className="device-delete-action"
+              disabled={busy}
+              label={`Delete ${device.name} permanently`}
+              title="Delete for good — the terminal loses access and disappears from the list"
+              onClick={onDelete}
+            >
+              <Trash2 />
+            </IconButton>
+          )}
+        </div>
+
+        <div className="device-actions-mobile">
+          <RowMenu
+            label={`Actions for ${device.name}`}
+            disabled={busy}
+            items={[
+              {
+                key: 'rename', label: 'Rename',
+                onPick: () => { setName(device.name); setEditing(true) },
+              },
+              {
+                key: 'archive', label: archived ? 'Restore to working list' : 'Archive',
+                onPick: () => onArchive(!archived),
+              },
+              archived && {
+                key: 'delete', label: 'Delete permanently', tone: 'danger', onPick: onDelete,
+              },
+            ]}
+          />
+        </div>
       </div>
     </div>
   )

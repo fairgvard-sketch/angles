@@ -1003,7 +1003,14 @@ button[aria-busy='true'] {
   }
   .device-actions { grid-column: 2; grid-row: 1; }
   .device-advice { grid-column: 1 / -1; grid-row: 5; margin-top: 4px; }
-  .device-actions .icon-button { width: var(--bo-touch); height: var(--bo-touch); min-width: var(--bo-touch); }
+  .device-actions-desktop { display: none; }
+  .device-actions-mobile { display: block; }
+  .device-actions-mobile .row-menu > .icon-button {
+    width: var(--bo-touch); height: var(--bo-touch); min-width: var(--bo-touch);
+    border: 1px solid var(--c-border); border-radius: var(--r-pill); background: var(--c-surface);
+  }
+  .device-actions-mobile .row-menu-pop { min-width: 210px; }
+  .device-actions-mobile .row-menu-pop button { min-height: var(--bo-touch); font-size: 14px; }
   .device-rename input { min-height: var(--bo-touch); font-size: 16px; }
   .device-rename .text-button { min-height: var(--bo-touch); }
 

@@ -537,7 +537,7 @@ before(async () => {
                     <span className="device-status is-offline"><i />Offline</span>
                     <div className="device-name"><strong>Front counter</strong></div>
                     <span className="device-version">v2.8.1 · bridge 1.4.0 · Chrome 126</span>
-                    <div className="device-meta"><span className="device-seen">Last seen 3d ago</span></div><div className="device-actions"><button className="icon-button">✎</button><button className="icon-button">□</button></div>
+                    <div className="device-meta"><span className="device-seen">Last seen 3d ago</span></div><div className="device-actions"><div className="device-actions-desktop"><button className="icon-button">✎</button><button className="icon-button">□</button></div><div className="device-actions-mobile"><div className="row-menu"><button className="icon-button device-overflow-action">•••</button></div></div></div>
                     <p className="device-advice"><span>This terminal has not reported for 3 days. Archive it if it is no longer in use.</span></p>
                   </div>
                 </div>
@@ -553,7 +553,7 @@ before(async () => {
                       <span className="device-status is-online"><i />Online</span>
                       <div className="device-name"><strong>{name}</strong></div>
                       <span className="device-version">v2.8.1 · bridge 1.4.0 · Chrome 126</span>
-                      <div className="device-meta"><span className="device-seen">Last seen Just now</span></div><div className="device-actions"><button className="icon-button">✎</button><button className="icon-button">□</button></div>
+                      <div className="device-meta"><span className="device-seen">Last seen Just now</span></div><div className="device-actions"><div className="device-actions-desktop"><button className="icon-button">✎</button><button className="icon-button">□</button></div><div className="device-actions-mobile"><div className="row-menu"><button className="icon-button device-overflow-action">•••</button></div></div></div>
                     </div>
                   ))}
                 </div>
@@ -1429,7 +1429,7 @@ describe('responsive control foundation', { skip }, () => {
       const actionsBox = row.querySelector('.device-actions').getBoundingClientRect()
       const name = row.querySelector('.device-name').getBoundingClientRect()
       const version = row.querySelector('.device-version').getBoundingClientRect()
-      const actions = [...row.querySelectorAll('.device-actions .icon-button')].map((button) => {
+      const actions = [...row.querySelectorAll('.device-actions-mobile > .row-menu > .icon-button')].map((button) => {
         const rect = button.getBoundingClientRect()
         return [Math.round(rect.width), Math.round(rect.height)]
       })
@@ -1445,6 +1445,7 @@ describe('responsive control foundation', { skip }, () => {
     )
     assert.ok(mobile.nameTop > mobile.statusTop)
     assert.ok(mobile.versionTop > mobile.nameTop)
+    assert.equal(mobile.actions.length, 1, 'на телефоне остаётся одно меню действий')
     assert.ok(mobile.actions.every(([width, height]) => width === 44 && height === 44))
     assert.equal(mobile.overflow, 0)
     await page.close()

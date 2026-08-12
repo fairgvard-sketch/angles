@@ -44,6 +44,8 @@ describe('строка устройства', () => {
     const html = row(base)
     assert.match(html, /aria-label="Rename Стойка 1"/)
     assert.match(html, /aria-label="Archive Стойка 1"/)
+    assert.match(html, /aria-label="Actions for Стойка 1"/)
+    assert.match(html, /device-actions-mobile/)
   })
 
   it('архивная строка предлагает вернуть, а не архивировать снова', () => {
@@ -62,7 +64,8 @@ describe('строка устройства', () => {
 
   it('во время запроса кнопки строки заблокированы', () => {
     const html = row(base, true)
-    assert.equal((html.match(/disabled=""/g) || []).length, 2)
+    // Две быстрые десктопные кнопки и одно мобильное меню.
+    assert.equal((html.match(/disabled=""/g) || []).length, 3)
   })
 
   it('версия показывается, а её отсутствие названо прямо', () => {
