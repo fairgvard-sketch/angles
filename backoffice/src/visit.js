@@ -244,3 +244,26 @@ export function eventText(event) {
     default: return event?.type ? String(event.type) : 'Updated'
   }
 }
+
+/**
+ * Освобождает ли переход стол.
+ *
+ * Отмена, отказ и неявка возвращают слот в продажу — и это тот самый
+ * момент, когда лист ожидания перестаёт быть архивом обещаний. Посадка
+ * и завершение визита стол не освобождают (визит уже состоялся), а
+ * подтверждение — тем более.
+ */
+export function releasesTable(actionKey) {
+  return actionKey === 'cancelled' || actionKey === 'rejected' || actionKey === 'no_show'
+}
+
+/**
+ * Стоит ли вообще искать, кого позвать.
+ *
+ * Прошедший слот звать некого: гость, ждавший вчера в семь, домой уже
+ * ушёл. Порог в минутах, а не «строго будущее»: бронь, отменённая за
+ * пять минут до визита, — самый ценный случай возврата.
+ */
+export function worthRecovering(startMs, nowMs = Date.now(), graceMin = 15) {
+  return Number.isFinite(startMs) && startMs > nowMs - graceMin * 60_000
+}

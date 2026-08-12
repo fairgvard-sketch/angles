@@ -163,9 +163,13 @@ export async function fetchWaitlist(locationId) {
  * Кого можно позвать на освободившееся время. Сервер проверяет не только
  * пожелание гостя, но и реальную возможность посадить: предлагать слот,
  * на который нет стола, значит обмануть дважды.
+ *
+ * Ответ несёт и ПОЧЕМУ кандидат подходит (окно, зоны, обещанное
+ * ожидание, 153): без этого список выглядит как «позвоните этим людям»
+ * без объяснения, и хостес не может решить, кому звонить первым.
  */
 export async function fetchWaitlistMatches(locationId, atIso) {
-  const { data, error } = await supabase.rpc('waitlist_matches', {
+  const { data, error } = await supabase.rpc('waitlist_matches_web', {
     p_location_id: locationId,
     p_at: atIso,
   })

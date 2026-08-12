@@ -2,7 +2,8 @@ import assert from 'node:assert/strict'
 import { describe, it } from 'node:test'
 import {
   dayDataWindow, guestSummary, orderSummary, primaryAction, rangeDataWindow,
-  secondaryActions, toBooking, toTable, trimToWindow, visitHistory,
+  releasesTable, secondaryActions, toBooking, toTable, trimToWindow, visitHistory,
+  worthRecovering,
 } from './visit.js'
 import { blockState } from './timeline.js'
 
@@ -194,5 +195,35 @@ describe('история визита', () => {
     )
     assert.equal(h.length, 2)
     assert.equal(h[1].text, 'Visit completed by Дана')
+  })
+})
+
+describe('возврат освободившегося слота', () => {
+  it('стол освобождают отмена, отказ и неявка', () => {
+    assert.equal(releasesTable('cancelled'), true)
+    assert.equal(releasesTable('rejected'), true)
+    assert.equal(releasesTable('no_show'), true)
+  })
+
+  it('посадка, завершение и подтверждение стол не освобождают', () => {
+    assert.equal(releasesTable('arrived'), false)
+    assert.equal(releasesTable('completed'), false)
+    assert.equal(releasesTable('confirmed'), false)
+  })
+
+  it('прошедший слот звать некого — гость давно ушёл', () => {
+    const now = Date.parse('2026-05-17T19:00:00Z')
+    assert.equal(worthRecovering(Date.parse('2026-05-17T17:00:00Z'), now), false)
+  })
+
+  it('отмена за пять минут до визита — самый ценный случай возврата', () => {
+    const now = Date.parse('2026-05-17T19:00:00Z')
+    assert.equal(worthRecovering(Date.parse('2026-05-17T19:05:00Z'), now), true)
+    assert.equal(worthRecovering(Date.parse('2026-05-17T18:50:00Z'), now), true)
+  })
+
+  it('мусорное время не открывает подбор', () => {
+    assert.equal(worthRecovering(NaN), false)
+    assert.equal(worthRecovering(undefined), false)
   })
 })

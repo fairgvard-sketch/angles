@@ -8,7 +8,7 @@ import { statusClass, statusLabel } from './reservation-status'
 import {
   blockDetail, blockWidthPx, halfHourMarks, overlappingVisits, showsMeta, showsName,
 } from './timeline-view'
-import { toBooking } from './visit'
+import { releasesTable, toBooking, worthRecovering } from './visit'
 import {
   markReservationArrived, setReservationTables, setReservationStatus, deskErrorText,
   updateReservation, updateReservationGuest,
@@ -16,6 +16,7 @@ import {
 import { isConflict } from './desk-availability'
 import PartyCount from './ui/PartyCount'
 import BookingSheet from './BookingSheet'
+import WaitlistRecovery from './WaitlistRecovery'
 
 /**
  * Таймлайн хостес в кабинете (Kassa 119/120): столы по вертикали, время
@@ -119,6 +120,8 @@ export default function TimelineDesk({ locationId, date, desk, tables, tz, onRel
   const [sheetError, setSheetError] = useState('')
   // Занятость — единственный отказ, к которому есть что добавить
   const [sheetConflict, setSheetConflict] = useState(false)
+  /* Освободившийся слот, на который есть кого позвать (153) */
+  const [recovery, setRecovery] = useState(null)
   const [zoneFilter, setZoneFilter] = useState(null)
   const hourPx = useHourPx()
 
@@ -213,7 +216,7 @@ export default function TimelineDesk({ locationId, date, desk, tables, tz, onRel
    * произошло, и не видел почему. Успех закрывает панель, отказ
    * оставляет её открытой вместе с причиной.
    */
-  async function act(fn) {
+  async function act(fn, freedAtMs = null) {
     setBusy(true)
     setSheetError('')
     setSheetConflict(false)
@@ -222,6 +225,10 @@ export default function TimelineDesk({ locationId, date, desk, tables, tz, onRel
       setDetail(null)
       await onReload()
       setError('')
+      // Подбор открывается только после УСПЕШНОГО освобождения слота:
+      // предлагать гостей на стол, который освободить не удалось, —
+      // второй обман за одну минуту.
+      if (freedAtMs) setRecovery(freedAtMs)
     } catch (e) {
       setSheetError(deskErrorText(e.message))
       setSheetConflict(isConflict(e.message))
@@ -440,12 +447,31 @@ export default function TimelineDesk({ locationId, date, desk, tables, tz, onRel
            * остальное идёт через set_reservation_status_web, который и
            * решает, разрешён ли переход.
            */
-          onAction={(key, reason = null) => act(() => (
-            key === 'arrived'
-              ? markReservationArrived(locationId, detailVisit.id)
-              : setReservationStatus(locationId, detailVisit.id, key, reason)
-          ))}
+          /*
+           * Отмена, отказ и неявка освобождают стол — и это тот самый
+           * момент, когда лист ожидания перестаёт быть архивом
+           * обещаний. Подбор открывается сам: отдельная кнопка «а кто у
+           * нас ждёт» означала бы, что о ней надо помнить в час пик.
+           */
+          onAction={(key, reason = null) => {
+            const freedAt = new Date(detailVisit.reserved_at).getTime()
+            return act(
+              () => (key === 'arrived'
+                ? markReservationArrived(locationId, detailVisit.id)
+                : setReservationStatus(locationId, detailVisit.id, key, reason)),
+              releasesTable(key) && worthRecovering(freedAt, nowMs) ? freedAt : null,
+            )
+          }}
           onTables={(ids) => act(() => setReservationTables(locationId, detailVisit.id, ids))}
+        />
+      )}
+
+      {recovery && (
+        <WaitlistRecovery
+          locationId={locationId}
+          atMs={recovery}
+          tz={tz}
+          onClose={() => setRecovery(null)}
         />
       )}
     </section>

@@ -9,10 +9,11 @@ import { statusClass, statusLabel, visitState } from './reservation-status'
 import {
   PAGE_SIZE, VIA_LABEL, createdVia, filterReservations, groupByDay, paginate, sortByTime,
 } from './reservation-list'
-import { trimToWindow } from './visit'
+import { releasesTable, trimToWindow, worthRecovering } from './visit'
 import { zonedToUtc } from './timeline'
 import PartyCount from './ui/PartyCount'
 import BookingSheet from './BookingSheet'
+import WaitlistRecovery from './WaitlistRecovery'
 
 /**
  * Список броней — рабочая таблица, а не сетка карточек.
@@ -73,6 +74,8 @@ export default function ReservationList({
   const [detail, setDetail] = useState(null)
   const [sheetError, setSheetError] = useState('')
   const [sheetConflict, setSheetConflict] = useState(false)
+  /* Освободившийся слот, на который есть кого позвать (153) */
+  const [recovery, setRecovery] = useState(null)
   const [page, setPage] = useState(1)
 
   const range = RANGES.find((r) => r.key === filters.rg) ?? RANGES[0]
@@ -148,7 +151,7 @@ export default function ReservationList({
     if (detail && inWindow !== null && !detailVisit) setDetail(null)
   }, [detail, inWindow, detailVisit])
 
-  async function act(fn) {
+  async function act(fn, freedAtMs = null) {
     setBusy(true)
     setSheetError('')
     setSheetConflict(false)
@@ -156,6 +159,8 @@ export default function ReservationList({
       await fn()
       setDetail(null)
       await onReload()
+      // Подбор открывается только после УСПЕШНОГО освобождения слота
+      if (freedAtMs) setRecovery(freedAtMs)
     } catch (e) {
       setSheetError(deskErrorText(e.message))
       setSheetConflict(isConflict(e.message))
@@ -356,12 +361,25 @@ export default function ReservationList({
               await updateReservation(locationId, detailVisit.id, patch)
             }
           })}
-          onAction={(key, reason = null) => act(() => (
-            key === 'arrived'
-              ? markReservationArrived(locationId, detailVisit.id)
-              : setReservationStatus(locationId, detailVisit.id, key, reason)
-          ))}
+          onAction={(key, reason = null) => {
+            const freedAt = new Date(detailVisit.reserved_at).getTime()
+            return act(
+              () => (key === 'arrived'
+                ? markReservationArrived(locationId, detailVisit.id)
+                : setReservationStatus(locationId, detailVisit.id, key, reason)),
+              releasesTable(key) && worthRecovering(freedAt) ? freedAt : null,
+            )
+          }}
           onTables={(ids) => act(() => setReservationTables(locationId, detailVisit.id, ids))}
+        />
+      )}
+
+      {recovery && (
+        <WaitlistRecovery
+          locationId={locationId}
+          atMs={recovery}
+          tz={tz}
+          onClose={() => setRecovery(null)}
         />
       )}
     </section>

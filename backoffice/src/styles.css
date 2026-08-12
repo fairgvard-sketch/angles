@@ -2623,6 +2623,18 @@ a { color: inherit; }
 .sheet-history { display: flex; flex-direction: column; gap: 6px; margin: 0; padding: 0; list-style: none; }
 .sheet-history li { display: grid; grid-template-columns: 108px minmax(0, 1fr); gap: var(--sp-2); font-size: 13px; }
 .sheet-history time { color: var(--c-text-subtle); font-variant-numeric: tabular-nums; }
+
+/* Кого позвать на освободившийся стол (153) */
+.recovery-list { display: flex; flex-direction: column; gap: var(--sp-3); margin: 0; padding: 0; list-style: none; }
+.recovery-list li {
+  display: flex; flex-direction: column; gap: 6px;
+  padding: 12px; border-radius: var(--r-md); border: 1px solid var(--c-border-panel);
+}
+.recovery-guest { display: flex; flex-wrap: wrap; align-items: baseline; gap: var(--sp-2); }
+.recovery-guest strong { font-size: 15px; }
+.recovery-why { margin: 0; font-size: 13px; color: var(--c-text-muted); }
+.recovery-note { margin: 0; font-size: 13px; color: var(--c-text-2); }
+.recovery-list button { align-self: flex-start; min-height: var(--bo-touch); }
 .sheet-history span { color: var(--c-text-2); }
 .sheet-section-title { font-size: 12px; font-weight: 700; color: var(--c-text-muted); text-transform: uppercase; letter-spacing: .04em; }
 
