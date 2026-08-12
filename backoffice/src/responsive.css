@@ -504,6 +504,11 @@ button[aria-busy='true'] {
   .rsv-header h1 {
     font-size: 25px;
   }
+
+  .device-row {
+    grid-template-columns: 96px minmax(135px, .75fr) minmax(180px, 1fr) minmax(110px, auto) auto;
+    gap-inline: 12px;
+  }
 }
 
 /* `styles.css` turns the desktop shell into one column at the same
@@ -584,6 +589,15 @@ button[aria-busy='true'] {
   .cat-open {
     max-width: 210px;
   }
+
+  .devices-toolbar .devices-search { flex-basis: 240px; }
+  .device-summary { flex-basis: 100%; margin-inline-start: 0; }
+  .device-row {
+    grid-template-columns: 100px minmax(130px, .7fr) minmax(0, 1fr) auto;
+  }
+  .device-meta { grid-column: 3; grid-row: 2; justify-content: flex-start; }
+  .device-actions { grid-column: 4; grid-row: 1 / span 2; }
+  .device-advice { grid-row: 3; }
 }
 
 /* ── Phone ───────────────────────────────────────────────── */
@@ -970,6 +984,28 @@ button[aria-busy='true'] {
   .data-row {
     padding-inline: 16px;
   }
+
+  .devices-toolbar { align-items: stretch; }
+  .devices-toolbar .devices-search { flex-basis: 100%; max-width: none; }
+  .device-summary { flex-basis: 100%; margin-inline-start: 0; justify-content: space-between; }
+  .fleet-section { margin-top: 24px; }
+  .fleet-location-panel .panel-heading { padding-inline: 16px; }
+  .device-row {
+    grid-template-columns: minmax(0, 1fr) auto;
+    gap: 7px 12px; padding: 14px 16px;
+  }
+  .device-status { grid-column: 1; grid-row: 1; }
+  .device-name { grid-column: 1 / -1; grid-row: 2; }
+  .device-version { grid-column: 1 / -1; grid-row: 3; white-space: normal; }
+  .device-meta {
+    grid-column: 1 / -1; grid-row: 4; flex-wrap: wrap;
+    justify-content: flex-start; gap: 6px 12px;
+  }
+  .device-actions { grid-column: 2; grid-row: 1; }
+  .device-advice { grid-column: 1 / -1; grid-row: 5; margin-top: 4px; }
+  .device-actions .icon-button { width: var(--bo-touch); height: var(--bo-touch); min-width: var(--bo-touch); }
+  .device-rename input { min-height: var(--bo-touch); font-size: 16px; }
+  .device-rename .text-button { min-height: var(--bo-touch); }
 
   .settings-form input,
   .qr-field input,

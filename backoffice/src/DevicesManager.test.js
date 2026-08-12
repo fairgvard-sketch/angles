@@ -34,7 +34,7 @@ const row = (device, busy = false) => renderToStaticMarkup(
 
 describe('строка устройства', () => {
   it('состояние названо словом, а не одним цветом', () => {
-    assert.match(row(base), /On line/)
+    assert.match(row(base), /Online/)
     assert.match(row({ ...base, silence_seconds: 7200 }), /Offline/)
     assert.match(row({ ...base, outbox_failed: 1 }), /Queue stuck/)
     assert.match(row({ ...base, silence_seconds: null }), /Never seen/)
@@ -57,6 +57,7 @@ describe('строка устройства', () => {
   it('молчащая касса объясняет, что делать', () => {
     const html = row({ ...base, silence_seconds: 9000 })
     assert.ok(html.includes('device-advice'), 'ожидался совет владельцу')
+    assert.match(html, /lucide-triangle-alert/)
   })
 
   it('во время запроса кнопки строки заблокированы', () => {
@@ -67,5 +68,13 @@ describe('строка устройства', () => {
   it('версия показывается, а её отсутствие названо прямо', () => {
     assert.match(row(base), /v1\.5\.0/)
     assert.match(row({ ...base, app_version: null }), /No version reported/)
+  })
+
+  it('разделяет статус, имя, версию и последнее подключение по колонкам', () => {
+    const html = row(base)
+    assert.match(html, /class="device-status is-online"/)
+    assert.match(html, /class="device-name"/)
+    assert.match(html, /class="device-version"/)
+    assert.match(html, /Last seen 1m ago/)
   })
 })

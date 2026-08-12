@@ -47,58 +47,60 @@ export function DeviceRow({ device, busy, onRename, onArchive, onDelete }) {
 
   return (
     <div className={`data-row device-row${archived ? ' is-archived' : ''}`}>
-      <div className="device-main">
-        <StatusBadge className="device-status" tone={status} label={STATUS_LABEL[status]} />
-        <div className="device-name">
-          {editing ? (
-            <form
-              className="device-rename"
-              onSubmit={(e) => {
-                e.preventDefault()
-                setEditing(false)
-                if (name.trim() && name.trim() !== device.name) onRename(name.trim())
-                else setName(device.name)
-              }}
-              /* Отмена по уходу фокуса — только когда фокус покидает ФОРМУ.
-                 Прежний onBlur на поле срабатывал раньше клика по «Save»:
-                 форма размонтировалась, клик приземлялся в пустоту, и
-                 переименование молча не отправлялось. */
-              onBlur={(e) => {
-                if (e.currentTarget.contains(e.relatedTarget)) return
-                setEditing(false)
-                setName(device.name)
-              }}
+      <StatusBadge className="device-status" tone={status} label={STATUS_LABEL[status]} />
+
+      <div className="device-name">
+        {editing ? (
+          <form
+            className="device-rename"
+            onSubmit={(e) => {
+              e.preventDefault()
+              setEditing(false)
+              if (name.trim() && name.trim() !== device.name) onRename(name.trim())
+              else setName(device.name)
+            }}
+            /* Отмена по уходу фокуса — только когда фокус покидает ФОРМУ.
+               Прежний onBlur на поле срабатывал раньше клика по «Save»:
+               форма размонтировалась, клик приземлялся в пустоту, и
+               переименование молча не отправлялось. */
+            onBlur={(e) => {
+              if (e.currentTarget.contains(e.relatedTarget)) return
+              setEditing(false)
+              setName(device.name)
+            }}
+          >
+            <input
+              ref={inputRef}
+              value={name}
+              maxLength={60}
+              aria-label={`Name for ${device.name}`}
+              onChange={(e) => setName(e.target.value)}
+            />
+            <Button
+              type="submit"
+              variant="text"
+              /* Safari не фокусирует кнопки по клику, поэтому
+                 relatedTarget там пуст — не даём увести фокус вовсе. */
+              onMouseDown={(e) => e.preventDefault()}
             >
-              <input
-                ref={inputRef}
-                value={name}
-                maxLength={60}
-                aria-label={`Name for ${device.name}`}
-                onChange={(e) => setName(e.target.value)}
-              />
-              <Button
-                type="submit"
-                variant="text"
-                /* Safari не фокусирует кнопки по клику, поэтому
-                   relatedTarget там пуст — не даём увести фокус вовсе. */
-                onMouseDown={(e) => e.preventDefault()}
-              >
-                Save
-              </Button>
-            </form>
-          ) : (
-            <strong>
-              {device.name}
-              {archived && <small className="device-archived-tag"> · archived</small>}
-            </strong>
-          )}
-          <small>{statusVersions(device) || 'No version reported'}</small>
-        </div>
+              Save
+            </Button>
+          </form>
+        ) : (
+          <strong>
+            {device.name}
+            {archived && <small className="device-archived-tag"> · archived</small>}
+          </strong>
+        )}
       </div>
+
+      <span className="device-version">{statusVersions(device) || 'No version reported'}</span>
 
       {/* Совет объясняет, что владельцу делать дальше: «Offline» само по
           себе не отличает сбой сети от списанного терминала. */}
-      {advice && !archived && <p className="device-advice">{advice}</p>}
+      {advice && !archived && (
+        <p className="device-advice"><AlertTriangle aria-hidden /><span>{advice}</span></p>
+      )}
 
       <div className="device-meta">
         {device.outbox_pending > 0 && (
@@ -107,36 +109,38 @@ export function DeviceRow({ device, busy, onRename, onArchive, onDelete }) {
             {device.outbox_pending} queued{outboxAge ? ` · ${outboxAge}` : ''}
           </span>
         )}
-        <span className="device-seen">{lastSeenLabel(device)}</span>
-        <div className="device-actions">
+        <span className="device-seen">Last seen {lastSeenLabel(device)}</span>
+      </div>
+
+      <div className="device-actions">
+        <IconButton
+          disabled={busy}
+          label={`Rename ${device.name}`}
+          onClick={() => { setName(device.name); setEditing(true) }}
+        >
+          <Pencil />
+        </IconButton>
+        <IconButton
+          disabled={busy}
+          label={archived ? `Restore ${device.name}` : `Archive ${device.name}`}
+          title={archived ? 'Back to the working list' : 'Hide from the working list — the terminal keeps working'}
+          onClick={() => onArchive(!archived)}
+        >
+          {archived ? <ArchiveRestore /> : <Archive />}
+        </IconButton>
+        {/* Удаление живёт только в архиве: сначала владелец убирает
+            кассу из работы и убеждается, что она не нужна. */}
+        {archived && (
           <IconButton
+            className="device-delete-action"
             disabled={busy}
-            label={`Rename ${device.name}`}
-            onClick={() => { setName(device.name); setEditing(true) }}
+            label={`Delete ${device.name} permanently`}
+            title="Delete for good — the terminal loses access and disappears from the list"
+            onClick={onDelete}
           >
-            <Pencil />
+            <Trash2 />
           </IconButton>
-          <IconButton
-            disabled={busy}
-            label={archived ? `Restore ${device.name}` : `Archive ${device.name}`}
-            title={archived ? 'Back to the working list' : 'Hide from the working list — the terminal keeps working'}
-            onClick={() => onArchive(!archived)}
-          >
-            {archived ? <ArchiveRestore /> : <Archive />}
-          </IconButton>
-          {/* Удаление живёт только в архиве: сначала владелец убирает
-              кассу из работы и убеждается, что она не нужна. */}
-          {archived && (
-            <IconButton
-              disabled={busy}
-              label={`Delete ${device.name} permanently`}
-              title="Delete for good — the terminal loses access and disappears from the list"
-              onClick={onDelete}
-            >
-              <Trash2 />
-            </IconButton>
-          )}
-        </div>
+        )}
       </div>
     </div>
   )
@@ -243,21 +247,24 @@ export default function DevicesManager({ context }) {
 
   return (
     <>
-      <PageHeader title="Devices" />
+      <PageHeader title="Devices">
+        <p className="devices-subtitle">Monitor and manage the terminals connected to your locations.</p>
+      </PageHeader>
 
-      <div className="order-toolbar">
+      <div className="devices-toolbar">
         <SearchField
           label="Search devices"
           value={query}
           onChange={setQuery}
           placeholder="Name, location or version"
+          className="order-search devices-search"
         />
         {/* Списанные кассы не должны занимать операционный список, но
             и потеряться не должны — переключатель, а не удаление. */}
         {archivedCount > 0 && (
           <Button
-            variant={showArchived ? 'primary' : 'secondary'}
-            size={showArchived ? 'compact' : 'default'}
+            variant="secondary"
+            className={`devices-archive-toggle${showArchived ? ' is-active' : ''}`}
             aria-pressed={showArchived}
             onClick={() => setShowArchived((v) => !v)}
           >
@@ -265,7 +272,7 @@ export default function DevicesManager({ context }) {
           </Button>
         )}
         {query && (
-          <Button variant="text" onClick={() => setQuery('')}><X /> Clear</Button>
+          <Button className="devices-clear" variant="text" onClick={() => setQuery('')}><X /> Clear</Button>
         )}
         <div className="device-summary">
           <span><Wifi /> {total} device{total === 1 ? '' : 's'}</span>
@@ -352,6 +359,7 @@ export default function DevicesManager({ context }) {
                   key={i}
                   title={g.name}
                   description={`${g.devices.length} device${g.devices.length === 1 ? '' : 's'}`}
+                  className="fleet-location-panel"
                 >
                   <div className="data-list">
                     {g.devices.map((d) => (
@@ -370,7 +378,9 @@ export default function DevicesManager({ context }) {
             </section>
           ))}
           {updatedAt && (
-            <p className="updated-at">Updated {updatedAt.toLocaleTimeString('en-GB', { hour: '2-digit', minute: '2-digit' })}</p>
+            <p className="updated-at devices-updated">
+              Updated automatically · {updatedAt.toLocaleTimeString('en-GB', { hour: '2-digit', minute: '2-digit' })}
+            </p>
           )}
         </>
       )}

@@ -22,7 +22,7 @@ export function deviceStatus(device) {
 }
 
 export const STATUS_LABEL = {
-  online: 'On line',
+  online: 'Online',
   stale: 'Delayed',
   offline: 'Offline',
   error: 'Queue stuck',

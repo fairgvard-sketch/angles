@@ -772,57 +772,104 @@ a { color: inherit; }
   .chart-bar .bar { transition: none; }
 }
 
-/* ── Девайсы (парк касс) ──────────────────────────────────── */
-.device-summary { display: flex; align-items: center; gap: 16px; font-size: 13px; font-weight: 650; color: var(--c-text-muted); }
-.device-summary span { display: inline-flex; align-items: center; gap: 7px; }
+/* ── Devices: компактный парк касс ────────────────────────── */
+.devices-subtitle { color: var(--c-text-muted); font-size: 14px; line-height: 1.45; }
+.devices-toolbar {
+  display: flex; flex-wrap: wrap; align-items: center;
+  gap: var(--sp-2); margin-bottom: var(--sp-5);
+}
+.devices-toolbar .devices-search { flex: 1 1 260px; max-width: 340px; min-height: 40px; border-radius: var(--r-pill); }
+.devices-toolbar .devices-archive-toggle { border-radius: var(--r-pill); padding-inline: 18px; }
+.devices-archive-toggle.is-active { border-color: var(--c-ink); background: var(--c-ink); color: var(--c-on-ink); }
+.devices-clear { min-height: 40px; }
+.device-summary {
+  display: flex; align-items: center; gap: 16px; margin-inline-start: auto;
+  font-size: 13px; font-weight: 650; color: var(--c-text-muted);
+}
+.device-summary span { display: inline-flex; align-items: center; gap: 7px; white-space: nowrap; }
 .device-summary svg { width: 15px; height: 15px; color: var(--c-icon-faint); }
 .device-summary .is-negative { color: var(--c-danger); }
 .device-summary .is-negative svg { color: var(--c-danger); }
 
-/* ── Парк касс (Phase 6) ───────────────────────────────────── */
-/* Строка стала двухуровневой: сверху имя и статус, снизу — что делать */
-.device-row { align-items: center; flex-wrap: wrap; row-gap: 8px; }
-.device-main { display: flex; align-items: center; gap: 14px; min-width: 0; }
-.device-advice {
-  flex: 1 0 100%; order: 3; margin: 0;
-  padding: 8px 10px; border-radius: var(--r-md);
-  background: #fdf7ea; color: #5a4514; font-size: 12px; line-height: 1.5;
+.fleet-section { margin-top: var(--sp-6); }
+.fleet-section:first-of-type { margin-top: 0; }
+.fleet-section-head {
+  display: flex; align-items: baseline; flex-wrap: wrap; gap: var(--sp-2);
+  margin-bottom: var(--sp-2);
 }
-.device-actions { display: flex; gap: 2px; }
-.device-actions .icon-button { width: 34px; height: 34px; }
-.device-actions .icon-button svg { width: 15px; height: 15px; }
+.fleet-section-head h2 { margin: 0; font-size: 16px; line-height: 1.25; }
+.fleet-section-head p { margin: 0; color: var(--c-text-subtle); font-size: 13px; }
+.fleet-section .panel + .panel { margin-top: var(--sp-3); }
+.fleet-location-panel { overflow: hidden; }
+.fleet-location-panel .panel-heading {
+  min-height: 52px; padding: 12px 18px; border-bottom: 1px solid var(--c-border-hair);
+}
+.fleet-location-panel .panel-heading > div { display: flex; align-items: baseline; gap: var(--sp-3); }
+.fleet-location-panel .panel-heading h2 { font-size: 15px; }
+.fleet-location-panel .panel-heading p { margin: 0; font-size: 12px; }
+.fleet-location-panel .data-list { padding: 0; }
+
+/* Одна строка отвечает на четыре вопроса: состояние, имя, версия и
+   последняя связь. Совет по проблеме получает отдельную строку. */
+.device-row {
+  display: grid; grid-template-columns: 112px minmax(150px, .8fr) minmax(210px, 1.25fr) minmax(120px, auto) auto;
+  align-items: center; gap: var(--sp-3) var(--sp-4);
+  min-height: 70px; padding: 11px 18px;
+}
+.device-row + .device-row { border-top: 1px solid var(--c-border-hair); }
+.device-row.is-archived { opacity: .68; }
+.device-archived-tag { color: var(--c-text-subtle); font-weight: 600; }
+.device-name { min-width: 0; }
+.device-name strong {
+  display: block; overflow: hidden; color: var(--c-text-strong);
+  font-size: 14px; font-weight: 700; text-overflow: ellipsis; white-space: nowrap;
+}
+.device-version {
+  overflow: hidden; color: var(--c-text-muted); font-size: 12px;
+  font-variant-numeric: tabular-nums; text-overflow: ellipsis; white-space: nowrap;
+}
 .device-rename { display: flex; align-items: center; gap: 6px; }
 .device-rename input {
-  min-width: 0; width: 100%; max-width: 220px; min-height: 34px; padding: 0 8px;
-  border: 1px solid var(--c-border); border-radius: var(--r-md); font: inherit; font-size: 13px;
+  min-width: 0; width: 100%; max-width: 220px; min-height: 36px; padding: 0 10px;
+  border: 1px solid var(--c-border); border-radius: var(--r-pill); font: inherit; font-size: 13px;
 }
-.device-rename .text-button { min-height: 34px; }
-.device-row.is-archived { opacity: .6; }
-.device-archived-tag { color: var(--c-text-subtle); font-weight: 600; }
-.device-main { display: flex; align-items: center; gap: 14px; min-width: 0; }
-.device-name { min-width: 0; }
-.device-name strong { display: block; font-size: 13px; font-weight: 700; color: #25282d; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-.device-name small { display: block; margin-top: 3px; color: var(--c-text-subtle); font-size: 11px; font-variant-numeric: tabular-nums; }
+.device-rename .text-button { min-height: 36px; }
 
 /* Статус: точка + подпись, цвет по состоянию (online/stale/offline/error/never) */
-.device-status { display: inline-flex; align-items: center; gap: 6px; flex-shrink: 0; width: 84px; font-size: 11px; font-weight: 750; }
+.device-status {
+  display: inline-flex; align-items: center; gap: 7px; width: auto;
+  color: var(--c-text-muted); font-size: 12px; font-weight: 750; white-space: nowrap;
+}
 .device-status i { width: 8px; height: 8px; border-radius: 50%; flex-shrink: 0; }
-.device-status.is-online { color: var(--c-success); } .device-status.is-online i { background: #3ba464; }
-.device-status.is-stale  { color: #8a6d1e; } .device-status.is-stale i  { background: #d3a536; }
-.device-status.is-offline{ color: #6b7078; } .device-status.is-offline i{ background: #b3b7bd; }
+.device-status.is-online { color: var(--c-success); } .device-status.is-online i { background: #168a4b; }
+.device-status.is-stale  { color: #735710; } .device-status.is-stale i  { background: #c58e10; }
+.device-status.is-offline{ color: var(--c-danger); } .device-status.is-offline i{ background: #d15048; }
 .device-status.is-error  { color: var(--c-danger); } .device-status.is-error i  { background: #d15048; }
-.device-status.is-never  { color: #6b7078; } .device-status.is-never i  { background: var(--c-border); }
+.device-status.is-never  { color: var(--c-text-muted); } .device-status.is-never i  { background: var(--c-icon-faint); }
 
-.device-meta { display: flex; align-items: center; gap: 14px; flex-shrink: 0; }
-.device-queue { display: inline-flex; align-items: center; gap: 5px; font-size: 11px; font-weight: 700; color: #8a6d1e; font-variant-numeric: tabular-nums; }
+.device-meta { display: flex; align-items: center; justify-content: flex-end; gap: var(--sp-3); min-width: 0; }
+.device-queue { display: inline-flex; align-items: center; gap: 5px; font-size: 11px; font-weight: 700; color: #735710; font-variant-numeric: tabular-nums; }
 .device-queue.is-negative { color: var(--c-danger); }
 .device-queue svg { width: 13px; height: 13px; }
 .device-seen { font-size: 12px; color: var(--c-text-subtle); font-variant-numeric: tabular-nums; white-space: nowrap; }
-
-@media (max-width: 640px) {
-  .device-status { width: auto; }
-  .device-name small { white-space: normal; }
+.device-actions { display: flex; justify-content: flex-end; gap: var(--sp-1); }
+.device-actions .icon-button {
+  width: 38px; height: 38px; min-width: 38px;
+  border: 1px solid var(--c-border); border-radius: var(--r-pill); background: var(--c-surface);
 }
+.device-actions .icon-button:hover { border-color: var(--bo-field-hover); }
+.device-actions .icon-button svg { width: 16px; height: 16px; }
+.device-actions .device-delete-action { border-color: #e3b7b3; color: var(--c-danger); }
+
+.device-advice {
+  grid-column: 1 / -1; grid-row: 2; display: flex; align-items: flex-start; gap: var(--sp-2);
+  margin: -2px 0 0; padding: 10px 12px; border: 1px solid #efcf8f;
+  border-radius: var(--r-md); background: #fffaf0; color: #684b08;
+  font-size: 12px; line-height: 1.45;
+}
+.device-advice svg { flex: none; width: 16px; height: 16px; margin-top: 1px; }
+.device-advice span { color: inherit; }
+.devices-updated { margin-top: var(--sp-5); text-align: start; font-size: 12px; }
 
 /* Чип-подпись визита: сколько гостей, какая зона, сколько неявок.
    Общий для панели визита и ленты броней; у Customers свой (`cus-chip`),
@@ -2427,14 +2474,6 @@ a { color: inherit; }
 @media (max-width: 640px) {
   .channel-blockers-list li { flex-wrap: wrap; }
 }
-
-/* Парк касс: секции «требует внимания / рабочие / архив» */
-.fleet-section { margin-top: var(--sp-5); }
-.fleet-section:first-of-type { margin-top: var(--sp-3); }
-.fleet-section-head { margin-bottom: var(--sp-2); }
-.fleet-section-head h2 { margin: 0; font-size: 15px; }
-.fleet-section-head p { margin: 2px 0 0; color: var(--c-text-subtle); font-size: 12px; }
-.fleet-section .panel + .panel { margin-top: var(--sp-2); }
 
 /* Результат массовой правки и отмена */
 .bulk-result {
