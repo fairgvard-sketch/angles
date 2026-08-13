@@ -2,7 +2,7 @@ import { useEffect, useMemo, useState } from 'react'
 import { CalendarDays, Clock, Search, TrendingUp, Users, UserX } from 'lucide-react'
 import {
   PERIODS, WEEKDAYS, MIN_SESSIONS_FOR_RATE,
-  analyticsRange, fetchReserveAnalytics, analyticsErrorText,
+  analyticsRange, defaultAnalyticsDates, fetchReserveAnalytics, analyticsErrorText,
   funnelView, pct, hours, leadTime,
   fetchRetention, returnRate, immature, newShare,
 } from './reserve-analytics'
@@ -202,7 +202,9 @@ function BarList({ title, hint, rows, empty }) {
 
 export default function ReserveAnalytics({ locations }) {
   const [period, setPeriod] = useState('30d')
-  const [custom, setCustom] = useState({ from: '', to: '' })
+  // Dates must be a usable period on the first tap, not two empty columns.
+  // Lazy initialization also means the two fields share the same "today".
+  const [custom, setCustom] = useState(() => defaultAnalyticsDates())
   // Пустой набор = все точки. Сетевой разрез (125): сервер всё равно
   // пересечёт выбор с точками организации, поэтому здесь он про удобство.
   const [picked, setPicked] = useState([])

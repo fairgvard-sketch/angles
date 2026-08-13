@@ -2922,7 +2922,15 @@ a { color: inherit; }
 /* ── Очередь ожидания (Kassa 137) ─────────────────────────────
    Та же таблица, что у списка броней: очередь и список — родственные
    поверхности, и разный вид сбивал бы больше, чем помогал. */
-.rsv-queue-count { color: var(--c-text-muted); font-size: 13px; font-weight: 650; }
+.rsv-waitlist-toolbar {
+  display: grid; grid-template-columns: max-content minmax(0, 1fr);
+  align-items: center; column-gap: var(--sp-3);
+}
+.rsv-waitlist-toolbar .primary-button { justify-self: start; }
+.rsv-queue-count {
+  min-width: 0; color: var(--c-text-muted); font-size: 13px; font-weight: 650;
+  line-height: 1.25;
+}
 .rsv-cell-wait { font-variant-numeric: tabular-nums; white-space: nowrap; }
 /* Перебор обещанного времени: очередь превращается в скандал именно
    здесь, и увидеть это хостес должен раньше гостя. Не только цветом —

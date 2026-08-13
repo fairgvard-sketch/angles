@@ -1,6 +1,31 @@
 import assert from 'node:assert/strict'
 import { describe, it } from 'node:test'
-import { FUNNEL_STEPS, MIN_SESSIONS_FOR_RATE, funnelView } from './reserve-analytics'
+import {
+  FUNNEL_STEPS, MIN_SESSIONS_FOR_RATE, analyticsRange, defaultAnalyticsDates, funnelView,
+} from './reserve-analytics'
+
+describe('analytics dates', () => {
+  it('opens Dates with an inclusive last-30-days range', () => {
+    assert.deepEqual(defaultAnalyticsDates(new Date(2026, 7, 13, 12)), {
+      from: '2026-07-15',
+      to: '2026-08-13',
+    })
+  })
+
+  it('uses the same default for an incomplete custom range', () => {
+    const range = analyticsRange('custom', { from: '', to: '' })
+    assert.match(range.from, /^\d{4}-\d{2}-\d{2}$/)
+    assert.match(range.to, /^\d{4}-\d{2}-\d{2}$/)
+    assert.ok(range.from <= range.to)
+  })
+
+  it('keeps the dates selected by the owner', () => {
+    assert.deepEqual(analyticsRange('custom', { from: '2026-04-02', to: '2026-04-18' }), {
+      from: '2026-04-02',
+      to: '2026-04-18',
+    })
+  })
+})
 
 /**
  * Воронка брони. Проверяется главное свойство: у всех шагов ОДНА

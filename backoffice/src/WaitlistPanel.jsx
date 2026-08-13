@@ -130,7 +130,7 @@ export default function WaitlistPanel({ locationId, date, query = '', tables = [
 
   return (
     <section className="panel form-panel rsv-list-panel">
-      <div className="rsv-list-toolbar">
+      <div className="rsv-list-toolbar rsv-waitlist-toolbar">
         <button
           type="button"
           className="primary-button compact"
@@ -168,7 +168,7 @@ export default function WaitlistPanel({ locationId, date, query = '', tables = [
         <p className="empty-state">
           {needle
             ? `Nobody in today’s queue matches “${query.trim()}”.`
-            : 'Nobody is waiting. Guests you add here appear as a queue with live wait times.'}
+            : 'Guests you add here appear as a queue with live wait times.'}
         </p>
       ) : (
         <div className="rsv-table-scroll">

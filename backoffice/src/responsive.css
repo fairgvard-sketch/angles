@@ -824,9 +824,10 @@ button[aria-busy='true'] {
     padding-inline: 10px;
   }
 
-  /* List filters are working form fields, not tiny toolbar chips. Keep
-     the useful 2x2 layout, but give every field the same visual weight
-     as the date and primary actions. */
+  /* List filters follow the same compact control rhythm as Catalogue.
+     The former 60px fields looked like primary actions and made four
+     secondary filters consume most of the phone screen. 44px remains a
+     proper touch target without inventing a Reservations-only size. */
   .rsv-list-toolbar {
     display: grid;
     grid-template-columns: repeat(2, minmax(0, 1fr));
@@ -841,11 +842,25 @@ button[aria-busy='true'] {
   }
 
   .rsv-list-toolbar .rsv-select select {
-    height: 60px;
-    min-height: 60px;
-    padding-inline: 14px 38px;
-    border-radius: 16px;
+    height: var(--bo-touch);
+    min-height: var(--bo-touch);
+    padding-inline: 10px 30px;
+    border-radius: var(--r-md);
     font-size: 16px;
+    font-weight: 400;
+  }
+
+  /* Waitlist is an action + live state, not four filters. Keep both on one
+     baseline instead of inheriting the List 2x2 grid geometry. */
+  .rsv-list-toolbar.rsv-waitlist-toolbar {
+    grid-template-columns: max-content minmax(0, 1fr);
+    align-items: center;
+    gap: 12px;
+  }
+
+  .rsv-waitlist-toolbar .primary-button {
+    width: auto;
+    height: var(--bo-touch);
   }
 
   /* This was the actual source of the broken timeline: the old rule set a
@@ -1285,6 +1300,10 @@ button[aria-busy='true'] {
 
   .rsv-list-toolbar {
     grid-template-columns: minmax(0, 1fr);
+  }
+
+  .rsv-list-toolbar.rsv-waitlist-toolbar {
+    grid-template-columns: max-content minmax(0, 1fr);
   }
 }
 

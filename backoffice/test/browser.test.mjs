@@ -553,6 +553,17 @@ before(async () => {
             ))}
           </div>
 
+          <div className="cat-toolbar">
+            {['All categories', 'All statuses'].map((label) => (
+              <label className="cat-select-filter" key={label}><select defaultValue={label}><option>{label}</option></select></label>
+            ))}
+          </div>
+
+          <div className="rsv-list-toolbar rsv-waitlist-toolbar">
+            <button className="primary-button compact">Add to waitlist</button>
+            <span className="rsv-queue-count">Nobody is waiting</span>
+          </div>
+
           <div className="location-tabs settings-topic-tabs report-tabs" role="tablist">
             <button className="is-active" role="tab">Sales</button>
             <button role="tab">Fiscal</button>
@@ -1690,7 +1701,13 @@ describe('responsive control foundation', { skip }, () => {
         pan: boxes('.timeline-pan > button'),
         reportTabs: boxes('.report-tabs > button'),
         listFilters: boxes('.rsv-list-toolbar select'),
+        catalogueFilters: boxes('.cat-toolbar .cat-select-filter select'),
         listFilterFont: parseFloat(getComputedStyle(document.querySelector('.rsv-list-toolbar select')).fontSize),
+        catalogueFilterFont: parseFloat(getComputedStyle(document.querySelector('.cat-toolbar .cat-select-filter select')).fontSize),
+        listFilterWeight: getComputedStyle(document.querySelector('.rsv-list-toolbar select')).fontWeight,
+        catalogueFilterWeight: getComputedStyle(document.querySelector('.cat-toolbar .cat-select-filter select')).fontWeight,
+        waitlistAction: boxes('.rsv-waitlist-toolbar .primary-button'),
+        waitlistState: boxes('.rsv-waitlist-toolbar .rsv-queue-count'),
       }
     })
 
@@ -1706,8 +1723,23 @@ describe('responsive control foundation', { skip }, () => {
     assert.ok(Math.abs(state.actions[0].width - state.actions[1].width) <= 1)
     assert.ok(state.actions[0].y < state.day[0].y, 'действия стоят раньше даты')
     assert.ok(state.listFilters.every((box) => box.width >= 170), 'поля не сжимаются в узкие чипы')
-    assert.deepEqual(state.listFilters.map((box) => box.height), [60, 60, 60, 60])
-    assert.ok(state.listFilterFont >= 16, 'фильтры читаются без масштабирования iOS')
+    assert.deepEqual(state.listFilters.map((box) => box.height), [44, 44, 44, 44])
+    assert.deepEqual(
+      state.listFilters.map((box) => box.height),
+      [state.catalogueFilters[0].height, state.catalogueFilters[0].height,
+        state.catalogueFilters[0].height, state.catalogueFilters[0].height],
+      'фильтры броней совпадают по высоте с каталогом',
+    )
+    assert.equal(state.listFilterFont, state.catalogueFilterFont, 'типографика совпадает с каталогом')
+    assert.equal(state.listFilterWeight, state.catalogueFilterWeight, 'жирность совпадает с каталогом')
+    assert.equal(state.waitlistAction[0].height, 44, 'действие очереди остаётся целью под палец')
+    assert.ok(
+      Math.abs(
+        (state.waitlistAction[0].y + state.waitlistAction[0].height / 2)
+        - (state.waitlistState[0].y + state.waitlistState[0].height / 2),
+      ) <= 1,
+      'действие и состояние очереди стоят на одной оптической линии',
+    )
     assert.equal(state.zones[0].width, state.controls[0].width, 'зоны занимают полную строку')
     assert.deepEqual(state.pan.map((box) => box.height), [44, 44])
     assert.ok(Math.abs(state.pan[0].width - state.pan[1].width) <= 1)

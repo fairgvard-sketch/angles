@@ -24,6 +24,13 @@ const iso = (d) => {
   return local.toISOString().slice(0, 10)
 }
 
+/** Custom mode opens with a useful, visible range instead of empty fields. */
+export function defaultAnalyticsDates(now = new Date()) {
+  const from = new Date(now)
+  from.setDate(from.getDate() - 29)
+  return { from: iso(from), to: iso(now) }
+}
+
 /** Диапазон ВКЛЮЧИТЕЛЬНО по обе даты — так его принимает RPC. */
 export function analyticsRange(period, custom) {
   const now = new Date()
@@ -39,7 +46,7 @@ export function analyticsRange(period, custom) {
   if (period === 'custom' && custom?.from && custom?.to) {
     return { from: custom.from, to: custom.to }
   }
-  return { from: iso(shifted(-29)), to: iso(now) }
+  return defaultAnalyticsDates(now)
 }
 
 /** `locationIds` пуст = все точки организации (сетевой разрез). */
