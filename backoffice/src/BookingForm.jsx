@@ -1,5 +1,8 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
-import { createReservation, deskErrorText, fromLocalInput, toLocalInput } from './reservations'
+import {
+  createReservation, deskErrorText, fromLocalInput, toLocalInput, lookupGuestByPhone,
+} from './reservations'
+import { bookingGuestHint } from './visit'
 import { conflictAlternatives, isConflict } from './desk-availability'
 import Drawer from './ui/Drawer'
 import { Button } from './ui/Button'
@@ -35,6 +38,37 @@ export default function BookingForm({
   const [nameError, setNameError] = useState('')
   // Отказ по занятости — единственный случай, когда есть что предложить
   const [conflict, setConflict] = useState(null)
+  // Гость, которого здесь уже знают (157)
+  const [match, setMatch] = useState(null)
+
+  /*
+   * Узнавание по телефону.
+   *
+   * Спрашиваем сервер только когда номер дописан до полного: на каждой
+   * цифре это был бы запрос в базу за букву, а по короткому вводу
+   * сервер всё равно ничего не отдаёт. Задержка гасит дребезг ввода.
+   */
+  useEffect(() => {
+    const digits = phone.replace(/\D/g, '')
+    if (digits.length < 9) { setMatch(null); return undefined }
+    let alive = true
+    const timer = setTimeout(() => {
+      lookupGuestByPhone(locationId, digits)
+        .then((data) => { if (alive) setMatch(bookingGuestHint(data)) })
+        // Молча: подсказка полезна, но её отсутствие не должно мешать
+        // заводить визит.
+        .catch(() => { if (alive) setMatch(null) })
+    }, 350)
+    return () => { alive = false; clearTimeout(timer) }
+  }, [locationId, phone])
+
+  /*
+   * Имя подставляется, только если хостес его ещё не ввёл: перетереть
+   * набранное значит спорить с человеком, который смотрит на гостя.
+   */
+  useEffect(() => {
+    if (match?.name && !name.trim()) setName(match.name)
+  }, [match, name])
 
   /*
    * Сообщение сервера живёт ровно до того, как хостес изменил то, из-за
@@ -166,6 +200,27 @@ export default function BookingForm({
               placeholder={walkIn ? 'Optional' : '05X XXX XXXX'}
               onChange={(e) => setPhone(e.target.value)}
             />
+            {/* Гость, которого здесь уже знают. Повторные неявки —
+                предупреждение смене и НИКОГДА не уходят гостю. */}
+            {match && (
+              <span
+                className={`booking-match${match.warn ? ' is-warn' : ''}`}
+                role="status"
+              >
+                <strong>{match.name || 'Known guest'}</strong>
+                {match.text && <span> · {match.text}</span>}
+                {match.usualParty && (
+                  <button
+                    type="button"
+                    className="text-button booking-match-apply"
+                    onClick={() => setParty(match.usualParty)}
+                  >
+                    usually {match.usualParty}
+                  </button>
+                )}
+                {match.note && <em>{match.note}</em>}
+              </span>
+            )}
           </label>
           <label className="qr-field">
             <span>Guests</span>

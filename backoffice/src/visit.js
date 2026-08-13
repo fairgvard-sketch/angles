@@ -280,3 +280,31 @@ export function releasesTable(actionKey) {
 export function worthRecovering(startMs, nowMs = Date.now(), graceMin = 15) {
   return Number.isFinite(startMs) && startMs > nowMs - graceMin * 60_000
 }
+
+/**
+ * Подсказка о госте в форме брони — одной строкой.
+ *
+ * Показывается только то, что меняет решение прямо сейчас. Полная
+ * история — в карточке клиента, куда идут отдельно и где право
+ * проверяется заново.
+ */
+export function bookingGuestHint(match) {
+  if (!match) return null
+  const visits = Number(match.visits) || 0
+  const noShows = Number(match.no_shows) || 0
+  const parts = []
+  if (visits === 1) parts.push('1 visit')
+  else if (visits > 1) parts.push(`${visits} visits`)
+  if (noShows > 0) parts.push(noShows === 1 ? '1 no-show' : `${noShows} no-shows`)
+  if (match.usual_zone) parts.push(`usually ${match.usual_zone}`)
+  return {
+    name: match.name || null,
+    guestId: match.guest_id,
+    // Пусто у гостя без истории — но сам факт «мы его знаем» полезен,
+    // поэтому подсказка показывается и с одним именем.
+    text: parts.join(' · '),
+    warn: noShows >= 2,
+    note: match.note || null,
+    usualParty: match.usual_party == null ? null : Math.round(Number(match.usual_party)),
+  }
+}

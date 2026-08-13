@@ -106,6 +106,19 @@ function CustomerRow({ guest, mode, selected, onOpen }) {
   )
 }
 
+/** Дни недели: сервер отдаёт EXTRACT(DOW) — 0 это воскресенье */
+const DOW_LABEL = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat']
+
+/** Состояние визита словом — цвет один не читается на солнце */
+const VISIT_STATUS_WORD = {
+  completed: 'Completed',
+  confirmed: 'Confirmed',
+  new: 'Pending',
+  no_show: 'No-show',
+  cancelled: 'Cancelled',
+  rejected: 'Rejected',
+}
+
 /**
  * Автоматический сегмент строки.
  *
@@ -369,6 +382,39 @@ function ProfileView({ guest, card, mode, error, onErase }) {
         <div><span>Last visit</span><strong>{lastVisitLabel(guest.last_visit_at)}</strong></div>
       </div>
 
+      {/*
+        Первое, что спрашивает хостес, открывая карточку от визита:
+        придёт ли этот человек ещё и когда. Раньше ответа не было.
+      */}
+      {card?.next_visit && (
+        <CardSection label="Next booking">
+          <p className="cus-next">
+            <strong>{formatDateTime(card.next_visit.reserved_at)}</strong>
+            <span> · {card.next_visit.party_size} guests</span>
+            {card.next_visit.location_name && (
+              <span className="cus-note-hint"> · {card.next_visit.location_name}</span>
+            )}
+          </p>
+        </CardSection>
+      )}
+
+      {/* Автоматические сегменты и то, чем они заслужены (155). Метка без
+          объяснения — то, чему владелец не верит. */}
+      {Array.isArray(card?.segments) && card.segments.length > 0 && (
+        <CardSection label="Segments">
+          <div className="cus-chips">
+            {card.segments.map((key) => (
+              <span key={key} className={`cus-segment is-${key.replace('_', '-')}`}>
+                {SEGMENT_LABEL[key] ?? key}
+              </span>
+            ))}
+          </div>
+          <p className="cus-note-hint">
+            {whySegment(card.segments[0], card.why_segment)}
+          </p>
+        </CardSection>
+      )}
+
       {rsv && rsv.total > 0 && (
         <CardSection label="Bookings">
           <div className="cus-chips">
@@ -379,8 +425,36 @@ function ProfileView({ guest, card, mode, error, onErase }) {
             )}
             {rsv.cancelled > 0 && <span className="cus-chip">{rsv.cancelled} cancelled</span>}
             {rsv.zone && <span className="cus-chip">{rsv.zone}</span>}
-            {rsv.avg_party && <span className="cus-chip">~{rsv.avg_party} guests</span>}
+            {/* Привычка гостя считается в часах ТОЧКИ (156): в UTC
+                вечерний гость переезжает на предыдущий день. */}
+            {card?.usual?.dow != null && (
+              <span className="cus-chip">
+                usually {DOW_LABEL[card.usual.dow]}
+                {card.usual.hour != null && ` ${String(card.usual.hour).padStart(2, '0')}:00`}
+              </span>
+            )}
+            {card?.usual?.party && <span className="cus-chip">~{card.usual.party} guests</span>}
           </div>
+        </CardSection>
+      )}
+
+      {/* «Восемь раз» должно быть проверяемо глазами, иначе это просто
+          число, которому не верят. */}
+      {Array.isArray(card?.visit_history) && card.visit_history.length > 0 && (
+        <CardSection label="Visits">
+          <ol className="cus-visits">
+            {card.visit_history.map((v) => (
+              <li key={v.id}>
+                <time dateTime={v.reserved_at}>{formatDateTime(v.reserved_at)}</time>
+                <span>{v.party_size} guests</span>
+                <span className="cus-note-hint">
+                  {VISIT_STATUS_WORD[v.status] ?? v.status}
+                  {v.zone_name && ` · ${v.zone_name}`}
+                  {v.on_register && ' · register'}
+                </span>
+              </li>
+            ))}
+          </ol>
         </CardSection>
       )}
 

@@ -140,6 +140,18 @@ const SUPABASE_STUB = `
   const RPC = {
     sales_report: salesDay,
     get_backoffice_fleet: () => FLEET,
+    // Узнавание гостя (157): отвечает ТОЛЬКО на полный номер — тем же
+    // правилом, что и сервер.
+    lookup_guest_by_phone_web: (args) => {
+      const digits = String((args && args.p_phone) || '').replace(/\D/g, '')
+      if (digits !== '0521111111') return null
+      return {
+        guest_id: 'g1', name: 'Мири Леви', phone: digits,
+        visits: 8, no_shows: 2, cancelled: 0, upcoming: 0,
+        usual_party: 4, usual_zone: 'Терраса',
+        note: 'Аллергия на орехи', segments: ['regular'],
+      }
+    },
     // Длинные подписи нарочно: строка обязана сжиматься, а не растягивать
     // страницу (регресс Phase 0 — горизонтальная прокрутка на 390px).
     get_activity_feed: () => [{
@@ -821,6 +833,29 @@ before(async () => {
     }
     createRoot(document.getElementById('root')).render(<Page />)
   `, { stubSupabase: true })
+
+  /*
+   * Узнавание гостя в форме брони (157). Проверяется настоящая форма:
+   * подсказка обязана появиться на полном номере и НЕ появиться на
+   * префиксе, иначе форма превращается в перебор клиентской базы.
+   */
+  await bundle('booking-form', `
+    import { createRoot } from 'react-dom/client'
+    import BookingForm from './BookingForm'
+    createRoot(document.getElementById('root')).render(
+      <main className="content">
+        <BookingForm
+          locationId="loc-1"
+          tables={[{ id: 't1', label: '1', seats: 4, zoneId: null, zoneName: null, sortOrder: 0, blocked: false }]}
+          bookings={[]}
+          tz="Asia/Jerusalem"
+          mode="booking"
+          onClose={() => {}}
+          onCreated={() => {}}
+        />
+      </main>
+    )
+  `, { stubSupabase: true })
 })
 
 after(async () => {
@@ -829,6 +864,68 @@ after(async () => {
   guestServer?.close()
 })
 
+
+
+describe('узнавание гостя в форме брони', { skip }, () => {
+  const open = async (viewport = { width: 1440, height: 1000 }) => {
+    const page = await browser.newPage()
+    await page.setViewport(viewport)
+    await page.goto(`${appOrigin}/booking-form`, { waitUntil: 'networkidle0' })
+    await page.waitForSelector('input[type="tel"]', { timeout: 5000 })
+    return page
+  }
+  const typePhone = async (page, value) => {
+    await page.focus('input[type="tel"]')
+    await page.evaluate(() => { document.querySelector('input[type="tel"]').value = '' })
+    await page.type('input[type="tel"]', value)
+    // Ввод гасится задержкой перед запросом
+    await new Promise((r) => setTimeout(r, 700))
+  }
+
+  it('полный номер узнаёт гостя и называет, чем он известен', async () => {
+    const page = await open()
+    await typePhone(page, '0521111111')
+    const state = await page.evaluate(() => ({
+      hint: document.querySelector('.booking-match')?.textContent ?? null,
+      warn: !!document.querySelector('.booking-match.is-warn'),
+      name: document.querySelector('input[maxlength="120"]')?.value ?? '',
+    }))
+    assert.match(state.hint, /Мири Леви/)
+    assert.match(state.hint, /8 visits/)
+    assert.match(state.hint, /2 no-shows/)
+    assert.equal(state.warn, true, 'повторные неявки предупреждают смену')
+    assert.equal(state.name, 'Мири Леви', 'имя подставлено, чтобы его не набирали заново')
+    await page.close()
+  })
+
+  it('префикс номера не отдаёт ничего — иначе это перебор базы', async () => {
+    const page = await open()
+    await typePhone(page, '05211')
+    assert.equal(
+      await page.evaluate(() => document.querySelector('.booking-match')),
+      null)
+    await page.close()
+  })
+
+  it('набранное хостес имя подсказка не перетирает', async () => {
+    const page = await open()
+    await page.type('input[maxlength="120"]', 'Гость у стойки')
+    await typePhone(page, '0521111111')
+    assert.equal(
+      await page.evaluate(() => document.querySelector('input[maxlength="120"]').value),
+      'Гость у стойки',
+      'спорить с человеком, который смотрит на гостя, нельзя')
+    await page.close()
+  })
+
+  it('на телефоне подсказка не расширяет страницу вбок', async () => {
+    const page = await open({ width: 390, height: 844, hasTouch: true, isMobile: true })
+    await typePhone(page, '0521111111')
+    assert.equal(await page.evaluate(() =>
+      document.documentElement.scrollWidth - document.documentElement.clientWidth), 0)
+    await page.close()
+  })
+})
 
 describe('панель визита', { skip }, () => {
   const open = async (variant, viewport = { width: 1440, height: 1000 }) => {
