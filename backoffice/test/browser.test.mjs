@@ -763,12 +763,160 @@ before(async () => {
     }
     createRoot(document.getElementById('root')).render(<Page />)
   `)
+
+  /*
+   * Панель визита — настоящая, а не разметка-двойник.
+   *
+   * Проверяется то, ради чего её и переделывали: главное действие стоит
+   * первым, контекст постоянного гостя виден смене, денежная часть есть
+   * только там, где есть касса, а пикер всех столов больше не стоит
+   * между хостес и посадкой.
+   */
+  await bundle('visit-sheet', `
+    import { useState } from 'react'
+    import { createRoot } from 'react-dom/client'
+    import BookingSheet from './BookingSheet'
+
+    const TABLES = [
+      { id: 't1', label: 'Терраса 3', seats: 4, zoneId: 'z1', zoneName: 'Терраса', sortOrder: 0, blocked: false },
+      { id: 't2', label: 'Bar 12', seats: 2, zoneId: 'z1', zoneName: 'Терраса', sortOrder: 1, blocked: false },
+    ]
+    const BASE = {
+      id: 'r1', status: 'confirmed', customer_name: 'Мири Леви',
+      customer_phone: '0501112233', party_size: 3,
+      reserved_at: new Date(Date.now() + 3600000).toISOString(),
+      duration_min: 90, note: null, table_ids: ['t1'], zone_id: 'z1',
+      created_at: new Date(Date.now() - 86400000).toISOString(),
+      created_via: 'public', source: 'qr', arrived_at: null,
+      guest: { id: 'g1', visits: 5, upcoming: 1, cancelled: 0, no_shows: 2 },
+      order: null, order_id: null,
+    }
+    const WITH_POS = {
+      ...BASE, id: 'r2', order_id: 'o1',
+      order: { id: 'o1', number: 42, status: 'open', total: 12500, paid: false },
+    }
+
+    function Page() {
+      const [which, setWhich] = useState(window.__VARIANT__ || 'standalone')
+      const reservation = which === 'pos' ? WITH_POS : BASE
+      return (
+        <main className="content">
+          <BookingSheet
+            locationId="loc-1"
+            reservation={reservation}
+            tables={TABLES}
+            tz="Asia/Jerusalem"
+            busy={false}
+            error=""
+            bookings={[]}
+            clashes={[]}
+            onClose={() => {}}
+            onAction={(key) => { window.__ACTED__ = key }}
+            onTables={() => {}}
+            onEdit={() => {}}
+            onClearError={() => {}}
+          />
+        </main>
+      )
+    }
+    createRoot(document.getElementById('root')).render(<Page />)
+  `, { stubSupabase: true })
 })
 
 after(async () => {
   await browser?.close()
   appServer?.close()
   guestServer?.close()
+})
+
+
+describe('панель визита', { skip }, () => {
+  const open = async (variant, viewport = { width: 1440, height: 1000 }) => {
+    const page = await browser.newPage()
+    await page.setViewport(viewport)
+    await page.evaluateOnNewDocument((v) => { window.__VARIANT__ = v }, variant)
+    await page.goto(`${appOrigin}/visit-sheet`, { waitUntil: 'networkidle0' })
+    await page.waitForSelector('.drawer', { timeout: 5000 })
+    return page
+  }
+
+  const read = () => ({
+    next: document.querySelector('.sheet-next button')?.textContent?.trim() ?? null,
+    // Главное действие обязано стоять ВЫШЕ прочих: ради него панель и открыли
+    nextBeforeRest: (() => {
+      const next = document.querySelector('.sheet-next button')
+      const rest = document.querySelector('.order-actions button')
+      if (!next || !rest) return null
+      return next.compareDocumentPosition(rest) & Node.DOCUMENT_POSITION_FOLLOWING ? true : false
+    })(),
+    restActions: [...document.querySelectorAll('.order-actions button')].map((b) => b.textContent.trim()),
+    guest: document.querySelector('.sheet-guest')?.textContent ?? null,
+    guestWarn: document.querySelector('.sheet-guest-warn')?.textContent?.trim() ?? null,
+    order: document.querySelector('.sheet-order')?.textContent ?? null,
+    orderTotal: document.querySelector('.sheet-order-total')?.textContent?.trim() ?? null,
+    pickerOpen: !!document.querySelector('.timeline-tablepick'),
+    disclosure: document.querySelector('.sheet-disclosure')?.textContent ?? null,
+    tapTargets: [...document.querySelectorAll('.sheet-next button, .sheet-disclosure')]
+      .map((b) => Math.round(b.getBoundingClientRect().height)),
+  })
+
+  it('главное действие стоит первым, остальное — ниже', async () => {
+    const page = await open('standalone')
+    const state = await page.evaluate(read)
+    assert.equal(state.next, 'Guest seated', 'подтверждённый визит ждёт посадки')
+    assert.equal(state.nextBeforeRest, true, 'главное действие выше прочих')
+    assert.ok(!state.restActions.includes('Guest seated'), 'главное действие не дублируется внизу')
+    assert.ok(state.restActions.includes('Cancel booking'))
+    await page.close()
+  })
+
+  it('пикер столов не стоит между хостес и посадкой, но стол назван', async () => {
+    const page = await open('standalone')
+    const state = await page.evaluate(read)
+    assert.equal(state.pickerOpen, false, 'двадцать кнопок столов не открыты по умолчанию')
+    assert.match(state.disclosure, /Терраса 3/, 'текущий стол виден без раскрытия')
+    await page.close()
+  })
+
+  it('постоянный гость и повторные неявки видны смене', async () => {
+    const page = await open('standalone')
+    const state = await page.evaluate(read)
+    assert.match(state.guest, /Returning guest/)
+    assert.match(state.guest, /5 visits/)
+    assert.match(state.guestWarn, /Missed 2 bookings/, 'две неявки предупреждают, одна — нет')
+    await page.close()
+  })
+
+  it('у визита без кассы денежной части нет, а не ноль', async () => {
+    const page = await open('standalone')
+    const state = await page.evaluate(read)
+    assert.equal(state.order, null, 'пустой «средний чек 0 ₪» описывал бы гостя, а не отсутствие кассы')
+    await page.close()
+  })
+
+  it('у визита на кассе видно номер заказа и то, оплачен ли он', async () => {
+    const page = await open('pos')
+    const state = await page.evaluate(read)
+    assert.match(state.order, /Order #42/)
+    assert.match(state.order, /Not paid yet/, '«открыт» и «оплачен» — разные вопросы')
+    assert.match(state.orderTotal, /125/)
+    // Посаженную на кассе бронь кабинет не трогает (pos_mode, 102)
+    assert.equal(state.next, null, 'действий по чужому визиту панель не предлагает')
+    await page.close()
+  })
+
+  it('на телефоне действие и раскрытия остаются мишенью под палец', async () => {
+    const page = await open('standalone', { width: 390, height: 844, hasTouch: true, isMobile: true })
+    const state = await page.evaluate(read)
+    assert.ok(state.tapTargets.length > 0)
+    for (const height of state.tapTargets) {
+      assert.ok(height >= 44, `мишень ${height}px меньше 44px`)
+    }
+    assert.equal(await page.evaluate(() =>
+      document.documentElement.scrollWidth - document.documentElement.clientWidth), 0,
+    'панель не расширяет страницу вбок')
+    await page.close()
+  })
 })
 
 describe('view error boundary', { skip }, () => {
@@ -1411,8 +1559,15 @@ describe('responsive control foundation', { skip }, () => {
     assert.equal(state.pageOverflow, 0, 'прокрутка времени не расширяет всю страницу')
     assert.equal(state.rulerWidth, state.gridWidth, 'шкала и строки используют одну видимую ширину')
     assert.ok(state.gridWidth >= state.panelWidth, 'сетка использует всю ширину мобильного полотна')
-    assert.equal(state.labelWidth, 72, 'колонка столов компактна, но остаётся видимой')
+    /*
+     * 72 px хватало ровно на «Table 12». Настоящие залы называют столы
+     * «Терраса 3» и «Bar 12» — такое имя обрывалось на середине, и
+     * хостес читал «Терра…», не зная, тот ли это стол.
+     */
+    assert.equal(state.labelWidth, 104, 'имя стола и число мест читаются целиком')
     assert.ok(state.visibleTrackWidth >= 240, 'на iPhone видно не меньше 2.5 часов')
+    // Час на телефоне сужен, поэтому расширенная колонка НЕ съела окно
+    assert.ok(state.visibleTrackWidth / 76 >= 3, 'видно не меньше трёх часов')
     assert.ok(state.trackWidth >= 720, 'время не сжимается — оно листается внутри сетки')
     assert.ok(state.scrollWidth > state.clientWidth, 'у времени есть собственная горизонтальная прокрутка')
     assert.equal(state.overflowX, 'auto')

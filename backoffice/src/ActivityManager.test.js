@@ -129,7 +129,10 @@ describe('раздел Activity', () => {
   it('ручное обновление не дублирует автообновление, выгружать нечего — кнопка выключена', () => {
     const html = render(h(ActivityManager, { context: context(ONE) }))
     assert.doesNotMatch(html, /Refresh activity/)
-    assert.match(html, /<button type="button" class="secondary-button" disabled=""/)
+    // Проверяем состояние кнопки, а не полный список её классов: набор
+    // классов — оформление, и правка отступов не должна красить журнал
+    // в красный.
+    assert.match(html, /class="[^"]*secondary-button[^"]*"[^>]*disabled=""/)
     assert.match(html, /Export CSV/)
   })
 

@@ -8,15 +8,15 @@ import { statusClass, statusLabel } from './reservation-status'
 import {
   blockDetail, blockWidthPx, halfHourMarks, overlappingVisits, showsMeta, showsName,
 } from './timeline-view'
+import { releasesTable, toBooking, worthRecovering } from './visit'
 import {
-  fetchReservationSettings, fetchTimelineReservations, fetchTimelineTables,
   markReservationArrived, setReservationTables, setReservationStatus, deskErrorText,
   updateReservation, updateReservationGuest,
 } from './reservations'
 import { isConflict } from './desk-availability'
-import { supabase } from './supabase'
 import PartyCount from './ui/PartyCount'
 import BookingSheet from './BookingSheet'
+import WaitlistRecovery from './WaitlistRecovery'
 
 /**
  * Таймлайн хостес в кабинете (Kassa 119/120): столы по вертикали, время
@@ -26,9 +26,22 @@ import BookingSheet from './BookingSheet'
  * не было ни одного экрана, отвечающего на вопрос «что с залом сейчас» —
  * standalone Reserve оставался списком заявок. Действия идут через
  * `_web`-RPC (120): право даёт членство, а не PIN.
+ *
+ * Данные полотно больше НЕ ЗАГРУЖАЕТ. Оно их рисует. Своя загрузка
+ * означала свою подписку, свой поллинг и — из-за того, что расписание
+ * приезжало ПОСЛЕ первого ответа и меняло окно, — вторую загрузку с
+ * миганием скелета при каждом открытии раздела.
  */
 
+/** Часовая клетка полотна на широком экране */
 const HOUR_PX = 96
+/**
+ * Час на телефоне ýже: полотно обязано показывать 2–3 часа в
+ * трёхсотпиксельном окне, иначе горизонтальная прокрутка становится
+ * единственным способом увидеть соседний визит.
+ */
+const HOUR_PX_PHONE = 76
+const PHONE_MAX_WIDTH = 720
 
 /** Время визита в зоне точки — и в подписи блока, и в карточке */
 function timeInZone(ms, tz) {
@@ -76,16 +89,30 @@ function TimelineRuler({ ticks, markerPct }) {
   )
 }
 
-export default function TimelineDesk({ locationId, date }) {
+/** Ширина часовой клетки по ширине окна — считается один раз на ресайз */
+function useHourPx() {
+  const [hourPx, setHourPx] = useState(() => (
+    typeof globalThis.innerWidth === 'number' && globalThis.innerWidth <= PHONE_MAX_WIDTH
+      ? HOUR_PX_PHONE : HOUR_PX
+  ))
+  useEffect(() => {
+    const onResize = () => setHourPx(
+      globalThis.innerWidth <= PHONE_MAX_WIDTH ? HOUR_PX_PHONE : HOUR_PX
+    )
+    onResize()
+    globalThis.addEventListener?.('resize', onResize)
+    return () => globalThis.removeEventListener?.('resize', onResize)
+  }, [])
+  return hourPx
+}
+
+export default function TimelineDesk({ locationId, date, desk, tables, tz, onReload }) {
   const [nowMs, setNowMs] = useState(() => Date.now())
   useEffect(() => {
     const id = setInterval(() => setNowMs(Date.now()), 60_000)
     return () => clearInterval(id)
   }, [])
 
-  const [meta, setMeta] = useState({ timezone: 'Asia/Jerusalem', schedule: null })
-  const [tables, setTables] = useState([])
-  const [raw, setRaw] = useState(null)
   const [error, setError] = useState('')
   const [busy, setBusy] = useState(false)
   const [detail, setDetail] = useState(null)
@@ -93,81 +120,23 @@ export default function TimelineDesk({ locationId, date }) {
   const [sheetError, setSheetError] = useState('')
   // Занятость — единственный отказ, к которому есть что добавить
   const [sheetConflict, setSheetConflict] = useState(false)
+  /* Освободившийся слот, на который есть кого позвать (153) */
+  const [recovery, setRecovery] = useState(null)
   const [zoneFilter, setZoneFilter] = useState(null)
+  const hourPx = useHourPx()
 
-  const tz = meta.timezone
   const todayStr = useMemo(() => todayInZone(nowMs, tz), [nowMs, tz])
+  const raw = desk?.visits ?? null
+  const schedule = desk?.schedule ?? null
 
-  const baseWindow = useMemo(
-    () => timelineWindow(date, tz, meta.schedule),
-    [date, tz, meta.schedule]
+  const bookings = useMemo(
+    () => (raw ?? []).map((v) => toBooking(v, blockState)),
+    [raw]
   )
 
-  // Ответ на устаревший запрос не должен переписать полотно: при быстрой
-  // смене дат сеть возвращает их в произвольном порядке, и хостес увидел
-  // бы вчерашние брони на сегодняшней дате.
-  const requestRef = useRef(0)
-
-  const load = useCallback(async () => {
-    if (!locationId) return
-    const ticket = requestRef.current + 1
-    requestRef.current = ticket
-    try {
-      const [settings, tbls, list] = await Promise.all([
-        fetchReservationSettings(locationId),
-        fetchTimelineTables(locationId),
-        fetchTimelineReservations(locationId, baseWindow.startMs, baseWindow.endMs),
-      ])
-      if (requestRef.current !== ticket) return
-      setMeta(settings)
-      setTables(tbls)
-      setRaw(list)
-      setError('')
-    } catch (e) {
-      if (requestRef.current !== ticket) return
-      setError(deskErrorText(e.message))
-    }
-  }, [locationId, baseWindow.startMs, baseWindow.endMs])
-
-  useEffect(() => {
-    setRaw(null)
-    load()
-    // Realtime: полотно обновляется на месте, прокрутку не трогаем —
-    // контейнер не перемонтируется, поэтому хостес не теряет позицию.
-    const channel = supabase
-      .channel(`timeline-${locationId}`)
-      .on('postgres_changes',
-        { event: '*', schema: 'public', table: 'reservations', filter: `location_id=eq.${locationId}` },
-        () => load())
-      .subscribe()
-    const timer = setInterval(load, 60_000)
-    return () => {
-      supabase.removeChannel(channel)
-      clearInterval(timer)
-    }
-  }, [locationId, load])
-
-  const bookings = useMemo(() => (raw ?? []).map((r) => {
-    const start = new Date(r.reserved_at).getTime()
-    const linked = (r.tables_link ?? []).map((l) => l.table_id)
-    return {
-      id: r.id,
-      tableIds: linked.length > 0
-        ? linked
-        : [r.table_id, ...(r.hold_table_ids ?? [])].filter(Boolean),
-      startMs: start,
-      endMs: start + (r.duration_min || 90) * 60_000,
-      state: blockState(r.status, r.arrived_at, r.order_id),
-      guestName: r.customer_name,
-      partySize: r.party_size,
-      phone: r.customer_phone ?? '',
-      posSeated: r.order_id != null,
-    }
-  }), [raw])
-
   const win = useMemo(
-    () => timelineWindow(date, tz, meta.schedule, bookings),
-    [date, tz, meta.schedule, bookings]
+    () => timelineWindow(date, tz, schedule, bookings),
+    [date, tz, schedule, bookings]
   )
   const rows = useMemo(() => buildRows(tables, bookings, win), [tables, bookings, win])
   // Отключённые столы остаются на плане: владелец должен видеть полную
@@ -180,7 +149,9 @@ export default function TimelineDesk({ locationId, date }) {
   // как отдельная отметка времени.
   const halfMarks = useMemo(() => halfHourMarks(ticks, win), [ticks, win])
   const markerPct = date === todayStr ? nowMarkerPct(nowMs, win) : null
-  const trackWidth = Math.max(720, ((win.endMs - win.startMs) / 3_600_000) * HOUR_PX)
+  const trackWidth = Math.max(
+    720, ((win.endMs - win.startMs) / 3_600_000) * hourPx
+  )
 
   const scrollRef = useRef(null)
   const rulerRef = useRef(null)
@@ -206,6 +177,25 @@ export default function TimelineDesk({ locationId, date }) {
     }
   }, [zoneFilter, zones])
 
+  /*
+   * Открытая панель показывает СВЕЖУЮ бронь.
+   *
+   * Панель держала копию строки, с которой её открыли: пока хостес
+   * читал карточку, гость отменял бронь с телефона, полотно это
+   * получало — а в панели оставалось «Подтверждена», и хостес сажал
+   * гостя, которого нет.
+   */
+  const detailVisit = useMemo(
+    () => (detail ? (raw ?? []).find((v) => v.id === detail) ?? null : null),
+    [detail, raw]
+  )
+
+  useEffect(() => {
+    // Визит исчез из окна (перенесён на другой день, удалён) — панель
+    // закрывается сама, а не показывает то, чего уже нет.
+    if (detail && raw !== null && !detailVisit) setDetail(null)
+  }, [detail, raw, detailVisit])
+
   function panTimeline(direction) {
     scrollRef.current?.scrollBy({
       left: direction * Math.max(240, scrollRef.current.clientWidth * 0.72),
@@ -226,15 +216,19 @@ export default function TimelineDesk({ locationId, date }) {
    * произошло, и не видел почему. Успех закрывает панель, отказ
    * оставляет её открытой вместе с причиной.
    */
-  async function act(fn) {
+  async function act(fn, freedAtMs = null) {
     setBusy(true)
     setSheetError('')
     setSheetConflict(false)
     try {
       await fn()
       setDetail(null)
-      await load()
+      await onReload()
       setError('')
+      // Подбор открывается только после УСПЕШНОГО освобождения слота:
+      // предлагать гостей на стол, который освободить не удалось, —
+      // второй обман за одну минуту.
+      if (freedAtMs) setRecovery(freedAtMs)
     } catch (e) {
       setSheetError(deskErrorText(e.message))
       setSheetConflict(isConflict(e.message))
@@ -373,12 +367,12 @@ export default function TimelineDesk({ locationId, date }) {
                               block.conflict ? ' is-conflict' : ''}${
                               block.clipsStart ? ' is-clip-start' : ''}${
                               block.clipsEnd ? ' is-clip-end' : ''}${
-                              detail?.id === block.booking.id ? ' is-selected' : ''}`}
+                              detail === block.booking.id ? ' is-selected' : ''}`}
                             style={{ left: `${block.leftPct}%`, width: `${block.widthPct}%` }}
                             // Выбранный визит — состояние кнопки, а не только
                             // рамка: читалка обязана сказать, что открыто.
-                            aria-pressed={detail?.id === block.booking.id}
-                            onClick={() => setDetail(raw.find((r) => r.id === block.booking.id) ?? null)}
+                            aria-pressed={detail === block.booking.id}
+                            onClick={() => setDetail(block.booking.id)}
                             // Одинаковых блоков на экране десятки: без имени
                             // с гостем, столом и временем скринридер читает
                             // подряд «кнопка, кнопка, кнопка». Подпись полная
@@ -421,9 +415,10 @@ export default function TimelineDesk({ locationId, date }) {
         </>
       )}
 
-      {detail && (
+      {detailVisit && (
         <BookingSheet
-          reservation={detail}
+          locationId={locationId}
+          reservation={detailVisit}
           tables={tables}
           tz={tz}
           busy={busy}
@@ -433,17 +428,17 @@ export default function TimelineDesk({ locationId, date }) {
           bookings={raw ?? []}
           // С кем именно столкнулась бронь — из тех же строк, что рисуют
           // полотно: панель и сетка не могут расходиться в этом ответе.
-          clashes={overlappingVisits(rows, detail.id)}
+          clashes={overlappingVisits(rows, detailVisit.id)}
           onClearError={() => { setSheetError(''); setSheetConflict(false) }}
           onClose={() => { setDetail(null); setSheetError(''); setSheetConflict(false) }}
           onEdit={(patch) => act(async () => {
             // Контакты и «когда/сколько» — разные функции сервера: у
             // второй пересчёт занятости, у первой его не нужно.
             if (patch.name != null || patch.phone != null) {
-              await updateReservationGuest(locationId, detail.id, patch)
+              await updateReservationGuest(locationId, detailVisit.id, patch)
             }
             if (patch.at != null || patch.partySize != null || patch.note != null) {
-              await updateReservation(locationId, detail.id, patch)
+              await updateReservation(locationId, detailVisit.id, patch)
             }
           })}
           /*
@@ -452,12 +447,31 @@ export default function TimelineDesk({ locationId, date }) {
            * остальное идёт через set_reservation_status_web, который и
            * решает, разрешён ли переход.
            */
-          onAction={(key, reason = null) => act(() => (
-            key === 'arrived'
-              ? markReservationArrived(locationId, detail.id)
-              : setReservationStatus(locationId, detail.id, key, reason)
-          ))}
-          onTables={(ids) => act(() => setReservationTables(locationId, detail.id, ids))}
+          /*
+           * Отмена, отказ и неявка освобождают стол — и это тот самый
+           * момент, когда лист ожидания перестаёт быть архивом
+           * обещаний. Подбор открывается сам: отдельная кнопка «а кто у
+           * нас ждёт» означала бы, что о ней надо помнить в час пик.
+           */
+          onAction={(key, reason = null) => {
+            const freedAt = new Date(detailVisit.reserved_at).getTime()
+            return act(
+              () => (key === 'arrived'
+                ? markReservationArrived(locationId, detailVisit.id)
+                : setReservationStatus(locationId, detailVisit.id, key, reason)),
+              releasesTable(key) && worthRecovering(freedAt, nowMs) ? freedAt : null,
+            )
+          }}
+          onTables={(ids) => act(() => setReservationTables(locationId, detailVisit.id, ids))}
+        />
+      )}
+
+      {recovery && (
+        <WaitlistRecovery
+          locationId={locationId}
+          atMs={recovery}
+          tz={tz}
+          onClose={() => setRecovery(null)}
         />
       )}
     </section>

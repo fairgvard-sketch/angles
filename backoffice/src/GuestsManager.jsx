@@ -8,6 +8,7 @@ import {
   saveGuestProfile, mergeGuests, anonymizeGuest,
   formatMoney, formatPhone, normalizePhoneInput, lastVisitLabel, formatDateTime,
   visitsLabel, loyaltyLabel, guestRowLabel, loadedCountLabel, tagTone,
+  SEGMENT_LABEL, primarySegment, whySegment,
   SEGMENTS, SORTS, segmentSummary, parseTagsInput, TAG_LIMIT,
   guestsToCsv, csvFileName, duplicateReason, mergeConfirmText, mergePreview, mergeSources,
   customerErrorText,
@@ -84,10 +85,17 @@ function CustomerRow({ guest, mode, selected, onOpen }) {
       <span className="cus-cell-name">
         <strong>{guest.name || formatPhone(guest.phone)}</strong>
         {guest.name && guest.phone && <small>{formatPhone(guest.phone)}</small>}
+        {/* Автоматический сегмент и ручные метки различимы: первый
+            считает сервер по визитам (155), вторые ставит человек. */}
+        <SegmentChip guest={guest} />
         <TagChips tags={guest.tags} />
       </span>
       <span className="cus-cell-loyalty">{loyaltyLabel(guest, mode)}</span>
-      <span className="cus-cell-num" data-label="Visits">{guest.visits ?? 0}</span>
+      {/* Визиты считает сервер по броням И кассе (155): у точки без
+          кассы колонка лояльности нулевая, а гость ходит каждую неделю. */}
+      <span className="cus-cell-num" data-label="Visits">
+        {guest.why_segment?.visits ?? guest.visits ?? 0}
+      </span>
       <span className="cus-cell-num" data-label="Total spent">
         {formatMoney(guest.total_spent)}
       </span>
@@ -95,6 +103,28 @@ function CustomerRow({ guest, mode, selected, onOpen }) {
         {lastVisitLabel(guest.last_visit_at)}
       </span>
     </button>
+  )
+}
+
+/**
+ * Автоматический сегмент строки.
+ *
+ * Ровно один — тот, что важнее прочих; остальные видны в карточке.
+ * Метка без объяснения бесполезна, поэтому «почему» уходит в подсказку
+ * и в имя для читалки.
+ */
+function SegmentChip({ guest }) {
+  const key = primarySegment(guest.segments)
+  if (!key) return null
+  const why = whySegment(key, guest.why_segment)
+  const label = SEGMENT_LABEL[key] ?? key
+  return (
+    <span
+      className={`cus-segment is-${key.replace('_', '-')}`}
+      title={why || undefined}
+    >
+      {label}
+    </span>
   )
 }
 

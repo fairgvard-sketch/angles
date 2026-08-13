@@ -1,8 +1,12 @@
-import { useMemo, useState } from 'react'
+import { useEffect, useMemo, useState } from 'react'
 import { blockState } from './timeline'
 import { statusClass, statusLabel, visitActions } from './reservation-status'
 import { conflictAlternatives } from './desk-availability'
-import { toLocalInput, fromLocalInput } from './reservations'
+import { toLocalInput, fromLocalInput, fetchVisit } from './reservations'
+import { formatMoney } from './customers'
+import {
+  guestSummary, orderSummary, primaryAction, secondaryActions, visitHistory,
+} from './visit'
 import Drawer from './ui/Drawer'
 import ConfirmDialog from './ui/ConfirmDialog'
 import PartyCount from './ui/PartyCount'
@@ -30,10 +34,11 @@ function timeInZone(ms, tz) {
 }
 
 export default function BookingSheet({
-  reservation, tables, tz, busy, error, conflict = false, bookings = [], clashes = [],
-  onClose, onAction, onTables, onEdit, onClearError,
+  locationId, reservation, tables, tz, busy, error, conflict = false,
+  bookings = [], clashes = [], onClose, onAction, onTables, onEdit, onClearError,
 }) {
-  const linked = (reservation.tables_link ?? []).map((l) => l.table_id)
+  const linked = reservation.table_ids
+    ?? (reservation.tables_link ?? []).map((l) => l.table_id)
   const initial = linked.length > 0
     ? linked
     : [reservation.table_id, ...(reservation.hold_table_ids ?? [])].filter(Boolean)
@@ -41,7 +46,39 @@ export default function BookingSheet({
   const posSeated = reservation.order_id != null
   const active = reservation.status === 'new' || reservation.status === 'confirmed'
 
+  /*
+   * Подробности приезжают ОТДЕЛЬНО и после открытия.
+   *
+   * Панель обязана открыться мгновенно — визит уже есть в списочной
+   * модели, ждать сеть, чтобы показать имя и время, незачем. Профиль
+   * гостя с заметкой и метками и денежная часть догружаются одним
+   * запросом (152): рассылать внутренние заметки обо всех гостях дня
+   * ради одного, которого откроют, нельзя.
+   */
+  const [deep, setDeep] = useState(null)
+  useEffect(() => {
+    if (!locationId || !reservation.id) return undefined
+    let alive = true
+    setDeep(null)
+    fetchVisit(locationId, reservation.id)
+      .then((data) => { if (alive) setDeep(data) })
+      // Молча: карточка без профиля всё равно полезна, а красная
+      // строка поверх рабочего действия отвлекает от него.
+      .catch(() => { if (alive) setDeep(null) })
+    return () => { alive = false }
+  }, [locationId, reservation.id])
+
   const actions = visitActions(reservation)
+  const nextAction = primaryAction(actions)
+  const restActions = secondaryActions(actions)
+
+  // Контекст постоянного гостя: сначала из списочной модели (она уже
+  // на экране), затем уточняется полной статистикой.
+  const guest = guestSummary(deep?.guest?.stats ?? reservation.guest)
+  const order = orderSummary(deep?.order ?? reservation.order, formatMoney)
+  const history = useMemo(() => visitHistory(reservation, deep?.events), [reservation, deep])
+  const guestNote = deep?.guest?.notes?.trim() || ''
+  const guestTags = Array.isArray(deep?.guest?.tags) ? deep.guest.tags : []
   /*
    * Отмена и отказ спрашивают причину — её увидит гость.
    *
@@ -55,6 +92,10 @@ export default function BookingSheet({
   // Правка визита открывается по кнопке: обычно карточку открывают,
   // чтобы посадить гостя, а не переписать его данные.
   const [editing, setEditing] = useState(false)
+  // Пересадка нужна одному визиту из десяти — пикер столов раскрывается
+  // по требованию и не стоит между хостес и посадкой.
+  const [picking, setPicking] = useState(false)
+  const [showHistory, setShowHistory] = useState(false)
   const [form, setForm] = useState(() => ({
     name: reservation.customer_name ?? '',
     phone: reservation.customer_phone ?? '',
@@ -201,7 +242,61 @@ export default function BookingSheet({
           )}
         </dl>
 
+        {/*
+          ОДНО действие, которое нужно сейчас, — сразу под фактами.
+
+          Раньше кнопки лежали плоским рядом ПОД раскрытым пикером всех
+          столов: чтобы посадить гостя, хостес прокручивал панель мимо
+          двадцати кнопок. Набор решает `visitActions` — зеркало
+          серверных переходов; экран не предлагает того, что сервер
+          отклонит.
+        */}
+        {nextAction && !posSeated && (
+          <div className="sheet-next">
+            <button
+              type="button"
+              className="primary-button"
+              disabled={busy}
+              onClick={() => (nextAction.confirm ? setAsking(nextAction) : onAction(nextAction.key))}
+            >
+              {nextAction.label}
+            </button>
+          </div>
+        )}
+
         {reservation.note && <p className="order-note">{reservation.note}</p>}
+
+        {/*
+          Гость, которого здесь уже знают.
+
+          Показывается только то, что что-то значит для смены: у нового
+          гостя истории нет, и три нуля вместо неё — шум на месте, где
+          должно стоять имя. Повторные неявки предупреждают смену и
+          НИКОГДА не уходят гостю: это внутренняя пометка (121).
+        */}
+        {(guest || guestNote || guestTags.length > 0) && (
+          <div className={`sheet-guest${guest?.warn ? ' is-warn' : ''}`}>
+            {guest && (
+              <p className="sheet-guest-line">
+                <strong>{guest.returning ? 'Returning guest' : 'Guest history'}</strong>
+                <span className="sheet-fact-muted"> · {guest.text}</span>
+              </p>
+            )}
+            {guest?.warn && (
+              <p className="sheet-guest-warn">
+                Missed {guest.noShows} bookings before — worth confirming by phone.
+              </p>
+            )}
+            {guestTags.length > 0 && (
+              <p className="sheet-guest-tags">
+                {guestTags.map((tag) => (
+                  <span key={tag} className="guest-fav">{tag}</span>
+                ))}
+              </p>
+            )}
+            {guestNote && <p className="sheet-guest-note">{guestNote}</p>}
+          </div>
+        )}
 
         {/*
           Конфликт назван по имени: красной рамки на полотне мало, чтобы
@@ -223,10 +318,31 @@ export default function BookingSheet({
           </div>
         )}
 
+        {/*
+          Денежная часть существует только там, где есть касса.
+
+          Раньше здесь стояла одна фраза «визит ведётся на кассе», и
+          хостес не мог ответить ни на «они уже заплатили», ни на «какой
+          у них номер» — за этим шли к терминалу. У standalone Reserve
+          блока нет вовсе: пустой «средний чек 0 ₪» описывал бы гостя,
+          который ничего не потратил, а не заведение без кассы.
+        */}
         {posSeated && (
-          <p className="form-hint">
-            Seated into a POS order — this visit is handled on the register.
-          </p>
+          <div className="sheet-order">
+            <p className="sheet-order-head">
+              <strong>{order ? `Order #${order.number}` : 'Seated into a POS order'}</strong>
+              {order && (
+                <span className={`rsv-status ${order.paid ? 'is-done' : 'is-pending'}`}>
+                  {order.label}
+                </span>
+              )}
+            </p>
+            {order && <p className="sheet-order-total">{order.total}</p>}
+            <p className="form-hint">
+              This visit is handled on the register — the back office does not
+              change it.
+            </p>
+          </div>
         )}
 
         {/* Отказ сервера — здесь, рядом с кнопкой, которую нажали, а не
@@ -345,8 +461,28 @@ export default function BookingSheet({
 
         {active && !posSeated && (
           <>
+            {/*
+              Пикер столов раскрывается по требованию.
+
+              Развёрнутый список из двадцати кнопок стоял между хостес и
+              действием, ради которого панель и открыли, — а пересадка
+              нужна одному визиту из десяти. Текущий стол при этом виден
+              всегда: он в фактах наверху.
+            */}
             <div className="sheet-section">
-              <span className="sheet-section-title">Tables</span>
+              <button
+                type="button"
+                className="sheet-disclosure"
+                aria-expanded={picking}
+                onClick={() => setPicking((v) => !v)}
+              >
+                <span className="sheet-section-title">Tables</span>
+                <span className="sheet-fact-muted">
+                  {seatedAt.length > 0 ? seatedAt.map((t) => t.label).join(' + ') : 'Not assigned yet'}
+                </span>
+              </button>
+              {picking && (
+              <>
               <div className="timeline-tablepick">
                 {tables.filter((t) => !t.blocked).map((t) => (
                   <button
@@ -374,12 +510,14 @@ export default function BookingSheet({
               >
                 Save tables
               </button>
+              </>
+              )}
             </div>
 
-            {/* Набор действий решает `visitActions`: экран не должен
-                предлагать переход, который сервер всё равно отклонит. */}
+            {/* Главное действие уже стоит наверху. Здесь — остальное:
+                то, что делают реже, и то, чего не отменить. */}
             <div className="order-actions">
-              {actions.map((action) => (
+              {restActions.map((action) => (
                 <button
                   key={action.key}
                   type="button"
@@ -410,6 +548,42 @@ export default function BookingSheet({
             onCancel={() => setAsking(null)}
             onConfirm={(text) => { setAsking(null); onAction(asking.key, text) }}
           />
+        )}
+
+        {/*
+          История визита — только записанные факты.
+
+          Из статуса события не выдумываются: у переходов, которых
+          продукт не записывал, есть один общий `decided_at`, и назвать
+          его «подтверждена в 14:20» нельзя — та же колонка могла быть
+          переписана отказом. Чего не записали, того здесь нет.
+        */}
+        {history.length > 1 && (
+          <div className="sheet-section">
+            <button
+              type="button"
+              className="sheet-disclosure"
+              aria-expanded={showHistory}
+              onClick={() => setShowHistory((v) => !v)}
+            >
+              <span className="sheet-section-title">History</span>
+              <span className="sheet-fact-muted">{history.length} events</span>
+            </button>
+            {showHistory && (
+              <ol className="sheet-history">
+                {history.map((event) => (
+                  <li key={`${event.kind}-${event.at}`}>
+                    <time dateTime={new Date(event.at).toISOString()}>
+                      {new Date(event.at).toLocaleString([], {
+                        day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit',
+                      })}
+                    </time>
+                    <span>{event.text}</span>
+                  </li>
+                ))}
+              </ol>
+            )}
+          </div>
         )}
 
         {(sourceLabel || reservation.created_at) && (

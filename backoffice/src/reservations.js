@@ -5,64 +5,53 @@ export { deskErrorText, toLocalInput, fromLocalInput } from './reservations-time
 /**
  * Веб-стол хостес (Kassa 102): полный цикл брони без POS.
  *
- * Чтение — прямой select под RLS членства (политика 053, JWT org_id),
- * запись — только RPC set_reservation_status_web (owner/manager,
- * модуль reservations; посаженные на кассе брони с order_id сервер
- * не отдаёт под запись — pos_mode).
+ * Чтение — одна серверная модель (`get_reservation_desk_web`, 152),
+ * запись — RPC с членством owner/manager и модулем reservations;
+ * посаженные на кассе брони с order_id сервер под запись не отдаёт
+ * (pos_mode).
+ *
+ * Прямых выборок из `reservations` здесь больше нет. Их было четыре, по
+ * одной на компонент, и один рендер раздела стоил четырнадцати
+ * запросов; хуже — полотно и список собирали одну и ту же бронь разными
+ * выборками, и «что видит хостес» зависело от вкладки, с которой он
+ * пришёл.
  */
-
-export const RESERVATION_STATUS_LABELS = {
-  new: 'New',
-  confirmed: 'Confirmed',
-  rejected: 'Rejected',
-  cancelled: 'Cancelled',
-  completed: 'Completed',
-  no_show: 'No-show',
-}
-
-/** Кнопки — зеркало переходов set_reservation_status_web. */
-export const RESERVATION_ACTIONS = {
-  new: [
-    { to: 'confirmed', label: 'Confirm', tone: 'primary' },
-    { to: 'rejected', label: 'Reject', tone: 'danger' },
-  ],
-  confirmed: [
-    { to: 'completed', label: 'Completed', tone: 'primary' },
-    { to: 'no_show', label: 'No-show' },
-    { to: 'cancelled', label: 'Cancel', tone: 'danger' },
-  ],
-}
-
-const SELECT_COLUMNS =
-  'id, status, customer_name, customer_phone, party_size, reserved_at, duration_min, note, reject_reason, order_id, table_id, created_at, is_test'
 
 /**
- * Актив: заявки new + подтверждённые визиты от начала сегодняшнего дня
- * (прошедшие confirmed остаются видимыми — хостес закрывает их
- * completed/no_show). История — последние решённые.
+ * Стол хостес за окно: часы точки, зоны, столы и визиты одним ответом.
+ *
+ * Окно задаётся в UTC и с запасом (`visit.js`), потому что часовой пояс
+ * точки приезжает В ЭТОМ ЖЕ ответе. Считать границы запроса по поясу
+ * значит спросить сервер дважды — ровно то, из-за чего полотно
+ * загружалось по два раза при каждом открытии.
  */
-export async function fetchReservations(locationId) {
-  const dayStart = new Date()
-  dayStart.setHours(0, 0, 0, 0)
-  const [active, history] = await Promise.all([
-    supabase
-      .from('reservations')
-      .select(SELECT_COLUMNS)
-      .eq('location_id', locationId)
-      .in('status', ['new', 'confirmed'])
-      .gte('reserved_at', dayStart.toISOString())
-      .order('reserved_at', { ascending: true }),
-    supabase
-      .from('reservations')
-      .select(SELECT_COLUMNS)
-      .eq('location_id', locationId)
-      .in('status', ['completed', 'no_show', 'rejected', 'cancelled'])
-      .order('reserved_at', { ascending: false })
-      .limit(20),
-  ])
-  if (active.error) throw active.error
-  if (history.error) throw history.error
-  return { active: active.data ?? [], history: history.data ?? [] }
+export async function fetchDesk(locationId, fromMs, toMs, limit = 500) {
+  const { data, error } = await supabase.rpc('get_reservation_desk_web', {
+    p_location_id: locationId,
+    p_from: new Date(fromMs).toISOString(),
+    p_to: new Date(toMs).toISOString(),
+    p_limit: limit,
+  })
+  if (error) throw new Error(error.message)
+  return data ?? { zones: [], tables: [], visits: [] }
+}
+
+/**
+ * Подробности открытого визита: профиль гостя с заметкой и метками,
+ * полная статистика броней и денежная часть из POS.
+ *
+ * Панель открывается БЕЗ этого запроса — визит уже есть в списочной
+ * модели. Здесь приезжает только то, чего в ней намеренно нет:
+ * рассылать внутренние заметки обо всех гостях дня ради одного,
+ * которого откроют, нельзя.
+ */
+export async function fetchVisit(locationId, id) {
+  const { data, error } = await supabase.rpc('get_visit_web', {
+    p_location_id: locationId,
+    p_id: id,
+  })
+  if (error) throw new Error(error.message)
+  return data
 }
 
 export async function setReservationStatus(locationId, id, status, reason = null) {
@@ -76,121 +65,7 @@ export async function setReservationStatus(locationId, id, status, reason = null
   return data
 }
 
-const sameDay = (a, b) =>
-  a.getFullYear() === b.getFullYear() && a.getMonth() === b.getMonth() && a.getDate() === b.getDate()
-
-export function visitLabel(iso) {
-  const date = new Date(iso)
-  const now = new Date()
-  const time = date.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
-  if (sameDay(date, now)) return `Today · ${time}`
-  const tomorrow = new Date(now)
-  tomorrow.setDate(now.getDate() + 1)
-  if (sameDay(date, tomorrow)) return `Tomorrow · ${time}`
-  return `${date.toLocaleDateString([], { weekday: 'short', day: 'numeric', month: 'short' })} · ${time}`
-}
-
-// ── Таймлайн хостес (Kassa 119/120) ──────────────────────────
-
-/**
- * Брони суток для полотна. Берём с запасом в сутки назад: ночная смена
- * начинается вчера, а фильтровать по концу визита через PostgREST нельзя —
- * длительность у каждой брони своя. Лишнее отсечёт раскладка по окну дня.
- *
- * `reservation_tables` (119) — источник занятости: столы объединения
- * приходят строками, а не разбором массива на клиенте.
- */
-export async function fetchTimelineReservations(locationId, fromMs, toMs) {
-  const { data, error } = await supabase
-    .from('reservations')
-    .select(
-      'id, status, customer_name, customer_phone, party_size, reserved_at, '
-      + 'duration_min, note, order_id, arrived_at, table_id, hold_table_ids, zone_id, is_test, '
-      // Путь заведения (136) и канал привода (124) — разные вещи, и в
-      // карточке визита нужны обе: «кто нажал кнопку» и «откуда гость
-      // узнал». Время создания объясняет странные визиты.
-      + 'created_via, source, created_at, rules_ack, '
-      + 'tables_link:reservation_tables ( table_id, is_primary )'
-    )
-    .eq('location_id', locationId)
-    .gte('reserved_at', new Date(fromMs - 24 * 3600_000).toISOString())
-    .lt('reserved_at', new Date(toMs).toISOString())
-    .order('reserved_at', { ascending: true })
-    .limit(500)
-  if (error) throw new Error(error.message)
-  return data ?? []
-}
-
-/**
- * Брони за отрезок времени — для списка.
- *
- * Отличается от полотна двумя вещами: берутся ВСЕ состояния, включая
- * отменённые и завершённые (список отвечает на вопрос «что было и что
- * будет», а не «что с залом сейчас»), и окно задаётся днями, а не
- * расписанием точки.
- *
- * Лимит честный: 500 визитов — это неделя работы большого зала. Когда
- * упрёмся, отбор поедет на сервер, а не превратится в тихую потерю
- * строк — поэтому вызывающий знает, что упёрся.
- */
-export async function fetchReservationRange(locationId, fromMs, toMs, limit = 500) {
-  const { data, error } = await supabase
-    .from('reservations')
-    .select(
-      'id, status, customer_name, customer_phone, party_size, reserved_at, '
-      + 'duration_min, note, reject_reason, order_id, arrived_at, table_id, '
-      + 'hold_table_ids, zone_id, is_test, created_via, source, created_at, rules_ack, '
-      + 'tables_link:reservation_tables ( table_id, is_primary )'
-    )
-    .eq('location_id', locationId)
-    .gte('reserved_at', new Date(fromMs).toISOString())
-    .lt('reserved_at', new Date(toMs).toISOString())
-    .order('reserved_at', { ascending: true })
-    .limit(limit)
-  if (error) throw new Error(error.message)
-  const rows = data ?? []
-  return { rows, capped: rows.length >= limit }
-}
-
-/** Столы и зоны точки для строк полотна */
-export async function fetchTimelineTables(locationId) {
-  const [tables, zones] = await Promise.all([
-    supabase.from('tables')
-      .select('id, label, seats, zone_id, sort_order, is_active, status')
-      .eq('location_id', locationId)
-      .order('sort_order'),
-    supabase.from('table_zones')
-      .select('id, name, sort_order')
-      .eq('location_id', locationId).eq('is_active', true)
-      .order('sort_order'),
-  ])
-  if (tables.error) throw new Error(tables.error.message)
-  if (zones.error) throw new Error(zones.error.message)
-  const zoneName = new Map((zones.data ?? []).map((z) => [z.id, z.name]))
-  return (tables.data ?? []).map((t) => ({
-    id: t.id,
-    label: t.label,
-    seats: t.seats ?? 2,
-    zoneId: t.zone_id ?? null,
-    zoneName: t.zone_id ? zoneName.get(t.zone_id) ?? null : null,
-    sortOrder: t.sort_order ?? 0,
-    blocked: !t.is_active || t.status === 'disabled',
-  }))
-}
-
-/** Настройки брони точки — из них берётся окно дня */
-export async function fetchReservationSettings(locationId) {
-  const { data, error } = await supabase
-    .from('locations')
-    .select('timezone, rsv:settings->reservations')
-    .eq('id', locationId)
-    .maybeSingle()
-  if (error) throw new Error(error.message)
-  return {
-    timezone: data?.timezone || 'Asia/Jerusalem',
-    schedule: data?.rsv?.schedule ?? null,
-  }
-}
+// ── Действия хостес (Kassa 119/120/127) ──────────────────────
 
 /** Назначить / объединить / разъединить столы визита (120) */
 export async function setReservationTables(locationId, id, tableIds) {
@@ -288,9 +163,13 @@ export async function fetchWaitlist(locationId) {
  * Кого можно позвать на освободившееся время. Сервер проверяет не только
  * пожелание гостя, но и реальную возможность посадить: предлагать слот,
  * на который нет стола, значит обмануть дважды.
+ *
+ * Ответ несёт и ПОЧЕМУ кандидат подходит (окно, зоны, обещанное
+ * ожидание, 153): без этого список выглядит как «позвоните этим людям»
+ * без объяснения, и хостес не может решить, кому звонить первым.
  */
 export async function fetchWaitlistMatches(locationId, atIso) {
-  const { data, error } = await supabase.rpc('waitlist_matches', {
+  const { data, error } = await supabase.rpc('waitlist_matches_web', {
     p_location_id: locationId,
     p_at: atIso,
   })

@@ -5,26 +5,30 @@ import {
   guestsToCsv, csvFileName, duplicateReason, mergePreview, mergeSources,
   customerErrorText, normalizePhoneInput, formatPhone, formatMoney,
   mergeConfirmText, loyaltyLabel, guestRowLabel, loadedCountLabel, tagTone,
-  visitsLabel, ROW_LIMIT, TAG_TONES,
+  visitsLabel, ROW_LIMIT, TAG_TONES, whySegment, primarySegment,
 } from './customers.js'
 
 // ── Сегменты считает сервер ──────────────────────────────────
 
 test('сегмент превращается в серверные параметры, а не в фильтр страницы', () => {
-  const p = segmentParams({ segment: 'regulars' })
-  assert.equal(p.p_min_visits, 3)
-  assert.equal(p.p_min_spent, null)
+  const p = segmentParams({ segment: 'regular' })
+  // Сегмент — имя, а не порог: формулу знает сервер (155), и она одна
+  // для кабинета, отчёта и выгрузки.
+  assert.equal(p.p_segment, 'regular')
+  assert.equal(p.p_min_visits, null)
   assert.equal(p.p_limit, 200)
 })
 
-test('переключение сегмента не тащит за собой прошлые пороги', () => {
-  const spenders = segmentParams({ segment: 'top' })
-  assert.equal(spenders.p_min_spent, 20000)
-  assert.equal(spenders.p_min_visits, null)
+test('переключение сегмента не тащит за собой прошлый', () => {
+  const vip = segmentParams({ segment: 'vip' })
+  assert.equal(vip.p_segment, 'vip')
 
-  const lapsed = segmentParams({ segment: 'lapsed' })
-  assert.equal(lapsed.p_inactive_days, 90)
-  assert.equal(lapsed.p_min_spent, null, 'порог суммы не остался от прошлого среза')
+  const lost = segmentParams({ segment: 'lost' })
+  assert.equal(lost.p_segment, 'lost', 'остался только текущий срез')
+  // Пороги трат ушли на сервер целиком: считать «постоянного» по
+  // колонке кассы значило бы не находить его у точки без кассы.
+  assert.equal(lost.p_min_spent, null)
+  assert.equal(lost.p_min_visits, null)
 })
 
 test('пустой поиск и пустые метки уходят как NULL', () => {
@@ -34,17 +38,23 @@ test('пустой поиск и пустые метки уходят как NUL
 })
 
 test('метки и поиск живут вместе с сегментом', () => {
-  const p = segmentParams({ search: ' Дана ', segment: 'regulars', tags: ['VIP'], sort: 'spend' })
+  const p = segmentParams({ search: ' Дана ', segment: 'regular', tags: ['VIP'], sort: 'spend' })
   assert.equal(p.p_search, 'Дана')
   assert.deepEqual(p.p_tags, ['VIP'])
-  assert.equal(p.p_min_visits, 3)
+  assert.equal(p.p_segment, 'regular')
   assert.equal(p.p_sort, 'spend')
 })
 
 test('неизвестный сегмент не роняет запрос — база показывается целиком', () => {
   const p = segmentParams({ segment: 'nonsense' })
+  assert.equal(p.p_segment, null)
   assert.equal(p.p_min_visits, null)
-  assert.equal(p.p_inactive_days, null)
+})
+
+test('точки сужают факты, а не заводят гостей заново', () => {
+  assert.equal(segmentParams({}).p_location_ids, null)
+  assert.deepEqual(segmentParams({ locationIds: ['loc-1'] }).p_location_ids, ['loc-1'])
+  assert.equal(segmentParams({ offset: 50 }).p_offset, 50)
 })
 
 test('у каждого сегмента есть подпись — чип без объяснения бесполезен', () => {
@@ -52,9 +62,37 @@ test('у каждого сегмента есть подпись — чип бе
 })
 
 test('заголовок списка называет активный срез', () => {
-  assert.match(segmentSummary({ segment: 'lapsed' }), /lapsed/)
+  assert.match(segmentSummary({ segment: 'lost' }), /lost/)
   assert.match(segmentSummary({ segment: 'all', tags: ['VIP'] }), /VIP/)
   assert.match(segmentSummary({ segment: 'all', tags: [], search: '' }), /Most recent/)
+})
+
+test('метка объясняет себя числами, а не словом', () => {
+  assert.match(
+    whySegment('lost', { visits: 8, days_since: 210 }),
+    /8 visits, last one 210 days ago/)
+  assert.match(
+    whySegment('at_risk', { visits: 6, days_since: 60, avg_gap_days: 14 }),
+    /every 14 days, silent for 60/)
+  assert.match(whySegment('repeat_no_show', { no_shows: 3 }), /3 no-shows/)
+})
+
+test('VIP без кассы объясняется визитами, а не нулём трат', () => {
+  assert.match(whySegment('vip', { visits: 12, spend: 0 }), /12 visits/)
+  assert.doesNotMatch(whySegment('vip', { visits: 12, spend: 0 }), /₪0/)
+  assert.match(whySegment('vip', { visits: 5, spend: 60000 }), /600/)
+})
+
+test('без чисел метка молчит, а не выдумывает объяснение', () => {
+  assert.equal(whySegment('lost', null), '')
+  assert.equal(whySegment('lost', {}), '')
+  assert.equal(whySegment('nonsense', { visits: 3 }), '')
+})
+
+test('в узкой колонке показывается один сегмент — первый', () => {
+  assert.equal(primarySegment(['returning', 'upcoming']), 'returning')
+  assert.equal(primarySegment([]), null)
+  assert.equal(primarySegment(undefined), null)
 })
 
 // ── Метки ────────────────────────────────────────────────────

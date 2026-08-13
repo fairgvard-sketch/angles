@@ -1,11 +1,12 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { ChevronLeft, ChevronRight, DoorOpen, Plus } from 'lucide-react'
 import { supabase } from './supabase'
-import { fetchReservations } from './reservations'
+import { fetchDesk, deskErrorText } from './reservations'
 import { shiftDate, todayInZone } from './timeline'
+import { dayDataWindow, rangeDataWindow, toTable } from './visit'
 import { playNewOrderChime } from './orders'
 import TimelineDesk from './TimelineDesk'
-import ReservationList from './ReservationList'
+import ReservationList, { RANGES } from './ReservationList'
 import WaitlistPanel from './WaitlistPanel'
 import FloorPlanEditor from './FloorPlanEditor'
 import ReserveAnalytics from './ReserveAnalytics'
@@ -13,8 +14,7 @@ import LaunchChecklist from './LaunchChecklist'
 import BookingForm from './BookingForm'
 import Tabs from './ui/Tabs'
 import { IconButton } from './ui/Button'
-import { fetchLocationSlug, fetchLocation } from './settings'
-import { fetchTimelineTables } from './reservations'
+import { fetchLocationSlug } from './settings'
 import { SearchField } from './ui/Layout'
 
 /**
@@ -23,12 +23,20 @@ import { SearchField } from './ui/Layout'
  * кассе брони (order_id) показываются read-only — их визит живёт в
  * POS-заказе (seat_reservation 057), веб его не трогает.
  *
- * Новые заявки приходят realtime-подпиской (публикация 053) со звуком;
- * страховка — поллинг раз в 60 секунд.
+ * ЗАГРУЗКА ЖИВЁТ ЗДЕСЬ, И ЭТО ГЛАВНОЕ ИЗМЕНЕНИЕ.
+ *
+ * Раньше данные тянули четверо: раздел (заявки дня), полотно
+ * (настройки + столы + зоны + брони), список (то же самое ещё раз) и
+ * лист ожидания (столы в третий раз). Один рендер стоил четырнадцати
+ * запросов, каждый держал СВОЮ realtime-подписку на `reservations`, и
+ * одно событие перезапускало все четыре загрузки.
+ *
+ * Теперь окно данных считает раздел, сервер отвечает одной моделью
+ * (152), а вкладки — представления над ней. Подписка одна.
  *
  * Вид «Floor plan» (123) стоит здесь же, а не в настройках: пустой
  * таймлайн чинится столами, и путь от проблемы к её причине должен быть
- * в один тап, без похода в другой раздел.
+ * в один тап.
  */
 
 const VIEWS = [
@@ -39,11 +47,14 @@ const VIEWS = [
   { key: 'analytics', label: 'Analytics' },
 ]
 
+/** Вкладки, которым нужны визиты; остальным хватает столов и зон */
+const NEEDS_VISITS = new Set(['timeline', 'list'])
+
 export default function ReservationsDesk({
   context, locationId, tab, onTabChange, date, onDateChange,
   filters = {}, onFiltersChange,
 }) {
-  const [data, setData] = useState(null)
+  const [desk, setDesk] = useState(null)
   const [error, setError] = useState('')
   // Таймлайн — вид по умолчанию: владелец открывает раздел, чтобы увидеть
   // зал. Вкладка живёт в адресе (Phase 2): ссылку на лист ожидания можно
@@ -55,9 +66,16 @@ export default function ReservationsDesk({
   const [slug, setSlug] = useState(null)
   // Ручная бронь / walk-in (127): 'booking' | 'walk-in' | null
   const [creating, setCreating] = useState(null)
-  const [tables, setTables] = useState([])
-  const [tz, setTz] = useState('Asia/Jerusalem')
   const knownIds = useRef(new Set())
+
+  /*
+   * Часовой пояс приезжает В ОТВЕТЕ, поэтому до первого ответа берётся
+   * дефолт — но окно ЗАПРОСА от пояса не зависит вовсе (`visit.js`).
+   * Иначе пришлось бы спрашивать сервер дважды: сначала «какой у тебя
+   * пояс», потом «дай визиты» — ровно так полотно и грузилось по два
+   * раза при каждом открытии.
+   */
+  const tz = desk?.timezone || 'Asia/Jerusalem'
 
   /*
    * Календарный день принадлежит только полотну: там столы действительно
@@ -71,68 +89,78 @@ export default function ReservationsDesk({
   const [query, setQuery] = useState('')
   const showsOperationalTools = view === 'timeline' || view === 'list' || view === 'waitlist'
 
+  const range = RANGES.find((r) => r.key === filters.rg) ?? RANGES[0]
+
+  const window = useMemo(() => {
+    if (view === 'timeline') return dayDataWindow(day)
+    if (view === 'list') return rangeDataWindow(today, range.days)
+    // Вкладкам без визитов нужны столы и зоны — их отдаёт та же модель,
+    // поэтому окно берётся минимальным, а не выключается отдельным флагом.
+    return dayDataWindow(today, 0)
+  }, [view, day, today, range.days])
+
   useEffect(() => {
-    if (!locationId) return
+    if (!locationId) return undefined
     let alive = true
     fetchLocationSlug(locationId)
       .then((s) => { if (alive) setSlug(s) })
       .catch(() => { if (alive) setSlug(null) })
-    // Столы и зона точки нужны форме ручной брони: стол хостес может
-    // назвать сам, а время вводится в часах ТОЧКИ, не браузера.
-    fetchTimelineTables(locationId)
-      .then((list) => { if (alive) setTables(list) })
-      .catch(() => { if (alive) setTables([]) })
-    fetchLocation(locationId)
-      .then((loc) => { if (alive) setTz(loc.timezone || 'Asia/Jerusalem') })
-      .catch(() => {})
     return () => { alive = false }
   }, [locationId])
 
-  const refresh = useCallback(async (withSound = false) => {
-    if (!locationId) return
+  // Ответ на устаревший запрос не должен переписать стол: при быстрой
+  // смене дат сеть возвращает их в произвольном порядке.
+  const requestRef = useRef(0)
+
+  const load = useCallback(async (withSound = false) => {
+    if (!locationId || !window) return
+    const ticket = requestRef.current + 1
+    requestRef.current = ticket
     try {
-      const next = await fetchReservations(locationId)
+      const next = await fetchDesk(locationId, window.fromMs, window.toMs)
+      if (requestRef.current !== ticket) return
+      setDesk(next)
       setError('')
-      setData(next)
-      const ids = new Set(next.active.map((r) => r.id))
+      const visits = next.visits ?? []
       if (withSound) {
-        const hasFresh = next.active.some(
-          (r) => r.status === 'new' && !knownIds.current.has(r.id)
-        )
-        if (hasFresh) playNewOrderChime()
+        const fresh = visits.some((v) => v.status === 'new' && !knownIds.current.has(v.id))
+        if (fresh) playNewOrderChime()
       }
-      knownIds.current = ids
+      knownIds.current = new Set(visits.map((v) => v.id))
     } catch (e) {
-      setError(e.message)
+      if (requestRef.current !== ticket) return
+      setError(deskErrorText(e.message))
     }
-  }, [locationId])
+  }, [locationId, window])
 
   useEffect(() => {
     if (!locationId) return undefined
-    setData(null)
+    /*
+     * Скелет показывается только когда МЕНЯЕТСЯ ТО, ЧТО СМОТРЯТ: точка,
+     * вкладка или день. Realtime и поллинг подменяют данные на месте —
+     * иначе стол мигал бы скелетом каждую минуту и на каждой чужой
+     * брони, теряя прокрутку под пальцем.
+     */
+    setDesk(null)
     knownIds.current = new Set()
-    refresh()
+    load()
     const channel = supabase
-      .channel(`reservations-${locationId}`)
+      .channel(`reservations-desk-${locationId}`)
       .on(
         'postgres_changes',
         { event: '*', schema: 'public', table: 'reservations', filter: `location_id=eq.${locationId}` },
-        () => refresh(true)
+        () => load(true)
       )
       .subscribe()
-    const timer = setInterval(() => refresh(true), 60000)
+    const timer = setInterval(() => load(true), 60000)
     return () => {
       supabase.removeChannel(channel)
       clearInterval(timer)
     }
-  }, [locationId, refresh])
+  }, [locationId, load])
 
-  /*
-   * Список визитов дня остаётся загруженным ради двух вещей: звонка о
-   * новой заявке и подсказок формы ручной брони — она предлагает
-   * альтернативы из тех же визитов, что уже на экране.
-   */
-  const active = data?.active ?? []
+  const tables = useMemo(() => (desk?.tables ?? []).map(toTable), [desk])
+  const visits = desk?.visits ?? []
 
   return (
     <>
@@ -227,16 +255,23 @@ export default function ReservationsDesk({
           tables={tables}
           /* Подсказки при конфликте считаются из того же списка визитов,
              который уже показан на экране */
-          bookings={data?.active ?? []}
+          bookings={visits}
           tz={tz}
           mode={creating}
           onClose={() => setCreating(null)}
-          onCreated={() => { setCreating(null); refresh() }}
+          onCreated={() => { setCreating(null); load() }}
         />
       )}
 
       {view === 'timeline' && locationId && (
-        <TimelineDesk locationId={locationId} date={day} />
+        <TimelineDesk
+          locationId={locationId}
+          date={day}
+          desk={desk}
+          tables={tables}
+          tz={tz}
+          onReload={load}
+        />
       )}
 
       {/* Настройка публичной страницы не должна стоять между хостес и
@@ -250,7 +285,7 @@ export default function ReservationsDesk({
         />
       )}
       {view === 'waitlist' && locationId && (
-        <WaitlistPanel locationId={locationId} date={today} query={query} />
+        <WaitlistPanel locationId={locationId} date={today} query={query} tables={tables} />
       )}
       {view === 'floor' && locationId && <FloorPlanEditor locationId={locationId} />}
       {/* Аналитика намеренно смотрит на всю организацию: сравнение точек
@@ -264,6 +299,10 @@ export default function ReservationsDesk({
           query={query}
           filters={filters}
           onFilters={onFiltersChange}
+          desk={desk}
+          tables={tables}
+          tz={tz}
+          onReload={load}
         />
       )}
     </>
