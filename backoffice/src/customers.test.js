@@ -5,7 +5,8 @@ import {
   guestsToCsv, csvFileName, duplicateReason, mergePreview, mergeSources,
   customerErrorText, normalizePhoneInput, formatPhone, formatMoney,
   mergeConfirmText, loyaltyLabel, guestRowLabel, loadedCountLabel, tagTone,
-  visitsLabel, ROW_LIMIT, TAG_TONES, whySegment, primarySegment,
+  visitsLabel, ROW_LIMIT, TAG_TONES, whySegment, primarySegment, combinedVisits,
+  segmentExplanations, explanationIdFor,
 } from './customers.js'
 
 // ── Сегменты считает сервер ──────────────────────────────────
@@ -382,4 +383,84 @@ test('гость без сегмента не ломает выгрузку', ()
 
 test('менеджеру объясняют, что стирать может только владелец', () => {
   assert.match(customerErrorText('owner_only'), /owner can erase/)
+})
+
+// ── Один счётчик визитов на все поверхности ──────────────────
+
+describe('канонический счётчик визитов', () => {
+  it('берётся из явного поля сервера', () => {
+    assert.equal(combinedVisits({ combined_visits: 6, visits: 4 }), 6)
+  })
+
+  it('ноль визитов — это ноль, а не «поля нет»', () => {
+    assert.equal(combinedVisits({ combined_visits: 0, visits: 9 }), 0)
+  })
+
+  it('старый ответ без поля падает на факты сегмента', () => {
+    assert.equal(combinedVisits({ visits: 4, why_segment: { visits: 6 } }), 6)
+  })
+
+  it('совсем старый ответ показывает счётчик лояльности, а не ноль', () => {
+    assert.equal(combinedVisits({ visits: 4 }), 4)
+    assert.equal(combinedVisits({}), 0)
+    assert.equal(combinedVisits(null), 0)
+  })
+
+  it('подпись для читалки называет ТО ЖЕ число, что видит зрячий', () => {
+    const guest = {
+      name: 'Мири', phone: '0521111111', combined_visits: 6, visits: 4,
+      total_spent: 12000, last_visit_at: null,
+    }
+    // Живой дефект: в ячейке было 6, а читалка объявляла 4
+    assert.match(guestRowLabel(guest, 'points'), /6 visits/)
+    assert.doesNotMatch(guestRowLabel(guest, 'points'), /4 visits/)
+  })
+
+  it('выгрузка согласуется с экраном', () => {
+    const csv = guestsToCsv([{
+      name: 'Мири', phone: '0521111111', combined_visits: 6, visits: 4,
+      total_spent: 0, points: 0, stamps: 0,
+    }])
+    const row = csv.split('\r\n')[1]
+    assert.equal(row.split(',')[2], '6')
+  })
+})
+
+// ── Объяснение КАЖДОГО сегмента ──────────────────────────────
+
+describe('обоснование сегментов карточки', () => {
+  const why = { visits: 8, days_since: 210, avg_gap_days: 14, spend: 60000, no_shows: 0, upcoming: 1 }
+
+  it('каждый показанный сегмент получает своё обоснование', () => {
+    const list = segmentExplanations(['lost', 'upcoming'], why)
+    assert.equal(list.length, 2)
+    assert.match(list[0].text, /8 visits, last one 210 days ago/)
+    assert.match(list[1].text, /1 booking ahead/)
+  })
+
+  it('одинаковая проза печатается один раз, но объясняет оба чипа', () => {
+    // «returning» и «regular» обоснованы одним и тем же числом визитов
+    const list = segmentExplanations(['returning', 'regular'], why)
+    assert.equal(list.length, 1, 'одно и то же не печатается дважды')
+    assert.deepEqual(list[0].keys, ['returning', 'regular'])
+    assert.equal(explanationIdFor(list, 'returning'), list[0].id)
+    assert.equal(explanationIdFor(list, 'regular'), list[0].id,
+      'у второго чипа тоже есть, на что сослаться для читалки')
+  })
+
+  it('сегмент без чисел не порождает пустой строки', () => {
+    const list = segmentExplanations(['lost'], null)
+    assert.deepEqual(list, [])
+    assert.equal(explanationIdFor(list, 'lost'), null)
+  })
+
+  it('пустой набор не ломает разбор', () => {
+    assert.deepEqual(segmentExplanations(undefined, why), [])
+    assert.deepEqual(segmentExplanations([], why), [])
+  })
+
+  it('идентификаторы уникальны — иначе aria-describedby укажет не туда', () => {
+    const list = segmentExplanations(['lost', 'upcoming', 'vip'], why)
+    assert.equal(new Set(list.map((e) => e.id)).size, list.length)
+  })
 })

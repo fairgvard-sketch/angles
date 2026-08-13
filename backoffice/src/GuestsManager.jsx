@@ -8,7 +8,8 @@ import {
   saveGuestProfile, mergeGuests, anonymizeGuest,
   formatMoney, formatPhone, normalizePhoneInput, lastVisitLabel, formatDateTime,
   visitsLabel, loyaltyLabel, guestRowLabel, loadedCountLabel, tagTone,
-  SEGMENT_LABEL, primarySegment, whySegment,
+  SEGMENT_LABEL, primarySegment, whySegment, combinedVisits,
+  segmentExplanations, explanationIdFor,
   SEGMENTS, SORTS, segmentSummary, parseTagsInput, TAG_LIMIT,
   guestsToCsv, csvFileName, duplicateReason, mergeConfirmText, mergePreview, mergeSources,
   customerErrorText,
@@ -91,11 +92,10 @@ function CustomerRow({ guest, mode, selected, onOpen }) {
         <TagChips tags={guest.tags} />
       </span>
       <span className="cus-cell-loyalty">{loyaltyLabel(guest, mode)}</span>
-      {/* Визиты считает сервер по броням И кассе (155): у точки без
-          кассы колонка лояльности нулевая, а гость ходит каждую неделю. */}
-      <span className="cus-cell-num" data-label="Visits">
-        {guest.why_segment?.visits ?? guest.visits ?? 0}
-      </span>
+      {/* Визиты считает сервер по броням И кассе (155/161): у точки без
+          кассы колонка лояльности нулевая, а гость ходит каждую неделю.
+          Ровно то же число объявляет читалке `guestRowLabel`. */}
+      <span className="cus-cell-num" data-label="Visits">{combinedVisits(guest)}</span>
       <span className="cus-cell-num" data-label="Total spent">
         {formatMoney(guest.total_spent)}
       </span>
@@ -103,6 +103,44 @@ function CustomerRow({ guest, mode, selected, onOpen }) {
         {lastVisitLabel(guest.last_visit_at)}
       </span>
     </button>
+  )
+}
+
+
+/**
+ * Сегменты карточки: чип и его обоснование.
+ *
+ * Обоснование — обычный видимый текст, а не всплывающая подсказка: то,
+ * что видно только по наведению, недоступно с клавиатуры и с телефона.
+ * Чип связан со своей строкой через `aria-describedby`, поэтому читалка
+ * называет метку вместе с причиной.
+ */
+function SegmentsSection({ segments, why }) {
+  const explanations = segmentExplanations(segments, why)
+  return (
+    <CardSection label="Segments">
+      <div className="cus-chips">
+        {segments.map((key) => (
+          <span
+            key={key}
+            className={`cus-segment is-${key.replace('_', '-')}`}
+            aria-describedby={explanationIdFor(explanations, key) ?? undefined}
+          >
+            {SEGMENT_LABEL[key] ?? key}
+          </span>
+        ))}
+      </div>
+      {explanations.length > 0 && (
+        <dl className="cus-why">
+          {explanations.map((item) => (
+            <div key={item.id}>
+              <dt>{item.keys.map((k) => SEGMENT_LABEL[k] ?? k).join(' · ')}</dt>
+              <dd id={item.id}>{item.text}</dd>
+            </div>
+          ))}
+        </dl>
+      )}
+    </CardSection>
   )
 }
 
@@ -377,7 +415,10 @@ function ProfileView({ guest, card, mode, error, onErase }) {
           <span>{mode === 'stamps' ? 'Stamps' : 'Points'}</span>
           <strong>{mode === 'stamps' ? guest.stamps ?? 0 : formatMoney(guest.points)}</strong>
         </div>
-        <div><span>Visits</span><strong>{guest.visits ?? 0}</strong></div>
+        {/* Тот же канонический счётчик, что в строке списка: до 161
+            здесь стоял счётчик лояльности, и одно число расходилось с
+            другим на глазах у владельца. */}
+        <div><span>Visits</span><strong>{combinedVisits(card ?? guest)}</strong></div>
         <div><span>Total spent</span><strong>{formatMoney(guest.total_spent)}</strong></div>
         <div><span>Last visit</span><strong>{lastVisitLabel(guest.last_visit_at)}</strong></div>
       </div>
@@ -398,21 +439,12 @@ function ProfileView({ guest, card, mode, error, onErase }) {
         </CardSection>
       )}
 
-      {/* Автоматические сегменты и то, чем они заслужены (155). Метка без
-          объяснения — то, чему владелец не верит. */}
+      {/* Автоматические сегменты и то, чем ЗАСЛУЖЕН КАЖДЫЙ (155).
+          Метка без объяснения — то, чему владелец не верит, а объяснение
+          только у первой метки означает, что карточка объясняет хуже,
+          чем строка списка. */}
       {Array.isArray(card?.segments) && card.segments.length > 0 && (
-        <CardSection label="Segments">
-          <div className="cus-chips">
-            {card.segments.map((key) => (
-              <span key={key} className={`cus-segment is-${key.replace('_', '-')}`}>
-                {SEGMENT_LABEL[key] ?? key}
-              </span>
-            ))}
-          </div>
-          <p className="cus-note-hint">
-            {whySegment(card.segments[0], card.why_segment)}
-          </p>
-        </CardSection>
+        <SegmentsSection segments={card.segments} why={card.why_segment} />
       )}
 
       {rsv && rsv.total > 0 && (

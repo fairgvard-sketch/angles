@@ -27,7 +27,18 @@ const iso = (ms) => new Date(Date.now() - ms).toISOString()
 
 const GUESTS = [
   {
-    id: 'g1', name: 'Dana Cohen', phone: '0501234567', visits: 23, total_spent: 128450,
+    /*
+     * Живой дефект: `visits` — счётчик лояльности кассы (4), а
+     * состоявшихся визитов шесть. Список показывал 6, карточка 4,
+     * читалка объявляла 4. Все поверхности обязаны сойтись на 6.
+     */
+    id: 'g1', name: 'Dana Cohen', phone: '0501234567', visits: 4, total_spent: 128450,
+    combined_visits: 6,
+    why_segment: {
+      visits: 6, from_bookings: 4, from_register: 2, days_since: 3,
+      avg_gap_days: 14, spend: 128450, no_shows: 1, cancelled: 0, upcoming: 1,
+    },
+    segments: ['returning', 'regular', 'vip', 'upcoming'],
     points: 4800, stamps: 2, tags: ['VIP', 'Oat milk'], notes: 'Oat milk, no sugar',
     last_visit_at: iso(0), created_at: '2026-01-02T08:00:00Z',
   },
@@ -53,6 +64,16 @@ const GUESTS = [
 
 const CARD = {
   loyalty_mode: 'points',
+  // Карточка приходит из get_guest_card (156/161/162)
+  visits: 4,
+  combined_visits: 6,
+  why_segment: {
+    visits: 6, from_bookings: 4, from_register: 2, days_since: 3,
+    avg_gap_days: 14, spend: 128450, no_shows: 1, cancelled: 0, upcoming: 1,
+  },
+  segments: ['returning', 'regular', 'vip', 'upcoming'],
+  // Привычки нет: 162 отдаёт пустые день и час, но среднюю компанию считает
+  usual: { dow: null, hour: null, party: 2 },
   reservations: {
     total: 6, visits: 6, upcoming: 1, no_shows: 1, cancelled: 0,
     zone: 'Terrace', avg_party: 2,
@@ -126,6 +147,8 @@ const GUESTS_STUB = `
       ...clone(DATA.CARD),
       loyalty_mode: params.get('mode') === 'stamps' ? 'stamps' : 'points',
       name: row.name, phone: row.phone, notes: row.notes, tags: row.tags,
+      visits: row.visits,
+      combined_visits: row.combined_visits ?? clone(DATA.CARD).combined_visits,
     }
   }
   export async function saveGuestProfile(id, patch) {
@@ -271,6 +294,112 @@ async function open(query = '', width = 1280) {
 
 const rowText = (i) => `.cus-list .cus-row:nth-of-type(${i})`
 
+
+describe('клиенты: один счётчик визитов и объяснённые сегменты', { skip }, () => {
+  it('строка, подпись для читалки и карточка называют ОДНО число', async () => {
+    const page = await open()
+    const row = await page.evaluate(() => {
+      const el = document.querySelector('.cus-row')
+      return {
+        cell: el.querySelector('[data-label="Visits"]').textContent.trim(),
+        label: el.getAttribute('aria-label'),
+      }
+    })
+    assert.equal(row.cell, '6', 'в ячейке — состоявшиеся визиты')
+    assert.match(row.label, /6 visits/, 'читалке объявляется то же самое')
+    assert.doesNotMatch(row.label, /4 visits/, 'счётчик лояльности читалке не подсовывается')
+
+    await page.click('.cus-row')
+    await page.waitForSelector('.cus-stats')
+    const stat = await page.evaluate(() => {
+      const box = [...document.querySelectorAll('.cus-stats > div')]
+        .find((d) => d.querySelector('span')?.textContent === 'Visits')
+      return box?.querySelector('strong')?.textContent?.trim() ?? null
+    })
+    assert.equal(stat, '6', 'карточка показывает то же число, что список')
+    await page.close()
+  })
+
+  it('каждый сегмент объяснён и связан со своим обоснованием', async () => {
+    const page = await open()
+    await page.click('.cus-row')
+    await page.waitForSelector('.cus-segment')
+    const state = await page.evaluate(() => {
+      /*
+       * Только чипы КАРТОЧКИ: в строке списка за листом стоит ещё один
+       * (основной сегмент), и он объясняется подсказкой по наведению —
+       * это отдельная поверхность со своим правилом.
+       */
+      const profile = document.querySelector('.cus-stats')?.closest('.cus-panel')
+        ?? document.querySelector('.cus-stats')?.parentElement
+      const chips = [...profile.querySelectorAll('.cus-segment')]
+      return chips.map((chip) => {
+        const id = chip.getAttribute('aria-describedby')
+        const target = id ? document.getElementById(id) : null
+        return {
+          label: chip.textContent.trim(),
+          described: !!target,
+          reason: target?.textContent?.trim() ?? null,
+        }
+      })
+    })
+    assert.equal(state.length, 4, 'все четыре метки на месте')
+    for (const chip of state) {
+      assert.ok(chip.described, `метка «${chip.label}» осталась без обоснования`)
+      assert.ok(chip.reason && chip.reason.length > 0,
+        `у метки «${chip.label}» пустое обоснование`)
+    }
+    // Обоснование — видимый текст, а не всплывашка по наведению
+    const visible = await page.evaluate(() =>
+      [...document.querySelectorAll('.cus-why dd')]
+        .every((el) => el.offsetHeight > 0))
+    assert.equal(visible, true, 'обоснование видно без наведения мышью')
+    await page.close()
+  })
+
+  it('«обычно» не показывается, когда привычки нет', async () => {
+    const page = await open()
+    await page.click('.cus-row')
+    await page.waitForSelector('.cus-stats')
+    const text = await page.evaluate(() => document.body.textContent)
+    assert.doesNotMatch(text, /usually (Sun|Mon|Tue|Wed|Thu|Fri|Sat)/,
+      '162 отдаёт пустые день и час — чип обязан исчезнуть')
+    await page.close()
+  })
+
+  it('на телефоне обоснования не рвут лист', async () => {
+    const page = await open('', 390)
+    await page.click('.cus-row')
+    await page.waitForSelector('.cus-segment')
+
+    /*
+     * Блок статистики не должен схлопываться. Лист карточки — колонка
+     * flex, а `overflow: hidden` разрешает элементу сжаться ниже
+     * содержимого: после добавления секций он на телефоне сжался со 119
+     * до 27 px, подписи остались, а числа обрезались. Значение, которого
+     * не видно, — это отсутствующее значение.
+     */
+    const stats = await page.evaluate(() => {
+      const box = document.querySelector('.cus-stats').getBoundingClientRect().height
+      const cell = document.querySelector('.cus-stats > div').getBoundingClientRect().height
+      const cells = document.querySelectorAll('.cus-stats > div').length
+      return { box: Math.round(box), cell: Math.round(cell), cells }
+    })
+    assert.equal(stats.cells, 4)
+    assert.ok(stats.box >= stats.cell * 2,
+      `блок статистики схлопнут: ${stats.box}px при ячейке ${stats.cell}px`)
+    const overflow = await page.evaluate(() => {
+      const doc = document.documentElement.scrollWidth - document.documentElement.clientWidth
+      const drawer = document.querySelector('.drawer') || document.querySelector('.cus-profile')
+      const inner = drawer ? drawer.scrollWidth - drawer.clientWidth : 0
+      return { doc, inner }
+    })
+    assert.equal(overflow.doc, 0, 'страница не едет вбок')
+    assert.equal(overflow.inner, 0, 'и сам лист тоже')
+    await page.close()
+  })
+})
+
 describe('клиенты: список', { skip }, () => {
   it('колонки подписаны, строка — одна кнопка с полным именем', async () => {
     const page = await open()
@@ -292,7 +421,9 @@ describe('клиенты: список', { skip }, () => {
     // ненулевое — у этого гостя штампы
     assert.equal(state.loyalty, '2 stamps')
     // Числа обязаны попасть в доступное имя: aria-label заменяет содержимое
-    assert.match(state.first, /^Open Dana Cohen · 050-123-4567 · 2 stamps · 23 visits · ₪1,284\.50 spent/)
+    // 6, а не 4: читалке объявляется КАНОНИЧЕСКИЙ счётчик визитов
+    // (161), а не счётчик лояльности кассы — это и был живой дефект.
+    assert.match(state.first, /^Open Dana Cohen · 050-123-4567 · 2 stamps · 6 visits · ₪1,284\.50 spent/)
     assert.match(state.first, /tagged VIP, Oat milk/)
     assert.deepEqual(page.errors, [])
     await page.close()
@@ -396,9 +527,13 @@ describe('клиенты: профиль', { skip }, () => {
     assert.ok(state.listStillThere, 'список обязан остаться на месте')
     assert.equal(state.selected, 'true')
     assert.equal(state.modal, null, 'панель чтения не модальна')
-    assert.deepEqual(state.stats, ['Points₪48.00', 'Visits23', 'Total spent₪1,284.50', 'Last visitToday'])
+    // «Visits6», а не «Visits23»: карточка показывает канонический
+    // счётчик визитов (161) — тот же, что строка списка и читалка.
+    assert.deepEqual(state.stats, ['Points₪48.00', 'Visits6', 'Total spent₪1,284.50', 'Last visitToday'])
     assert.ok(state.bookings.includes('1 no-show'), 'неявка названа словом')
-    assert.deepEqual(state.sections, ['Bookings', 'Tags', 'Internal note', 'Usually orders'])
+    // «Segments» — автоматические метки с обоснованием каждой (155/161)
+    assert.deepEqual(state.sections,
+      ['Segments', 'Bookings', 'Tags', 'Internal note', 'Usually orders'])
     assert.deepEqual(state.tabs, ['Orders', 'Loyalty log'])
     assert.deepEqual(page.errors, [])
     await page.close()
