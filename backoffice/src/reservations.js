@@ -77,6 +77,23 @@ export async function setReservationTables(locationId, id, tableIds) {
   if (error) throw new Error(error.message)
 }
 
+/**
+ * Узнать гостя по телефону при ручной броне (157).
+ *
+ * Совпадение точное и только по полному номеру: поиск по началу
+ * превратил бы форму брони в перебор клиентской базы. Пустой ответ
+ * одинаков для «такого гостя нет» и «номер ещё короткий» — по нему
+ * нельзя проверить существование чужого номера.
+ */
+export async function lookupGuestByPhone(locationId, phone) {
+  const { data, error } = await supabase.rpc('lookup_guest_by_phone_web', {
+    p_location_id: locationId,
+    p_phone: phone,
+  })
+  if (error) throw new Error(error.message)
+  return data
+}
+
 // ── Ручная бронь и правка визита (Kassa 120/127) ─────────────
 
 /**
@@ -142,6 +159,24 @@ export async function markReservationArrived(locationId, id) {
     p_id: id,
   })
   if (error) throw new Error(error.message)
+}
+
+/**
+ * Очередь уведомлений точки (158).
+ *
+ * Отдаёт и сводку, и записи, и главное — `provider_ready`. Без него
+ * интерфейс не отличит «нечего отправлять» от «нечем отправлять» и
+ * покажет пустой список как норму.
+ */
+export async function fetchNotificationOutbox(locationId, status = null) {
+  const { data, error } = await supabase.rpc('get_notification_outbox_web', {
+    p_location_id: locationId,
+    p_status: status,
+    p_limit: 50,
+    p_offset: 0,
+  })
+  if (error) throw new Error(error.message)
+  return data
 }
 
 // ── Лист ожидания (Kassa 122) ────────────────────────────────

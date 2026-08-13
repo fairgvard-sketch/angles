@@ -146,8 +146,9 @@ test('визит после полуночи по UTC остаётся тем ж
 
 test('пустые поля выгружаются пустыми, а не «null»', () => {
   const line = guestsToCsv(ROWS).split('\r\n')[2]
-  // Имя, «последний визит», метки и заметка у этого гостя пусты
-  assert.equal(line, ',0521112222,0,0.00,0.00,0,,2026-05-05,,')
+  // Имя, «последний визит», метки, заметка, сегмент и его причина у
+  // этого гостя пусты — пустыми и выгружаются
+  assert.equal(line, ',0521112222,0,0.00,0.00,0,,2026-05-05,,,,')
 })
 
 test('имя файла содержит дату выгрузки', () => {
@@ -360,4 +361,25 @@ describe('mergeConfirmText', () => {
   it('без источников текста нет — подтверждать нечего', () => {
     assert.equal(mergeConfirmText(target, []), '')
   })
+})
+
+test('выгрузка несёт сегмент и его причину — иначе по списку не позвонить', () => {
+  const csv = guestsToCsv([{
+    name: 'Мири', phone: '0521111111', visits: 8,
+    segments: ['lost', 'returning'],
+    why_segment: { visits: 8, days_since: 210 },
+  }])
+  const [header, row] = csv.split('\r\n')
+  assert.match(header, /Segments,Why/)
+  assert.match(row, /Lost \| Returning/)
+  assert.match(row, /8 visits, last one 210 days ago/)
+})
+
+test('гость без сегмента не ломает выгрузку', () => {
+  const csv = guestsToCsv([{ name: 'Новый', phone: '0500000000' }])
+  assert.equal(csv.split('\r\n').length, 2)
+})
+
+test('менеджеру объясняют, что стирать может только владелец', () => {
+  assert.match(customerErrorText('owner_only'), /owner can erase/)
 })

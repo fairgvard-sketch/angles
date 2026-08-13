@@ -371,6 +371,9 @@ export function guestsToCsv(rows, { timeZone = 'Asia/Jerusalem' } = {}) {
   const header = [
     'Name', 'Phone', 'Visits', 'Total spent (ILS)', 'Points (ILS)', 'Stamps',
     `Last visit (${timeZone})`, `Customer since (${timeZone})`, 'Tags', 'Notes',
+    // Сегмент и его доказательство: список «кого позвать» без причины
+    // бесполезен тому, кто будет по нему звонить.
+    'Segments', 'Why',
   ]
   const lines = [header.join(',')]
   for (const g of rows ?? []) {
@@ -385,6 +388,8 @@ export function guestsToCsv(rows, { timeZone = 'Asia/Jerusalem' } = {}) {
       csvCell(csvDate(g.created_at, timeZone)),
       csvCell((g.tags ?? []).join(' | ')),
       csvCell(g.notes ?? ''),
+      csvCell((g.segments ?? []).map((k) => SEGMENT_LABEL[k] ?? k).join(' | ')),
+      csvCell(whySegment(primarySegment(g.segments), g.why_segment)),
     ].join(','))
   }
   // CRLF: Excel на Windows иначе склеивает строки
@@ -449,6 +454,10 @@ export function mergeSources(group, targetId) {
  * не ту причину отказа.
  */
 const ERRORS = {
+  // 160: стирание — единственное необратимое действие над базой, и оно
+  // доступно только владельцу. Менеджеру важно сказать, ЧТО делать,
+  // а не «отказано».
+  owner_only: 'Only the account owner can erase a customer. Ask them to do it.',
   phone_taken: 'Another customer already has this number. Merge the two profiles instead.',
   phone_invalid: 'That does not look like a phone number.',
   too_many_tags: `Up to ${TAG_LIMIT} tags per customer.`,

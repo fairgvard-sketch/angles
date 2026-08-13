@@ -2,9 +2,10 @@ import { useEffect, useRef, useState } from 'react'
 import {
   AlertTriangle, ArrowDown, ArrowUp, Check, Clock, Copy, Download, ExternalLink,
   Image, LayoutGrid, ListChecks, QrCode, RefreshCw, ShoppingBag, Table, Code2,
-  ListTree, CalendarClock, Contact, Ban, Trash2,
+  ListTree, CalendarClock, Contact, Ban, Trash2, Send,
 } from 'lucide-react'
 import { fetchLocation, fetchLocationSlug, fetchTables, saveLocationSlug } from './settings'
+import { fetchNotificationOutbox } from './reservations'
 import {
   ORDER_TYPES, ORDER_TYPE_LABELS,
   ONLINE_BACKGROUND_PRESETS, PUBLIC_MENU_ORIGIN,
@@ -1629,6 +1630,14 @@ export function ReserveTab({
             Locations → Reservations.
           </p>
         </SettingGroup>
+
+        {/*
+          Доставка стоит здесь, а не отдельным разделом: это условие
+          работы канала, как часы и правила. Молчащая очередь и очередь,
+          которой нечем отправлять, выглядят одинаково — и разницу
+          обязан называть интерфейс, а не догадка владельца.
+        */}
+        <DeliveryGroup {...group('delivery')} locationId={locationId} />
       </div>
     </>
   )
@@ -1645,6 +1654,81 @@ function pickKeys(source, delta) {
   const result = {}
   for (const key of Object.keys(delta)) result[key] = source?.[key]
   return result
+}
+
+
+/**
+ * Состояние доставки уведомлений (158).
+ *
+ * Продукт копит доменные события с 122, а отправлять их нечем: ни один
+ * провайдер не подключён. Владелец имеет право знать об этом до того,
+ * как гость скажет «мне никто не написал».
+ */
+function DeliveryGroup({ locationId, open, onToggle, id }) {
+  const [state, setState] = useState(null)
+  const [error, setError] = useState('')
+
+  useEffect(() => {
+    if (!locationId) return undefined
+    let alive = true
+    setState(null)
+    fetchNotificationOutbox(locationId)
+      .then((data) => { if (alive) setState(data) })
+      .catch((e) => { if (alive) setError(e.message) })
+    return () => { alive = false }
+  }, [locationId])
+
+  const ready = state?.provider_ready
+  const summary = state?.summary || {}
+  const total = Object.values(summary).reduce((a, b) => a + Number(b || 0), 0)
+
+  return (
+    <SettingGroup
+      id={id}
+      open={open}
+      onToggle={onToggle}
+      icon={Send}
+      title="Delivery"
+      hint="Whether confirmations and reminders can actually reach the guest."
+      value={state === null ? '—' : ready ? 'Connected' : 'Not configured'}
+    >
+      {error && <p className="form-error" role="alert">{error}</p>}
+      {state !== null && !ready && (
+        <p className="form-hint">
+          <strong>Delivery is not configured.</strong> No email or SMS provider
+          is connected, so nothing is sent. Bookings, reminders and waitlist
+          offers keep working — the guest simply is not messaged, and the queue
+          records that honestly instead of pretending.
+        </p>
+      )}
+      {state !== null && total > 0 && (
+        <div className="cus-chips">
+          {Object.entries(summary).map(([key, n]) => (
+            <span key={key} className={`cus-chip${key === 'failed' ? ' is-warn' : ''}`}>
+              {n} {key}
+            </span>
+          ))}
+        </div>
+      )}
+      {state !== null && total === 0 && (
+        <p className="form-hint">No notification events for this location yet.</p>
+      )}
+      {Array.isArray(state?.rows) && state.rows.length > 0 && (
+        <ul className="delivery-list">
+          {state.rows.slice(0, 8).map((row) => (
+            <li key={row.id}>
+              <span>{row.kind.replace(/_/g, ' ')}</span>
+              <span className="cus-note-hint">
+                {row.status}
+                {row.last_error && ` · ${row.last_error}`}
+                {row.recipient_tail && ` · …${row.recipient_tail}`}
+              </span>
+            </li>
+          ))}
+        </ul>
+      )}
+    </SettingGroup>
+  )
 }
 
 export default function QrChannels({ context, locationId, tab: tabFromUrl, onTabChange, onNavigate }) {

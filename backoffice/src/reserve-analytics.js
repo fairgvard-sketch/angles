@@ -169,3 +169,41 @@ export function analyticsErrorText(message) {
   if (m.includes('invalid_range')) return 'The start date must come before the end date.'
   return m
 }
+
+/**
+ * Возврат когорты — доля от СОЗРЕВШЕЙ базы.
+ *
+ * Гость, впервые пришедший вчера, не «не вернулся за 90 дней»: у него
+ * ещё 89. Делить по всем гостям периода значит занижать возврат тем
+ * сильнее, чем свежее период — и владелец сделает вывод об обратном.
+ *
+ * Пустая созревшая база даёт null, а не ноль: «нет данных» и «никто не
+ * вернулся» — разные ответы (то же правило, что у конверсии в 125).
+ */
+export async function fetchRetention(locationIds, from, to) {
+  const { data, error } = await supabase.rpc('guest_retention_analytics_web', {
+    p_location_ids: locationIds && locationIds.length ? locationIds : null,
+    p_from: from,
+    p_to: to,
+  })
+  if (error) throw new Error(error.message)
+  return data
+}
+
+export function returnRate(window) {
+  const mature = Number(window?.mature) || 0
+  if (mature <= 0) return null
+  return (Number(window?.returned) || 0) / mature
+}
+
+/** Сколько гостей когорты ещё не прожили окно — это надо назвать */
+export function immature(cohortSize, window) {
+  return Math.max(0, (Number(cohortSize) || 0) - (Number(window?.mature) || 0))
+}
+
+/** Новые против вернувшихся — доля новых среди гостей периода */
+export function newShare(guests) {
+  const total = Number(guests?.total) || 0
+  if (total <= 0) return null
+  return (Number(guests?.new) || 0) / total
+}

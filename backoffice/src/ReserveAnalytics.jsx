@@ -4,6 +4,7 @@ import {
   PERIODS, WEEKDAYS, MIN_SESSIONS_FOR_RATE,
   analyticsRange, fetchReserveAnalytics, analyticsErrorText,
   funnelView, pct, hours, leadTime,
+  fetchRetention, returnRate, immature, newShare,
 } from './reserve-analytics'
 import Tabs from './ui/Tabs'
 
@@ -29,6 +30,91 @@ function Stat({ icon: Icon, label, value, sub }) {
         {sub && <div className="stat-detail">{sub}</div>}
       </div>
     </div>
+  )
+}
+
+
+/**
+ * Удержание (Kassa 159): возвращаются ли эти люди.
+ *
+ * Отчёт по броням отвечает «сколько пришло». Возврат — то, что
+ * отличает заведение с базой от заведения с потоком, и до 159 его не
+ * знал никто.
+ *
+ * Доля считается от СОЗРЕВШЕЙ базы, и число ещё не созревших названо
+ * рядом: без него владелец увидит падение возврата там, где просто не
+ * прошло время.
+ */
+function Retention({ data }) {
+  if (!data) return null
+  const rr = data.return_rate ?? {}
+  const cohort = Number(rr.cohort_size) || 0
+  const windows = [
+    { key: 'd30', label: '30 days' },
+    { key: 'd60', label: '60 days' },
+    { key: 'd90', label: '90 days' },
+  ]
+  return (
+    <section className="panel">
+      <div className="panel-heading">
+        <div>
+          <h2>Retention</h2>
+          <p>Do they come back · by visit date</p>
+        </div>
+      </div>
+      <section className="stat-row">
+        <Stat
+          icon={Users}
+          label="New guests"
+          value={data.guests?.new ?? 0}
+          sub={newShare(data.guests) === null
+            ? 'no visits in this period'
+            : `${pct(newShare(data.guests))} of everyone who came`}
+        />
+        <Stat
+          icon={TrendingUp}
+          label="Returning guests"
+          value={data.guests?.returning ?? 0}
+          sub="had been here before this period"
+        />
+        <Stat
+          icon={UserX}
+          label="No-shows"
+          value={data.outcomes?.no_show ?? 0}
+          sub={`of ${data.outcomes?.total ?? 0} bookings`}
+        />
+      </section>
+
+      <div className="retention-windows">
+        {windows.map(({ key, label }) => {
+          const w = rr[key] ?? {}
+          const rate = returnRate(w)
+          const waiting = immature(cohort, w)
+          return (
+            <div key={key} className="retention-window">
+              <span className="retention-label">Came back within {label}</span>
+              {/* «Нет данных» и «никто не вернулся» — разные ответы */}
+              <strong>{rate === null ? '—' : pct(rate)}</strong>
+              <span className="cus-note-hint">
+                {rate === null
+                  ? 'nobody has lived through this window yet'
+                  : `${w.returned} of ${w.mature} first-timers`}
+                {waiting > 0 && ` · ${waiting} still have time`}
+              </span>
+            </div>
+          )
+        })}
+      </div>
+
+      {/* Деньги — только там, где есть касса. У standalone Reserve блока
+          нет вовсе: ноль описывал бы гостей, а не отсутствие кассы. */}
+      {data.money && (
+        <p className="form-hint">
+          Average check {Math.round((data.money.avg_check ?? 0) / 100)} ₪ ·{' '}
+          {data.money.orders} paid orders in this period.
+        </p>
+      )}
+    </section>
   )
 }
 
@@ -136,6 +222,22 @@ export default function ReserveAnalytics({ locations }) {
       .then((data) => { if (alive) setReport(data) })
       .catch((e) => { if (alive) setError(analyticsErrorText(e.message)) })
       .finally(() => { if (alive) setLoading(false) })
+    return () => { alive = false }
+  }, [ready, from, to, pickedKey]) // eslint-disable-line react-hooks/exhaustive-deps
+
+  /*
+   * Удержание грузится ОТДЕЛЬНЫМ запросом и не блокирует отчёт: оно
+   * считает когорты по всей истории организации и стоит дороже. Отчёт
+   * по броням появляется сразу, удержание — следом.
+   */
+  const [retention, setRetention] = useState(null)
+  useEffect(() => {
+    if (!ready) return undefined
+    let alive = true
+    setRetention(null)
+    fetchRetention(picked, from, to)
+      .then((data) => { if (alive) setRetention(data) })
+      .catch(() => { if (alive) setRetention(null) })
     return () => { alive = false }
   }, [ready, from, to, pickedKey]) // eslint-disable-line react-hooks/exhaustive-deps
 
@@ -286,6 +388,8 @@ export default function ReserveAnalytics({ locations }) {
           </section>
 
           <Funnel view={funnelRows} />
+
+          <Retention data={retention} />
 
           <div className="overview-columns">
             <BarList

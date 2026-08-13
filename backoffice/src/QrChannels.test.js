@@ -202,15 +202,17 @@ describe('Брони: настройки на месте', () => {
     assert.match(html, /Download QR/)
   })
 
-  it('пять групп настроек и их собственные значения', () => {
+  it('группы настроек и их собственные значения', () => {
     const html = renderReserve()
     for (const title of [
       'Booking hours', 'Slots &amp; booking window', 'Cancellation &amp; changes',
       'What the guest must know', 'Confirmation', 'Look of the booking page',
+      // Доставка — условие работы канала, как часы и правила (158)
+      'Delivery',
     ]) {
       assert.match(html, new RegExp(title), title)
     }
-    assert.equal((html.match(/aria-expanded="false"/g) || []).length, 6)
+    assert.equal((html.match(/aria-expanded="false"/g) || []).length, 7)
     assert.match(html, /30 min slots · up to 12 guests · 60 days ahead/)
     assert.match(html, /2 hours before · waitlist on/)
     assert.match(html, /Instant/)
