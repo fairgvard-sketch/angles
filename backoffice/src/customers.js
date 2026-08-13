@@ -61,6 +61,28 @@ export function formatDateTime(iso) {
 }
 
 /** «4 visits» / «1 visit» — единица нужна там, где нет шапки колонки */
+/**
+ * Канонический счётчик визитов гостя.
+ *
+ * На живой приёмке один человек показывался с 6 визитами в списке и 4 в
+ * карточке, а читалка называла третье число: часть экранов читала
+ * `guests.visits` — счётчик лояльности, который заполняет только касса,
+ * — а часть считала состоявшиеся визиты.
+ *
+ * Складывать брони и заказы ЗДЕСЬ нельзя: визит, посаженный в заказ,
+ * дал бы двойку. Величину считает сервер (155/161), где вычет уже
+ * сделан; клиент только выбирает правильное поле и переживает старый
+ * ответ без него.
+ */
+export function combinedVisits(guest) {
+  const canonical = guest?.combined_visits
+  if (Number.isFinite(Number(canonical))) return Number(canonical)
+  const fromFacts = guest?.why_segment?.visits
+  if (Number.isFinite(Number(fromFacts))) return Number(fromFacts)
+  // Совсем старый ответ: лучше показать счётчик лояльности, чем ноль
+  return Number(guest?.visits) || 0
+}
+
 export function visitsLabel(visits) {
   const n = visits ?? 0
   return `${n} visit${n === 1 ? '' : 's'}`
@@ -104,7 +126,7 @@ export function guestRowLabel(guest, mode) {
   const parts = [guest?.name || phone]
   if (guest?.name && phone) parts.push(phone)
   parts.push(loyaltyLabel(guest, mode))
-  parts.push(visitsLabel(guest?.visits))
+  parts.push(visitsLabel(combinedVisits(guest)))
   parts.push(`${formatMoney(guest?.total_spent)} spent`)
   parts.push(`last visit ${lastVisitLabel(guest?.last_visit_at).toLowerCase()}`)
   if (guest?.tags?.length) parts.push(`tagged ${guest.tags.join(', ')}`)
@@ -380,7 +402,7 @@ export function guestsToCsv(rows, { timeZone = 'Asia/Jerusalem' } = {}) {
     lines.push([
       csvCell(g.name ?? ''),
       csvCell(g.phone ?? ''),
-      csvCell(g.visits ?? 0),
+      csvCell(combinedVisits(g)),
       csvCell(((g.total_spent ?? 0) / 100).toFixed(2)),
       csvCell(((g.points ?? 0) / 100).toFixed(2)),
       csvCell(g.stamps ?? 0),
@@ -482,4 +504,41 @@ export function customerErrorText(message) {
     return 'Your role cannot change customers.'
   }
   return text
+}
+
+/**
+ * Объяснение к КАЖДОМУ сегменту карточки.
+ *
+ * В профиле печаталось одно объяснение под всей группой чипов — то
+ * есть причина первого сегмента. Остальные метки («VIP», «Coming
+ * soon») стояли рядом без всякого обоснования, хотя в списке у
+ * основной метки подсказка есть. Карточка не имеет права объяснять
+ * ХУЖЕ, чем строка списка.
+ *
+ * Одинаковая проза схлопывается: два сегмента, обоснованные одним и тем
+ * же числом визитов, не должны печатать это число дважды. Ссылка на
+ * общий текст при этом остаётся у обоих чипов, поэтому читалка
+ * прочитает обоснование для каждого.
+ */
+export function segmentExplanations(segments, why) {
+  const out = []
+  const byText = new Map()
+  for (const key of segments ?? []) {
+    const text = whySegment(key, why)
+    if (!text) continue
+    const seen = byText.get(text)
+    if (seen) {
+      seen.keys.push(key)
+      continue
+    }
+    const entry = { id: `seg-${out.length}`, text, keys: [key] }
+    byText.set(text, entry)
+    out.push(entry)
+  }
+  return out
+}
+
+/** Какой строкой объяснён конкретный чип (для aria-describedby) */
+export function explanationIdFor(explanations, key) {
+  return (explanations ?? []).find((e) => e.keys.includes(key))?.id ?? null
 }

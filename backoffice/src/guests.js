@@ -5,7 +5,8 @@ export {
   formatMoney, formatPhone, normalizePhoneInput, lastVisitLabel, formatDateTime,
   visitsLabel, loyaltyLabel, guestRowLabel, loadedCountLabel, tagTone,
   SEGMENTS, SORTS, ROW_LIMIT, segmentParams, segmentSummary, parseTagsInput, TAG_LIMIT,
-  SEGMENT_LABEL, primarySegment, whySegment,
+  SEGMENT_LABEL, primarySegment, whySegment, combinedVisits,
+  segmentExplanations, explanationIdFor,
   guestsToCsv, csvFileName, duplicateReason, mergeConfirmText, mergePreview, mergeSources,
   customerErrorText,
 } from './customers'

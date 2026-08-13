@@ -2658,6 +2658,15 @@ a { color: inherit; }
 .cus-visits li { display: grid; grid-template-columns: minmax(0, 1.2fr) auto minmax(0, 1.4fr); gap: var(--sp-2); font-size: 13px; align-items: baseline; }
 .cus-visits time { color: var(--c-text-2); font-variant-numeric: tabular-nums; }
 
+/*
+ * Обоснование сегмента — видимый текст, а не всплывашка: подсказка по
+ * наведению недоступна с клавиатуры и с телефона.
+ */
+.cus-why { display: flex; flex-direction: column; gap: 4px; margin: 6px 0 0; }
+.cus-why > div { display: grid; grid-template-columns: minmax(0, auto) minmax(0, 1fr); gap: var(--sp-2); align-items: baseline; }
+.cus-why dt { font-size: 12px; font-weight: 700; color: var(--c-text-muted); }
+.cus-why dd { margin: 0; font-size: 12px; color: var(--c-text-2); min-width: 0; overflow-wrap: anywhere; }
+
 /* Очередь доставки в настройках канала (158) */
 .delivery-list { display: flex; flex-direction: column; gap: 4px; margin: 0; padding: 0; list-style: none; }
 .delivery-list li { display: flex; justify-content: space-between; gap: var(--sp-2); font-size: 13px; }
@@ -4230,10 +4239,19 @@ a { color: inherit; }
 /* ── Профиль клиента ───────────────────────────────────────── */
 /* Четыре главных числа — одной сеткой 2×2, а не четырьмя карточками:
    в панели 440 px четыре карточки становились четырьмя строчками */
+/*
+ * `flex: none` не косметика. Лист карточки — колонка flex, а
+ * `overflow: hidden` разрешает элементу сжиматься НИЖЕ содержимого. Как
+ * только в карточку добавились секции (следующая бронь, сегменты,
+ * список визитов), этот блок на телефоне схлопнулся со 119 px до 27:
+ * подписи остались, а сами числа обрезались. Значение, которого не
+ * видно, — это и есть отсутствующее значение.
+ */
 .cus-stats {
   display: grid; grid-template-columns: 1fr 1fr;
   border: 1px solid var(--c-border-panel); border-radius: var(--r-md);
   overflow: hidden;
+  flex: none;
 }
 .cus-stats > div {
   padding: 10px var(--sp-3);

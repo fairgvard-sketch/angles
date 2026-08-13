@@ -281,6 +281,57 @@ before(async () => {
     createRoot(document.getElementById('root')).render(<App />)
   `)
 
+  /*
+   * Пропавший после деплоя чанк в НАСТОЯЩЕЙ границе ошибки. Счётчик
+   * перезагрузок и хранилище подставлены, чтобы проверить главное
+   * свойство — одна перезагрузка на сборку и никакой петли.
+   */
+  await bundle('stale-chunk', `
+    import { useState } from 'react'
+    import { createRoot } from 'react-dom/client'
+    import ViewErrorBoundary from './ErrorBoundary'
+
+    window.__RELOADS__ = 0
+    const storage = {
+      getItem: (k) => window.sessionStorage.getItem(k),
+      setItem: (k, v) => window.sessionStorage.setItem(k, v),
+    }
+    /*
+     * Документ стенда несёт ВСТРОЕННЫЙ модуль без src, а у выложенной
+     * сборки входной скрипт хеширован. Подставляем такой же, иначе
+     * стенд проверял бы случай «сборку опознать нечем», а не рабочий.
+     */
+    const doc = {
+      querySelector: (sel) => (sel.includes('script')
+        ? { getAttribute: () => (window.__BUILD__ || '/account/assets/index-test123.js') }
+        : null),
+    }
+
+    function Section() {
+      throw new Error(window.__ERR__ || 'Failed to fetch dynamically imported module: /account/assets/X-abc.js')
+    }
+    function App() {
+      const [n, setN] = useState(0)
+      return (
+        <div>
+          <nav id="chrome">navigation still here</nav>
+          <button id="remount" onClick={() => setN((v) => v + 1)}>remount</button>
+          <ViewErrorBoundary
+            key={n}
+            view="reservations"
+            doc={doc}
+            storage={storage}
+            reload={() => { window.__RELOADS__ += 1 }}
+            onHome={() => {}}
+          >
+            <Section />
+          </ViewErrorBoundary>
+        </div>
+      )
+    }
+    createRoot(document.getElementById('root')).render(<App />)
+  `)
+
   await bundle('tabs', `
     import { useState } from 'react'
     import { createRoot } from 'react-dom/client'
@@ -1012,6 +1063,66 @@ describe('панель визита', { skip }, () => {
     assert.equal(await page.evaluate(() =>
       document.documentElement.scrollWidth - document.documentElement.clientWidth), 0,
     'панель не расширяет страницу вбок')
+    await page.close()
+  })
+})
+
+
+describe('пропавший после деплоя чанк', { skip }, () => {
+  const open = async (message) => {
+    const page = await browser.newPage()
+    if (message) await page.evaluateOnNewDocument((m) => { window.__ERR__ = m }, message)
+    await page.goto(`${appOrigin}/stale-chunk`, { waitUntil: 'networkidle0' })
+    return page
+  }
+
+  it('перезагружается сам ровно один раз и не зацикливается', async () => {
+    const page = await open()
+    await page.waitForFunction(() => window.__RELOADS__ === 1)
+
+    // Повторные монтирования той же сборки перезагрузку НЕ повторяют:
+    // это была бы петля на глазах у владельца.
+    await page.click('#remount')
+    await page.click('#remount')
+    await new Promise((r) => setTimeout(r, 300))
+    assert.equal(await page.evaluate(() => window.__RELOADS__), 1)
+
+    // И объясняет, что произошло, вместо «Failed to fetch…»
+    await page.waitForSelector('.view-crash')
+    const text = await page.$eval('.view-crash', (el) => el.textContent)
+    assert.match(text, /new version was released/i)
+    assert.match(text, /Reload updated version/i)
+    // «Try again» здесь не предлагается: он заведомо не сработает
+    assert.doesNotMatch(text, /Try again/i)
+    await page.close()
+  })
+
+  it('кнопка перезагружает документ, а не перемонтирует раздел', async () => {
+    const page = await open()
+    await page.waitForFunction(() => window.__RELOADS__ === 1)
+    await page.click('.view-crash .primary-button')
+    assert.equal(await page.evaluate(() => window.__RELOADS__), 2)
+    await page.close()
+  })
+
+  it('Safari-формулировка распознаётся так же', async () => {
+    const page = await open('Importing a module script failed.')
+    await page.waitForFunction(() => window.__RELOADS__ === 1)
+    assert.match(await page.$eval('.view-crash', (el) => el.textContent),
+      /new version was released/i)
+    await page.close()
+  })
+
+  it('обычная ошибка рендера страницу НЕ перезагружает', async () => {
+    const page = await open('selecting is not defined')
+    await page.waitForSelector('.view-crash')
+    await new Promise((r) => setTimeout(r, 300))
+    assert.equal(await page.evaluate(() => window.__RELOADS__), 0)
+    const text = await page.$eval('.view-crash', (el) => el.textContent)
+    assert.match(text, /could not be displayed/i)
+    assert.match(text, /Try again/i)
+    // Навигация цела — раздел упал, кабинет работает
+    assert.ok(await page.$('#chrome'))
     await page.close()
   })
 })
