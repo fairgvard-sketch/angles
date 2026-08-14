@@ -209,10 +209,12 @@ describe('Брони: настройки на месте', () => {
       'What the guest must know', 'Confirmation', 'Look of the booking page',
       // Доставка — условие работы канала, как часы и правила (158)
       'Delivery',
+      // Предоплата (Kassa 164): раздел виден и честно объясняет своё состояние
+      'Prepayment for bookings',
     ]) {
       assert.match(html, new RegExp(title), title)
     }
-    assert.equal((html.match(/aria-expanded="false"/g) || []).length, 7)
+    assert.equal((html.match(/aria-expanded="false"/g) || []).length, 8)
     assert.match(html, /30 min slots · up to 12 guests · 60 days ahead/)
     assert.match(html, /2 hours before · waitlist on/)
     assert.match(html, /Instant/)
@@ -273,12 +275,54 @@ describe('Брони: настройки на месте', () => {
     assert.match(overridden, /override/)
   })
 
-  it('депозита и оплаты в интерфейсе нет', () => {
+  /**
+   * Предоплата (Kassa 164). Прежде раздела не было вовсе, и владелец не
+   * понимал, почему «депозит» из старых настроек ничего не делает.
+   * Теперь раздел есть и называет состояние вслух — но включить из него
+   * ничего нельзя, потому что включать нечего: платёжного провайдера в
+   * проекте нет.
+   *
+   * Проверять «слова payment нет на странице» больше нельзя и не нужно:
+   * заголовок раздела сам содержит это слово. Значение имеет другое —
+   * отсутствие ОРГАНА УПРАВЛЕНИЯ, которым предоплату можно включить.
+   */
+  function prepaySection(html) {
+    const from = html.indexOf('Prepayment for bookings')
+    assert.notEqual(from, -1, 'раздел предоплаты должен быть на странице')
+    const rest = html.slice(from)
+    const to = rest.indexOf('</section>')
+    return to === -1 ? rest : rest.slice(0, to)
+  }
+
+  it('раздел предоплаты объясняет, чего не хватает, и не даёт её включить', () => {
+    const html = renderReserve({ openGroup: 'prepay' })
+    assert.match(html, /Unavailable — no payment provider/)
+    assert.match(html, /Payment provider connected: <strong>no<\/strong>/)
+    assert.match(html, /Verified payment webhook: <strong>no<\/strong>/)
+
+    // Ни поля суммы, ни тумблера: включать нечего, и вид не должен
+    // обещать обратного
+    const section = prepaySection(html)
+    assert.doesNotMatch(section, /<input/)
+    assert.doesNotMatch(section, /role="switch"/)
+    assert.doesNotMatch(section, /channel-switch/)
+  })
+
+  it('в остальных группах органов управления депозитом тоже нет', () => {
     for (const group of ['hours', 'window', 'cutoff', 'rules', 'confirm', 'page']) {
-      const html = renderReserve({ openGroup: group })
-      assert.doesNotMatch(html, /[Dd]eposit/, group)
-      assert.doesNotMatch(html, /card|payment/i, group)
+      const section = prepaySection(renderReserve({ openGroup: group }))
+      // Соседняя открытая группа не разворачивает предоплату
+      assert.doesNotMatch(section, /<input/, group)
     }
+  })
+
+  it('старая сумма депозита названа мёртвой, а не выдана за работающую', () => {
+    const html = renderReserve({
+      openGroup: 'prepay',
+      settings: { reservations: { enabled: true, deposit_amount: 5000 } },
+    })
+    assert.match(html, /still has an old/)
+    assert.match(html, /not charged/)
   })
 })
 

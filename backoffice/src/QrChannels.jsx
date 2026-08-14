@@ -2,7 +2,7 @@ import { useEffect, useRef, useState } from 'react'
 import {
   AlertTriangle, ArrowDown, ArrowUp, Check, Clock, Copy, Download, ExternalLink,
   Image, LayoutGrid, ListChecks, QrCode, RefreshCw, ShoppingBag, Table, Code2,
-  ListTree, CalendarClock, Contact, Ban, Trash2, Send,
+  ListTree, CalendarClock, Contact, Ban, Trash2, Send, CreditCard,
 } from 'lucide-react'
 import { fetchLocation, fetchLocationSlug, fetchTables, saveLocationSlug } from './settings'
 import { fetchNotificationOutbox } from './reservations'
@@ -1358,6 +1358,14 @@ export function ReserveTab({
 }) {
   const enabled = reservationsEnabled(settings)
   const rsv = settings.reservations || {}
+  // Предоплата (Kassa 164) возможна только при живом платёжном провайдере.
+  // В проекте его нет: `supabase/functions/cardcom-payment` — карантинная
+  // заглушка. Держим значение здесь одним местом, чтобы «готово» нельзя
+  // было показать случайно, поправив разметку.
+  const prepayReady = false
+  // У точки могли остаться старые поля депозита (Kassa 063). Они ничего не
+  // списывают — но владелец о них помнит и вправе знать, что они мертвы.
+  const depositLegacy = Number(rsv.deposit_amount) > 0
   const instant = rsv.instant === true
   // Расписание (Kassa 117). Точка без ключа schedule разворачивается из
   // legacy open/close, поэтому редактор всегда открывается заполненным.
@@ -1570,11 +1578,46 @@ export function ReserveTab({
           )}
         </SettingGroup>
 
-        {/* Депозит убран из интерфейса (Kassa 117). Поля deposit_* и серверная
-            логика сохранены — точка, у которой флаг уже проставлен, ведёт себя
-            как прежде, — но показывать переключатель нельзя: оплаты за ним нет
-            и не планируется, а владелец воспринимал его как работающую
-            предоплату. Вернуть — только вместе с реальным приёмом платежа. */}
+        {/* Предоплата (Kassa 164). Тумблера здесь по-прежнему НЕТ, и это
+            не упущение: включать нечего, пока у точки нет живого платёжного
+            провайдера. Сервер устроен так же — `reservation_prepay_rule`
+            возвращает null без провайдера со статусом healthy, поэтому
+            гостевая страница про предоплату просто не узнаёт.
+
+            Раньше раздел был скрыт целиком, и владелец не понимал, почему
+            «депозит» из старых настроек ничего не делает. Теперь состояние
+            названо вслух вместе с тем, чего именно не хватает. */}
+        <SettingGroup
+          {...group('prepay')}
+          icon={CreditCard}
+          title="Prepayment for bookings"
+          hint="Charge a deposit per guest before the table is confirmed."
+          value={prepayReady ? 'Ready to configure' : 'Unavailable — no payment provider'}
+        >
+          <p className="form-hint" style={{ marginTop: 0 }}>
+            Guests are asked to pay only when a payment provider is connected and
+            healthy. Until then this step never appears on the booking page, and a
+            booking is never shown as paid.
+          </p>
+          <ul className="form-hint" style={{ marginTop: 12, paddingInlineStart: 18 }}>
+            <li>Payment provider connected: <strong>no</strong></li>
+            <li>Provider credentials stored as Edge Function secrets: <strong>no</strong></li>
+            <li>Verified payment webhook: <strong>no</strong></li>
+          </ul>
+          <p className="form-hint" style={{ marginTop: 12 }}>
+            Connecting a provider is a separate task: it needs a merchant account,
+            credentials and a signed webhook endpoint. Ask your developer to finish
+            the Cardcom integration before turning prepayment on.
+          </p>
+          {depositLegacy && (
+            <p className="form-hint" style={{ marginTop: 12 }}>
+              <AlertTriangle size={14} aria-hidden /> This location still has an old
+              deposit amount saved ({(rsv.deposit_amount / 100).toFixed(0)} per guest).
+              It is not charged and guests are not asked for it.
+            </p>
+          )}
+        </SettingGroup>
+
         <SettingGroup
           {...group('page')}
           icon={Contact}
