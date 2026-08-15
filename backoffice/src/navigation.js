@@ -58,7 +58,16 @@ export const NAV_ITEMS = [
   // же селект в общей шапке — две одинаковые точки входа рядом.
   { id: 'locations', label: 'Locations', group: 'manage' },
   { id: 'team', label: 'Team', group: 'manage' },
-  { id: 'online', label: 'QR Menu & Online', group: 'channels', scoped: true },
+  // Два гостевых канала — два раздела. Одним пунктом с вкладками они
+  // делили адрес, заголовок и превью: ссылку на настройку брони нельзя
+  // было прислать, не объяснив «потом переключись на вторую вкладку», а
+  // точка, купившая только бронь, открывала раздел на вкладке меню,
+  // которого у неё нет. Идентификатор `online` остаётся за меню: он лежит
+  // в закладках и всегда означал именно его — это была вкладка по
+  // умолчанию. Бронь получает свой `reserve` (не путать с `reservations`,
+  // это рабочий стол хостес).
+  { id: 'online', label: 'QR Menu', group: 'channels', scoped: true },
+  { id: 'reserve', label: 'QR Reservations', group: 'channels', scoped: true },
   { id: 'integrations', label: 'Integrations', group: 'channels', planned: true },
   { id: 'devices', label: 'Devices', group: 'system' },
 ]
@@ -186,10 +195,10 @@ export function visibleNavigation(context) {
     if (planned) return developer
     if (id === 'overview' || id === 'locations') return true
     if (id === 'menu') return can('catalog_manage')
-    if (id === 'online') {
-      return can('public_menu') || can('online_orders')
-        || can('public_reservations') || can('reservations_desk')
-    }
+    // Каждый канал виден по СВОЕЙ способности: раздел брони у точки без
+    // броней был бы вкладкой, ведущей в отказ сервера, а не разделом.
+    if (id === 'online') return can('public_menu') || can('online_orders')
+    if (id === 'reserve') return can('public_reservations') || can('reservations_desk')
     // Инбокс заказов (101): capability orders_desk — pos-точки видят его
     // read-only, их цикл живёт на кассе.
     if (id === 'orders') return can('orders_desk')

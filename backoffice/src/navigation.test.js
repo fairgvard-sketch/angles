@@ -93,8 +93,17 @@ test('Orders standalone: инбокс заказов и каталог, без �
 
 test('Reserve standalone: стол хостес и гостевая страница, без каталога', () => {
   const nav = ids(RESERVE_ONLY)
-  assert.deepEqual(nav, ['overview', 'reservations', 'locations', 'online'])
+  assert.deepEqual(nav, ['overview', 'reservations', 'locations', 'reserve'])
   assert.ok(!nav.includes('menu'))
+  // Канал меню не куплен — и раздела меню быть не должно. Пока каналы
+  // жили одним пунктом, точка с одной бронью открывала его на вкладке
+  // меню, которого у неё нет.
+  assert.ok(!nav.includes('online'))
+})
+
+test('Menu-only не получает раздел броней', () => {
+  assert.ok(!ids(MENU_ONLY).includes('reserve'))
+  assert.ok(ids(MENU_ONLY).includes('online'))
 })
 
 test('Developer: все разделы', () => {
@@ -154,6 +163,7 @@ test('Разделы одной точки помечены — для них п
   assert.equal(isLocationScoped('reservations'), true)
   assert.equal(isLocationScoped('orders'), true)
   assert.equal(isLocationScoped('online'), true)
+  assert.equal(isLocationScoped('reserve'), true)
   // Locations выбирает точку внутри своего экрана настроек
   assert.equal(isLocationScoped('locations'), false)
   // Дашборд читает продажи, заказы, брони и каналы одной точки: без

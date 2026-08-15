@@ -434,7 +434,7 @@ export function attentionItems({
       tone: 'info',
       title: 'Online ordering is off',
       detail: 'Guests can open the menu but cannot order.',
-      action: { label: 'Open channels', view: 'online' },
+      action: { label: 'Open QR menu', view: 'online' },
     })
   }
   if (channels && can('public_reservations') && !channels.reservations) {
@@ -443,7 +443,10 @@ export function attentionItems({
       tone: 'info',
       title: 'Table booking is off',
       detail: 'The booking page tells guests that bookings are paused.',
-      action: { label: 'Open channels', view: 'online', tab: 'reservations' },
+      // Раньше здесь стоял `view: 'online', tab: 'reservations'` — вкладки
+      // с таким ключом не существовало, и строка про бронь молча открывала
+      // настройки меню. Теперь у канала свой раздел.
+      action: { label: 'Open QR bookings', view: 'reserve' },
     })
   }
 

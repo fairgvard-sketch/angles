@@ -2,6 +2,7 @@ import { Suspense, lazy, useCallback, useEffect, useMemo, useRef, useState } fro
 import {
   Activity,
   BarChart3,
+  CalendarClock,
   CalendarDays,
   Check,
   ChevronRight,
@@ -141,6 +142,10 @@ const NAV_ICONS = {
   team: Users,
   guests: UserRound,
   online: QrCode,
+  // Каналы соседи по группе, и одинаковый QR у обоих делал бы список
+  // нечитаемым: у брони календарь со стрелкой времени, у стола хостес
+  // (`reservations`) — обычный календарь.
+  reserve: CalendarClock,
   devices: MonitorSmartphone,
   reports: BarChart3,
   integrations: CreditCard,
@@ -855,7 +860,10 @@ function Dashboard({ session, context, onReloadContext }) {
         {/* onNavigate — короткий путь «меню собирается в Каталоге»:
             раздел QR не редактирует товары, он только уводит туда. */}
         {view === 'online' && (
-          <QrChannels context={context} {...scopedProps} {...tabProps} onNavigate={navigate} />
+          <QrChannels context={context} channel="online" {...scopedProps} onNavigate={navigate} />
+        )}
+        {view === 'reserve' && (
+          <QrChannels context={context} channel="reserve" {...scopedProps} onNavigate={navigate} />
         )}
         {view === 'devices' && <DevicesManager context={context} />}
         {/* Точка нужна только вкладке Loyalty — она и показывает свой

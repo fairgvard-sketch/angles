@@ -78,6 +78,7 @@ function renderReserve(props = {}) {
     settings: reserveSettings,
     patch: noop,
     slug: 'bulochka',
+    onSlugSaved: noop,
     tz: 'Asia/Jerusalem',
     businessAddress: 'Allenby 23, Tel Aviv',
     url: 'https://menu.angle.co.il/reserve/bulochka',
@@ -87,40 +88,32 @@ function renderReserve(props = {}) {
   }))
 }
 
-describe('QR-каналы: навигация', () => {
-  it('вкладок ровно две, и они те самые', () => {
-    const html = renderToStaticMarkup(
-      h(QrChannels, { context, locationId: 'loc-1', tab: null, onTabChange: noop })
+describe('QR-каналы: два раздела вместо вкладок', () => {
+  it('раздел называет СВОЙ канал', () => {
+    const menu = renderToStaticMarkup(
+      h(QrChannels, { context, locationId: 'loc-1', channel: 'online' })
     )
-    assert.deepEqual(tabLabels(html), ['QR menu &amp; ordering', 'Reservations'])
+    assert.match(menu, />QR Menu</)
+
+    const reserve = renderToStaticMarkup(
+      h(QrChannels, { context, locationId: 'loc-1', channel: 'reserve' })
+    )
+    assert.match(reserve, />QR Reservations</)
   })
 
-  it('вкладка приходит из адреса, мусор в ней открывает первую', () => {
-    const reserve = renderToStaticMarkup(
-      h(QrChannels, { context, locationId: 'loc-1', tab: 'reserve', onTabChange: noop })
-    )
-    assert.match(reserve, /aria-selected="true"[^>]*>Reservations/)
-
-    for (const tab of [null, undefined, 'nope']) {
+  it('вкладок внутри нет — канал задаёт раздел', () => {
+    for (const channel of ['online', 'reserve']) {
       const html = renderToStaticMarkup(
-        h(QrChannels, { context, locationId: 'loc-1', tab, onTabChange: noop })
+        h(QrChannels, { context, locationId: 'loc-1', channel })
       )
-      assert.match(
-        html,
-        /aria-selected="true"[^>]*>QR menu &amp; ordering/,
-        `tab=${String(tab)}`
-      )
+      assert.equal(tabLabels(html).length, 0, channel)
+      assert.doesNotMatch(html, /role="tablist"/, channel)
     }
   })
 
-  it('вкладки — настоящий tablist с одной точкой входа с клавиатуры', () => {
-    const html = renderToStaticMarkup(
-      h(QrChannels, { context, locationId: 'loc-1', tab: 'online', onTabChange: noop })
-    )
-    assert.match(html, /role="tablist"/)
-    // Активная вкладка в обходе табом, соседняя — нет (roving tabindex)
-    assert.match(html, /aria-selected="true" tabindex="0"/)
-    assert.match(html, /aria-selected="false" tabindex="-1"/)
+  it('без канала открывается меню: это был канал по умолчанию', () => {
+    const html = renderToStaticMarkup(h(QrChannels, { context, locationId: 'loc-1' }))
+    assert.match(html, />QR Menu</)
   })
 })
 
@@ -205,6 +198,10 @@ describe('Брони: настройки на месте', () => {
   it('группы настроек и их собственные значения', () => {
     const html = renderReserve()
     for (const title of [
+      // Короткий адрес — общий для меню и брони; пока бронь была вкладкой,
+      // его редактор жил только на соседней, и шаг чеклиста «Claim a short
+      // link» вёл в группу, которой здесь не существовало
+      'Link &amp; address',
       'Booking hours', 'Slots &amp; booking window', 'Cancellation &amp; changes',
       'What the guest must know', 'Confirmation', 'Look of the booking page',
       // Доставка — условие работы канала, как часы и правила (158)
@@ -214,10 +211,19 @@ describe('Брони: настройки на месте', () => {
     ]) {
       assert.match(html, new RegExp(title), title)
     }
-    assert.equal((html.match(/aria-expanded="false"/g) || []).length, 8)
+    assert.equal((html.match(/aria-expanded="false"/g) || []).length, 9)
     assert.match(html, /30 min slots · up to 12 guests · 60 days ahead/)
     assert.match(html, /2 hours before · waitlist on/)
     assert.match(html, /Instant/)
+  })
+
+  it('короткий адрес редактируется и здесь, префиксом своей страницы', () => {
+    const html = renderReserve({ openGroup: 'address' })
+    assert.match(html, /menu\.angle\.co\.il\/reserve\//)
+    assert.match(html, /Save address/)
+    // Адрес один на оба канала, и об этом сказано вслух: правка здесь
+    // меняет и ссылку меню
+    assert.match(html, /both guest pages/)
   })
 
   it('правила отмены, лист ожидания и текст политики редактируются', () => {

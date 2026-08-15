@@ -134,6 +134,20 @@ export function canonicalRoute(route) {
     }
   }
 
+  // Бронь была вкладкой канала, стала своим разделом. Прежний адрес лежит
+  // в закладках и в письмах поддержки. `reservations` здесь тоже принимаем:
+  // так называла вкладку строка «Table booking is off» на главной, хотя
+  // вкладки с таким ключом никогда не было — ссылка молча открывала меню.
+  if (next.view === 'online') {
+    if (next.tab === 'reserve' || next.tab === 'reservations') {
+      next.view = 'reserve'
+      next.tab = null
+    } else if (next.tab === 'online') {
+      // Ключ единственной вкладки в адресе больше ничего не выбирает
+      next.tab = null
+    }
+  }
+
   // Экран дублей был вкладкой, стал режимом Directory
   if (next.view === 'guests' && next.tab === 'duplicates') {
     next.tab = 'directory'

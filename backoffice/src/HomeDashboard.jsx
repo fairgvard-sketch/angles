@@ -460,7 +460,23 @@ export default function HomeDashboard({ context, locationId, onNavigate, childre
             {data?.channels && (
               <Panel
                 title="Online channels"
-                actions={<Button variant="text" onClick={() => onNavigate('online')}>Manage channels <ChevronRight /></Button>}
+                /* Каналы разъехались по своим разделам, и одна кнопка
+                   «Manage channels» вела бы из карточки про оба только в
+                   меню. Кнопка на канал — и ровно те, что у аккаунта есть. */
+                actions={(
+                  <>
+                    {can('public_menu') && (
+                      <Button variant="text" onClick={() => onNavigate('online')}>
+                        QR menu <ChevronRight />
+                      </Button>
+                    )}
+                    {can('public_reservations') && (
+                      <Button variant="text" onClick={() => onNavigate('reserve')}>
+                        QR bookings <ChevronRight />
+                      </Button>
+                    )}
+                  </>
+                )}
               >
                 <div className="data-list">
                   {can('online_orders') && (
@@ -483,9 +499,12 @@ export default function HomeDashboard({ context, locationId, onNavigate, childre
                   )}
                   <div className="data-row">
                     <span><QrCode aria-hidden /> Guest page</span>
+                    {/* Открываем ту страницу, которая у аккаунта есть:
+                        точке с одной бронью ссылка на /order вела в меню,
+                        которого она не покупала. */}
                     <a
                       className="text-button"
-                      href={`${PUBLIC_MENU_ORIGIN}/order/${data.channels.slug || data.channels.locationId}`}
+                      href={`${PUBLIC_MENU_ORIGIN}/${can('public_menu') ? 'order' : 'reserve'}/${data.channels.slug || data.channels.locationId}`}
                       target="_blank"
                       rel="noreferrer"
                     >

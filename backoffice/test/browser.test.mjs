@@ -381,7 +381,8 @@ before(async () => {
           { id: 'team', label: 'Team' },
         ] },
         { id: 'channels', label: 'Channels', items: [
-          { id: 'online', label: 'QR Menu & Online' }, { id: 'integrations', label: 'Integrations' },
+          { id: 'online', label: 'QR Menu' }, { id: 'reserve', label: 'QR Reservations' },
+          { id: 'integrations', label: 'Integrations' },
         ] },
         { id: 'system', label: 'System', items: [{ id: 'devices', label: 'Devices' }] },
       ],
@@ -1236,13 +1237,16 @@ describe('dashboard', { skip }, () => {
     // Панели живой работы — без описаний под заголовком, журнал последним
     assert.deepEqual(state.panels, ['Orders', 'Reservations', 'Devices', 'Online channels', 'Recent activity'])
 
-    // Кнопка пункта ведёт в свой раздел, а выключенный канал — в свою вкладку
+    // Кнопка пункта ведёт в свой раздел, а выключенный канал — в раздел
+    // своего канала: у брони он свой, а не вкладка внутри меню
     await page.evaluate(() => {
       const row = [...document.querySelectorAll('.dash-attention-row')]
         .find((r) => /Table booking is off/.test(r.textContent))
       row.querySelector('button').click()
     })
-    assert.deepEqual(await page.evaluate(() => window.__NAV__), { view: 'online', tab: 'reservations' })
+    const nav = await page.evaluate(() => window.__NAV__)
+    assert.equal(nav.view, 'reserve')
+    assert.ok(!nav.tab, 'вкладки у канала больше нет — раздел свой')
     await page.close()
   })
 

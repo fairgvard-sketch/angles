@@ -138,10 +138,27 @@ test('раздел аккаунта отвечает и на прежнее им
   assert.equal(legacy('?view=account&tab=products').tab, 'products')
 })
 
+test('бронь была вкладкой канала, стала своим разделом', () => {
+  const route = legacy('?view=online&tab=reserve&loc=loc-1')
+  assert.equal(route.view, 'reserve')
+  assert.equal(route.tab, null)
+  // Точка обязана уцелеть: ссылка вела в настройки КОНКРЕТНОЙ точки
+  assert.equal(route.locationId, 'loc-1')
+
+  // Так адресовала бронь строка «Table booking is off» на главной. Вкладки
+  // с этим ключом не существовало, и ссылка молча открывала меню.
+  assert.equal(legacy('?view=online&tab=reservations').view, 'reserve')
+
+  // Меню осталось на прежнем адресе — он в закладках
+  assert.equal(legacy('?view=online').view, 'online')
+  assert.equal(legacy('?view=online&tab=online').tab, null)
+})
+
 test('перевод устаревшего адреса устойчив: второй раз ничего не меняет', () => {
   for (const search of [
     '?view=sales', '?view=locations&tab=export', '?view=locations&tab=loyalty',
     '?view=locations&tab=general', '?view=guests&tab=duplicates', '?view=account',
+    '?view=online&tab=reserve', '?view=online&tab=reservations',
   ]) {
     const once = readRoute(search)
     assert.deepEqual(canonicalRoute(once), once, `цикл перевода на ${search}`)

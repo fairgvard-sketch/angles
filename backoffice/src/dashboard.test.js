@@ -270,13 +270,18 @@ describe('«требует внимания»', () => {
     assert.match(shift.title, /Ротшильд 12/)
   })
 
-  it('выключенный канал ведёт прямо в свою вкладку', () => {
+  it('выключенный канал ведёт прямо в свой раздел', () => {
     const items = attentionItems({
       ...base,
       channels: { orders: false, reservations: false, slug: '', locationId: 'loc-1' },
     })
+    // Каналы — разные разделы кабинета. Прежде обе строки вели в `online`,
+    // и бронь дополняла адрес вкладкой `reservations`, которой не было:
+    // владелец, нажавший «Table booking is off», попадал в настройки меню.
+    assert.equal(items.find((i) => i.id === 'channel-orders').action.view, 'online')
     const rsv = items.find((i) => i.id === 'channel-reservations')
-    assert.equal(rsv.action.tab, 'reservations')
+    assert.equal(rsv.action.view, 'reserve')
+    assert.equal(rsv.action.tab, undefined)
   })
 
   it('заявка на активацию видна здесь — карточка продуктов уехала в аккаунт', () => {

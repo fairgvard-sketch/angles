@@ -35,12 +35,16 @@ import { fetchCategories, fetchItems } from './menu'
 import { fetchLaunchChecklist } from './launch'
 import { blockerSummary, menuBlockers, reserveBlockers } from './channel-readiness'
 import { PageHeader } from './ui/Layout'
-import Tabs from './ui/Tabs'
 import { Button } from './ui/Button'
 import Skeleton, { SkeletonBar, SkeletonPanel } from './ui/Skeleton'
 
 /**
- * QR-каналы гостя: онлайн-заказы и бронирование столов.
+ * QR-канал гостя: меню с заказами ЛИБО бронирование столов.
+ *
+ * Один компонент на два раздела кабинета («QR Menu» и «QR Reservations»).
+ * Вкладок внутри больше нет: канал задаётся разделом, поэтому у каждого
+ * свой адрес, свой заголовок и своё превью, а ссылку на настройку брони
+ * можно прислать как есть.
  *
  * Экран строится сверху вниз по вопросам владельца:
  *   1. Принимает ли канал заказы прямо сейчас? — тумблер в герое.
@@ -58,10 +62,15 @@ import Skeleton, { SkeletonBar, SkeletonPanel } from './ui/Skeleton'
  * (см. online.js). Маршруты /order и /reserve обслуживает menu-приложение.
  */
 
-const TABS = [
-  { key: 'online', label: 'QR menu & ordering' },
-  { key: 'reserve', label: 'Reservations' },
-]
+/**
+ * Заголовок раздела по каналу. Каналы разъехались по собственным
+ * разделам, поэтому «QR Menu & Online» над обоими больше не стоит: над
+ * настройками брони он назывался бы меню.
+ */
+const CHANNEL_TITLE = {
+  online: 'QR Menu',
+  reserve: 'QR Reservations',
+}
 
 /**
  * Рабочая шапка канала: состояние, гостевая ссылка, действия и QR.
@@ -197,7 +206,7 @@ function ChannelBar({ title, enabled, onToggle, onLabel, offLabel, url, qrUrl, q
  * занять имя. Формат и занятость проверяет set_location_slug — форма лишь
  * показывает ответ сервера.
  */
-function SlugBlock({ locationId, slug, onSaved }) {
+function SlugBlock({ locationId, slug, onSaved, prefix = 'menu.angle.co.il/order/' }) {
   const [value, setValue] = useState(slug)
   const [state, setState] = useState('idle')
   const [error, setError] = useState('')
@@ -226,11 +235,12 @@ function SlugBlock({ locationId, slug, onSaved }) {
     <div className="qr-block-text">
       <p>
         A readable link for flyers and social profiles. The long link with the
-        location id keeps working, so printed QR codes stay valid.
+        location id keeps working, so printed QR codes stay valid. One address
+        serves both guest pages — the menu and the booking page.
       </p>
       <div className="qr-field" style={{ marginTop: 14 }}>
         <div className="slug-input">
-          <span className="slug-prefix">menu.angle.co.il/order/</span>
+          <span className="slug-prefix">{prefix}</span>
           <input
             value={value}
             onChange={(e) => setValue(e.target.value)}
@@ -1353,7 +1363,7 @@ function AddressField({ override, businessAddress, onChange }) {
 }
 
 export function ReserveTab({
-  locationId, settings, patch, slug, tz, businessAddress, url,
+  locationId, settings, patch, slug, onSlugSaved, tz, businessAddress, url,
   openGroup, onOpenGroup, blockerCount = 0,
 }) {
   const enabled = reservationsEnabled(settings)
@@ -1396,6 +1406,26 @@ export function ReserveTab({
 
       <h2 className="setting-section-title">Booking setup</h2>
       <div className="setting-rows">
+        {/* Короткий адрес — общий для обеих гостевых страниц, и пока
+            бронь была вкладкой, редактор жил только на соседней. Шаг
+            чеклиста «Claim a short link» вёл в группу, которой на этой
+            вкладке не существовало: строка блокера была, а нажатие не
+            делало ничего. */}
+        <SettingGroup
+          {...group('address')}
+          icon={QrCode}
+          title="Link & address"
+          hint="The short address printed on flyers and shown in the browser."
+          value={slug ? `/${slug}` : 'Location id'}
+        >
+          <SlugBlock
+            locationId={locationId}
+            slug={slug}
+            onSaved={onSlugSaved}
+            prefix="menu.angle.co.il/reserve/"
+          />
+        </SettingGroup>
+
         <SettingGroup
           {...group('hours')}
           icon={CalendarClock}
@@ -1774,11 +1804,15 @@ function DeliveryGroup({ locationId, open, onToggle, id }) {
   )
 }
 
-export default function QrChannels({ context, locationId, tab: tabFromUrl, onTabChange, onNavigate }) {
+/**
+ * Раздел канала. Один и тот же экран обслуживает оба: слева настройки
+ * канала, справа его живое превью. Какой именно канал — решает раздел
+ * (`channel`), а не вкладка внутри: у каналов разные адреса в кабинете.
+ */
+export default function QrChannels({ context, locationId, channel = 'online', onNavigate }) {
   const locations = context?.locations || []
   const activeId = locationId || locations[0]?.id || null
-  const tab = TABS.some((t) => t.key === tabFromUrl) ? tabFromUrl : 'online'
-  const setTab = onTabChange
+  const tab = channel === 'reserve' ? 'reserve' : 'online'
   const [settings, setSettings] = useState(null)
   // Адрес заведения — канонический источник для гостевой страницы
   const [businessAddress, setBusinessAddress] = useState('')
@@ -1870,10 +1904,12 @@ export default function QrChannels({ context, locationId, tab: tabFromUrl, onTab
     }
   }
 
+  const title = CHANNEL_TITLE[tab]
+
   if (locations.length === 0) {
     return (
       <>
-        <PageHeader title="QR Menu & Online" />
+        <PageHeader title={title} />
         <p className="empty-state">No locations are linked to this account.</p>
       </>
     )
@@ -1898,19 +1934,7 @@ export default function QrChannels({ context, locationId, tab: tabFromUrl, onTab
 
   return (
     <>
-      <PageHeader title="QR Menu & Online" />
-
-      {/* Ровно два канала — ровно две вкладки. Клавиатура и RTL живут в
-          общем примитиве Tabs, а не переписываются здесь заново. */}
-      <Tabs
-        className="channel-tabs"
-        label="Channel"
-        items={TABS}
-        value={tab}
-        // Группы принадлежат каналу: при смене вкладки закрываем
-        // открытую, иначе на соседней вкладке раскрылась бы чужая.
-        onChange={(key) => { setTab(key); setOpenGroup(null) }}
-      />
+      <PageHeader title={title} />
 
       {/* Место под отклик зарезервировано: «Saved» не должен сдвигать
           весь экран на строку вниз каждый раз, когда он появляется. */}
@@ -1983,6 +2007,7 @@ export default function QrChannels({ context, locationId, tab: tabFromUrl, onTab
                 settings={settings}
                 patch={makePatcher('reservations', saveReservations)}
                 slug={slug}
+                onSlugSaved={setSlug}
                 businessAddress={businessAddress}
                 tz={locations.find((l) => l.id === activeId)?.timezone || 'Asia/Jerusalem'}
                 url={guestUrl}
