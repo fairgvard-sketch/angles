@@ -495,9 +495,9 @@ describe('команда: доступ одной поверхностью', { s
     assert.equal(state.title, 'Senior barista')
     assert.match(state.subtitle, /2 of 9 actions · 1 person/)
     assert.equal(state.checked.length, 2)
-    // Про базовый уровень сказана правда: он ничего не выдаёт
-    assert.match(state.hint, /grants nothing/)
+    // Галочки исчерпывающие, и подпись обязана говорить именно это
     assert.match(state.hint, /exactly what is ticked below/)
+    assert.match(state.hint, /stays with owners and managers/)
     await page.close()
   })
 
@@ -535,7 +535,7 @@ describe('команда: доступ одной поверхностью', { s
     await page.close()
   })
 
-  it('строка роли называет уровень, набор и число носителей', async () => {
+  it('строка роли называет набор и число носителей, без «уровня»', async () => {
     const page = await open()
     await page.waitForSelector('.tm-role-row')
     const state = await page.evaluate(() => ({
@@ -545,9 +545,26 @@ describe('команда: доступ одной поверхностью', { s
       label: document.querySelector('.tm-role-row').getAttribute('aria-label'),
     }))
     assert.equal(state.name, 'Senior barista')
-    assert.equal(state.meta, 'Manager base · 2 of 9 actions')
+    // Права роли исчерпываются галочками: «уровень» рядом с ними читался
+    // как второй источник прав, которым он не является ни в 094, ни в can()
+    assert.equal(state.meta, '2 of 9 actions')
     assert.equal(state.holders, '1 person')
     assert.match(state.label, /Open role Senior barista/)
+    assert.doesNotMatch(state.label, /base/)
+    await page.close()
+  })
+
+  it('в форме роли нет второго поля про уровень', async () => {
+    const page = await open()
+    await page.waitForSelector('.tm-role-row')
+    await page.click('.tm-role-row')
+    await page.waitForSelector('.drawer')
+    const fields = await page.evaluate(() => ({
+      labels: [...document.querySelectorAll('.drawer .qr-field > span')].map((s) => s.textContent),
+      selects: document.querySelectorAll('.drawer .qr-field select').length,
+    }))
+    assert.deepEqual(fields.labels, ['Role name'])
+    assert.equal(fields.selects, 0, 'уровень роли ничего не даёт — поля быть не должно')
     await page.close()
   })
 
@@ -616,6 +633,22 @@ describe('команда: телефон и клавиатура', { skip }, () 
     }))
     assert.equal(state.overflow, 0)
     assert.ok(state.button >= 44, `${state.button}px — меньше 44px под палец`)
+    await page.close()
+  })
+
+  it('на телефоне раскрытая панель стоит под своей строкой, а не под соседней', async () => {
+    const page = await open('', 390)
+    await page.waitForSelector('.tm-mobile-access')
+    await page.click('.tm-mobile-access > button')
+    await page.waitForSelector('.tm-roles-panel')
+    const order = await page.evaluate(() => {
+      const kids = [...document.querySelector('.tm-mobile-access').children]
+      return kids.map((el) => (
+        el.tagName === 'BUTTON' ? el.querySelector('strong').textContent : el.className
+      ))
+    })
+    assert.deepEqual(order, ['Custom roles', 'tm-section', 'Default access'],
+      'роли обязаны раскрываться между строками, иначе читаются как часть Default access')
     await page.close()
   })
 

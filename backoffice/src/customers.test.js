@@ -90,8 +90,15 @@ test('без чисел метка молчит, а не выдумывает о
   assert.equal(whySegment('nonsense', { visits: 3 }), '')
 })
 
-test('в узкой колонке показывается один сегмент — первый', () => {
+test('в узкой колонке показывается один сегмент — самый содержательный', () => {
   assert.equal(primarySegment(['returning', 'upcoming']), 'returning')
+  // Сервер отдаёт от общего к частному: у гостя с семью визитами
+  // «returning» стоит первым, но говорит о нём меньше, чем «regular»
+  assert.equal(primarySegment(['returning', 'regular']), 'regular')
+  assert.equal(primarySegment(['returning', 'regular', 'vip']), 'vip')
+  // То, что требует действия, важнее того, как гость хорош
+  assert.equal(primarySegment(['returning', 'regular', 'vip', 'at_risk']), 'at_risk')
+  assert.equal(primarySegment(['returning', 'lost']), 'lost')
   assert.equal(primarySegment([]), null)
   assert.equal(primarySegment(undefined), null)
 })

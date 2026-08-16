@@ -4230,6 +4230,10 @@ a { color: inherit; }
 .cus-cell-name small {
   color: var(--c-text-subtle); font-size: 12px; font-variant-numeric: tabular-nums;
 }
+/* Метка ужимается по слову: ячейка имени — grid, и растянутый на всю
+   её ширину чип с рамкой читается как пустое поле ввода, а не как
+   характеристика гостя. */
+.cus-cell-name > .cus-segment { justify-self: start; margin-top: 2px; }
 .cus-row-tags { display: flex; flex-wrap: wrap; gap: 4px; margin-top: 2px; }
 .cus-cell-loyalty {
   min-width: 0; color: var(--c-text-2); font-size: 13px;

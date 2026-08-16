@@ -357,6 +357,24 @@ describe('клиенты: один счётчик визитов и объясн
     await page.close()
   })
 
+  it('метка в строке ужимается по слову, а не тянется полем ввода', async () => {
+    const page = await open('', 390)
+    await page.waitForSelector('.cus-row .cus-segment')
+    const box = await page.evaluate(() => {
+      const chip = document.querySelector('.cus-row .cus-segment')
+      const cell = chip.closest('.cus-cell-name')
+      return {
+        chip: Math.round(chip.getBoundingClientRect().width),
+        cell: Math.round(cell.getBoundingClientRect().width),
+        text: chip.textContent.trim(),
+      }
+    })
+    // Ячейка имени — grid: растянутый чип с рамкой читается как пустое поле
+    assert.ok(box.chip < box.cell * 0.7,
+      `метка «${box.text}» заняла ${box.chip}px из ${box.cell}px — это уже не чип`)
+    await page.close()
+  })
+
   it('«обычно» не показывается, когда привычки нет', async () => {
     const page = await open()
     await page.click('.cus-row')

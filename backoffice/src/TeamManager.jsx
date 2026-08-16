@@ -631,17 +631,18 @@ function PeopleSection({
 // ── Доступ ───────────────────────────────────────────────────
 
 /**
- * Редактор роли.
+ * Редактор роли: имя и галочки, больше в роли ничего нет.
  *
- * Про базовый уровень здесь сказана правда: он НЕ добавляет прав. Ни
- * `require_staff_perm` (094), ни `can()` кассы его при разрешении не
- * читают — набор галочек исчерпывающий. Поле осталось потому, что его
- * требует `save_role`, и потому, что оно описывает роль словом.
+ * Базового уровня в форме нет сознательно. Ни `require_staff_perm`
+ * (094), ни `can()` кассы его при разрешении не читают — набор галочек
+ * исчерпывающий, а второе поле про «уровень» читалось как ещё один
+ * источник прав. `save_role` его требует аргументом, поэтому значение
+ * едет прежнее (у новой роли — 'barista') и роль его не меняет.
  */
 function RoleCard({ role, holders, onClose, onSaved }) {
   const isNew = !role.id
   const [name, setName] = useState(role.name || '')
-  const [base, setBase] = useState(role.base || 'barista')
+  const base = role.base || 'barista'
   const [perms, setPerms] = useState(() => new Set(role.perms || []))
   const [busy, setBusy] = useState(false)
   const [error, setError] = useState('')
@@ -698,18 +699,10 @@ function RoleCard({ role, holders, onClose, onSaved }) {
           <input value={name} maxLength={40} placeholder="Senior barista" onChange={(e) => setName(e.target.value)} />
         </label>
 
-        <label className="qr-field">
-          <span>Comparable level</span>
-          <select value={base} onChange={(e) => setBase(e.target.value)}>
-            <option value="barista">Barista</option>
-            <option value="manager">Manager</option>
-          </select>
-        </label>
         <p className="tm-hint">
-          A label only — it grants nothing. A person with this role can do
-          exactly what is ticked below and nothing else, whatever the
-          location rules say. Managing the team, roles and settings always
-          stays with owners and managers.
+          A person with this role can do exactly what is ticked below and
+          nothing else, whatever the location rules say. Managing the team,
+          roles and settings always stays with owners and managers.
         </p>
 
         <section className="tm-block">
@@ -857,11 +850,11 @@ function RolesPanel({ roles, staff, narrow, sectionRef, onOpen }) {
                       className="tm-role-row"
                       key={role.id}
                       onClick={() => onOpen(role)}
-                      aria-label={`Open role ${role.name} · ${ROLE_LABELS[role.base] || role.base} base · ${allowed} of ${PERM_KEYS.length} actions · ${holders} people`}
+                      aria-label={`Open role ${role.name} · ${allowed} of ${PERM_KEYS.length} actions · ${holders} people`}
                     >
                       <span className="tm-role-name">{role.name}</span>
                       <span className="tm-role-meta">
-                        {ROLE_LABELS[role.base] || role.base} base · {allowed} of {PERM_KEYS.length} actions
+                        {allowed} of {PERM_KEYS.length} actions
                       </span>
                       <span className="tm-role-holders">
                         {holders > 0 ? `${holders} ${holders === 1 ? 'person' : 'people'}` : 'unused'}
@@ -1111,6 +1104,26 @@ function PeopleAndAccess({
     target.focus({ preventScroll: true })
   }, [focus, ready, mobileAccess])
 
+  const rolesPanel = (
+    <RolesPanel
+      roles={roles}
+      staff={staff}
+      narrow={narrow}
+      sectionRef={rolesRef}
+      onOpen={setEditing}
+    />
+  )
+  const permissionsPanel = (
+    <PermissionsPanel
+      locations={locations}
+      roles={roles}
+      staff={staff}
+      settingsByLocation={settingsByLocation}
+      sectionRef={permsRef}
+      onSettingsChanged={onSettingsChanged}
+    />
+  )
+
   return (
     <>
       <PeopleSection
@@ -1132,7 +1145,12 @@ function PeopleAndAccess({
         <EmptyState>No locations are linked to this account.</EmptyState>
       ) : (
         <>
-          {narrow && (
+          {narrow ? (
+            /*
+             * Гармошка, а не список с общей полкой внизу: раскрытое
+             * содержимое стоит сразу под своей строкой. Иначе роли
+             * выезжали под «Default access» и читались как его часть.
+             */
             <div className="tm-mobile-access" aria-label="Roles and access settings">
               <button
                 type="button"
@@ -1142,6 +1160,7 @@ function PeopleAndAccess({
                 <span><strong>Custom roles</strong><small>{roles?.length ?? 0} configured</small></span>
                 <ChevronRight aria-hidden />
               </button>
+              {mobileAccess === 'roles' && rolesPanel}
               <button
                 type="button"
                 aria-expanded={mobileAccess === 'permissions'}
@@ -1150,29 +1169,14 @@ function PeopleAndAccess({
                 <span><strong>Default access</strong><small>{PERM_KEYS.length} actions per location</small></span>
                 <ChevronRight aria-hidden />
               </button>
+              {mobileAccess === 'permissions' && permissionsPanel}
+            </div>
+          ) : (
+            <div className="tm-access-grid">
+              {rolesPanel}
+              {permissionsPanel}
             </div>
           )}
-          <div className="tm-access-grid">
-            {(!narrow || mobileAccess === 'roles') && (
-              <RolesPanel
-                roles={roles}
-                staff={staff}
-                narrow={narrow}
-                sectionRef={rolesRef}
-                onOpen={setEditing}
-              />
-            )}
-            {(!narrow || mobileAccess === 'permissions') && (
-              <PermissionsPanel
-                locations={locations}
-                roles={roles}
-                staff={staff}
-                settingsByLocation={settingsByLocation}
-                sectionRef={permsRef}
-                onSettingsChanged={onSettingsChanged}
-              />
-            )}
-          </div>
         </>
       )}
 
