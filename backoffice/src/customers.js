@@ -129,6 +129,17 @@ export function guestRowLabel(guest, mode) {
   parts.push(visitsLabel(combinedVisits(guest)))
   parts.push(`${formatMoney(guest?.total_spent)} spent`)
   parts.push(`last visit ${lastVisitLabel(guest?.last_visit_at).toLowerCase()}`)
+  /*
+   * Автоматическая метка и её причина — часть строки, а не подсказка по
+   * наведению: `title` у чипа на телефоне не показывается вообще, а
+   * читалке содержимое кнопки заменяет этот текст целиком.
+   */
+  const segment = primarySegment(guest?.segments)
+  if (segment) {
+    const why = whySegment(segment, guest?.why_segment)
+    const label = SEGMENT_LABEL[segment] ?? segment
+    parts.push(why ? `${label} — ${why}` : label)
+  }
   if (guest?.tags?.length) parts.push(`tagged ${guest.tags.join(', ')}`)
   return `Open ${parts.join(' · ')}`
 }
@@ -325,8 +336,14 @@ export function segmentSummary({ segment = 'all', tags = [], search = '' } = {})
   if (preset && preset.key !== 'all') parts.push(preset.label.toLowerCase())
   if (tags.length) parts.push(`tagged ${tags.join(' + ')}`)
   if (search.trim()) parts.push(`matching “${search.trim()}”`)
-  if (!parts.length) return 'Most recent visitors first.'
-  return `Showing ${parts.join(', ')}.`
+  const line = parts.length ? `Showing ${parts.join(', ')}.` : 'Most recent visitors first.'
+  /*
+   * Правило выбранного сегмента — видимым текстом. В чипах оно жило
+   * подсказкой `title`, которой на телефоне нет, и метка выглядела
+   * решением кабинета, а не следствием визитов.
+   */
+  if (!preset?.hint) return line
+  return `${line} ${preset.label}: ${preset.hint.toLowerCase()} — counted automatically.`
 }
 
 /**

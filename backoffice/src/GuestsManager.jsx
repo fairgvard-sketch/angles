@@ -140,6 +140,13 @@ function SegmentsSection({ segments, why }) {
           ))}
         </dl>
       )}
+      {/* Откуда метки взялись — вопрос, который задают именно здесь:
+          набор считается по визитам и тратам, руками он не ставится, а
+          для «я так решил» рядом живут метки владельца. */}
+      <p className="cus-note-hint">
+        Counted from visits and spend — these are not set by hand. Your own
+        labels are Tags.
+      </p>
     </CardSection>
   )
 }
@@ -490,13 +497,20 @@ function ProfileView({ guest, card, mode, error, onErase }) {
         </CardSection>
       )}
 
-      {tags.length > 0 && (
-        <CardSection label="Tags">
+      {/* Секция стоит всегда, даже пустая: иначе о том, что метки вообще
+          бывают и ставятся вручную, узнаёт только тот, у кого они уже
+          есть. Ставить их можно сколько угодно — или ни одной. */}
+      <CardSection label="Tags">
+        {tags.length > 0 ? (
           <div className="cus-chips">
             {tags.map((tag) => <TagChip tag={tag} key={tag} />)}
           </div>
-        </CardSection>
-      )}
+        ) : (
+          <p className="cus-note-hint">
+            None yet — add your own in Edit. As many as you need, or none.
+          </p>
+        )}
+      </CardSection>
 
       {card?.notes && (
         <CardSection label="Internal note">

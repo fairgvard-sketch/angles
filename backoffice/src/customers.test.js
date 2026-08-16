@@ -64,6 +64,10 @@ test('у каждого сегмента есть подпись — чип бе
 
 test('заголовок списка называет активный срез', () => {
   assert.match(segmentSummary({ segment: 'lost' }), /lost/)
+  // Правило сегмента — текстом, а не подсказкой по наведению
+  assert.match(segmentSummary({ segment: 'regular' }), /5 visits or more/)
+  assert.match(segmentSummary({ segment: 'regular' }), /counted automatically/)
+  assert.doesNotMatch(segmentSummary({ segment: 'all' }), /counted automatically/)
   assert.match(segmentSummary({ segment: 'all', tags: ['VIP'] }), /VIP/)
   assert.match(segmentSummary({ segment: 'all', tags: [], search: '' }), /Most recent/)
 })
@@ -287,6 +291,17 @@ describe('guestRowLabel', () => {
     assert.match(label, /₪1,284\.50 spent/)
     assert.match(label, /last visit today/)
     assert.match(label, /tagged VIP/)
+  })
+
+  it('называет автоматическую метку и её причину — на телефоне подсказки нет', () => {
+    const label = guestRowLabel({
+      ...guest,
+      segments: ['returning', 'regular'],
+      why_segment: { visits: 23, days_since: 0 },
+    }, 'points')
+    assert.match(label, /Regular/)
+    assert.doesNotMatch(label, /Returning/, 'в строке одна метка — самая содержательная')
+    assert.match(label, /23 visits/)
   })
 
   it('профиль без имени называется номером и не повторяет его дважды', () => {
