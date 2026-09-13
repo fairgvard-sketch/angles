@@ -1380,3 +1380,42 @@ SQL-политики на целевой БД, не реальный сетев�
 
 На момент этой записи main push и CI/deploy ещё впереди; их результаты
 фиксируются следующей записью. **F5, живой Auth/почта и T2 не закрыты**.
+
+## 13.09.2026 — выпуск 169: main, CI и публикации PASS
+
+Функциональные коммиты отправлены fast-forward в main:
+
+- Kassa **`0502e6bc10b05518d7decd2282ac96e2e2e42edf`**, 37 файлов;
+  [CI 34769854654](https://github.com/fairgvard-sketch/pos/actions/runs/34769854654)
+  — frontend и database **success**, в том числе создание схемы и pgTAP в CI.
+- ANGLE **`50dc0b9834c6a5c4a0ee8d0ebb6df7635c29a978`**, 20 файлов;
+  [CI 34769859282](https://github.com/fairgvard-sketch/angles/actions/runs/34769859282)
+  — **success**, обязательный browser suite и docs guard.
+
+Статусы проверены 16:55 UTC. Vercel **success** на этих же SHA:
+[POS](https://vercel.com/vandal2/pos/3PySn1GviZKsWZeaE674ityRi3vs),
+[Menu](https://vercel.com/vandal2/angle-menu/5hRvjvmHMTyCNjKBWZRhNCsaeVg1),
+[ANGLE](https://vercel.com/vandal2/angles/8iZzRhkvUbX1kCm4gwhYjiJs3aGw).
+Это штатные отдельные сборки Git-интеграции; локальные placeholder-артефакты
+не публиковались. Edge Functions и APK не менялись и не перевыпускались.
+
+Read-only HTTP smoke PASS: главная, `/account/`, POS `/setup`, гостевая
+страница Menu возвращают HTML200. Все 17 проверенных same-origin JS/CSS,
+включая POS modulepreload и legacy entry/polyfills, отвечают200 с правильными
+content types. Кабинет `index-DKHB4ZdL.js`, POS `index-BF7Nf_Yf.js`,
+Menu `index-D5jjuRiZ.js`. Удалённая карусель логотипов отсутствует в главной;
+hero.mp4?v=2 — video/mp4, **1 070 121 B**, ожидаемая immutable cache policy.
+Артефакт: `/private/tmp/angle-a62-accept-8ScYsx/public-smoke.json`;
+статусы CI/Vercel — status-*.json в той же папке.
+
+Проверка HTTP — не пользовательская сессия, не обновление service worker на
+работающей кассе и не приёмка T2. Реальные заказы/платежи/аккаунты не создавались.
+Подписочный checkout остался disabled, эквайринг/налоговая регистрация не
+включались. **F5 остаётся обязательным блокером первых реальных операций**;
+физический T2, production Auth/почта и оставшаяся серверная F6 не закрыты.
+
+После функционального push tracked-деревья чистые. На диске сохранены вне
+коммитов 57 ANGLE и 10 Kassa файлов-дублей ` 2`, два сырых видео ANGLE и
+`.claude/launch.json` Kassa; ничего не удалено. Обновление этого журнала и
+статусов плана отправляется отдельным документационным коммитом поверх
+проверенного кода; приведённые выше CI относятся к функциональным SHA.
