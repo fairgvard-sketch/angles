@@ -829,8 +829,9 @@ Auth/Storage bootstrap приведён к совместимой техниче
 на восстановленной 168: положительный прогон, намеренно неверный receipt
 counter, отключённые триггеры, повторный положительный прогон. Отказы дают
 `23514`/ненулевой exit; изменение counter откатывается. Отдельный локальный
-pgTAP wrapper — **5/5 PASS**. Полный продуктовый pgTAP suite в F5 не запускался:
-прикладные миграции/RPC не менялись. FK/org-проверка не подменяет полный RLS-аудит.
+pgTAP wrapper — **5/5 PASS**. Полный продуктовый pgTAP suite локально в F5
+не запускался: прикладные миграции/RPC не менялись. После push он прошёл в
+database job CI ниже. FK/org-проверка не подменяет полный RLS-аудит.
 
 ### Storage и реальная защита production
 
@@ -897,5 +898,13 @@ F5 Kassa опубликован в `origin/main`:
 **`157d2aa57500143ef71df3cf06edce23c8e645be`**, ровно 9 перечисленных файлов
 кода/тестов/инструкций, без пользовательского `CLAUDE.md` и копий.
 [CI 34752913138](https://github.com/fairgvard-sketch/pos/actions/runs/34752913138)
-запустился (**in_progress** на момент записи, не PASS). Миграций и ручного
-production-деплоя в F5 нет; автоматические проверки деплоя учитываются отдельно.
+— **PASS**, включая frontend и database jobs. Автоматические Vercel `pos` и
+`angle-menu` — **success** на этом SHA. Read-only smoke: POS `/setup` и Menu
+отвечают HTTP 200; entry остались `index-C7Mk36eb.js` и `index-BQ0Vcfr2.js`.
+Это не ручная приёмка функций. Миграций и ручного production-деплоя в F5 нет.
+
+ANGLE `ed9d9611c66b5ce12e429fdbd34dec6897fdb35f` опубликован в `origin/main`:
+план, журнал, правила документации и docs guard; 5 файлов.
+[CI 34752986266](https://github.com/fairgvard-sketch/angles/actions/runs/34752986266)
+ещё **in_progress** на момент этой сверки. Последующее дополнение журнала
+с результатом Kassa не меняет код guard; его CI не объявляется пройденным заранее.
