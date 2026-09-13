@@ -329,3 +329,72 @@
 - Итог локальной интеграции F2 — PASS с указанным ограничением стабильности
   тестов и остатком F2.1. Документы: **7 тестов валидатора, 70 документов,
   225 локальных ссылок, 0 ошибок/пропусков**. `git diff --check` обоих — PASS.
+
+## 13.09.2026 — выпуск A1–A5/D0/F2/F3, схема 167
+
+- Владелец явно разрешил production-миграции и push в `main` обоих репозиториев.
+  Функциональные коммиты выпуска: ANGLE `d2b5a5867f46a72bcc8a19709dd89f540c0f2f0a`,
+  Kassa `ce629370331c96d60c131c6e919a755be1b1a9d1`. Оба отправлены fast-forward
+  в `main`; без force, без посторонних видео, `CLAUDE.md` и `.claude/launch.json`.
+  Дальнейший документационный коммит не меняет прикладной код или схему.
+- Первые GitHub CI были **FAIL**, а не приняты по локальному зелёному прогону.
+  Улучшена диагностика первых упавших assertions в error-аннотации, без
+  повышения таймаутов, retry и ослабления проверок.
+  В ANGLE фикстура dashboard считала часы в зоне браузера, тогда как продукт
+  сравнивает зону точки Asia/Jerusalem: в UTC получалось +113% вместо +50%.
+  Исправлена только фикстура; добавлена проверка UTC/Jerusalem/Los Angeles
+  с фиксированным временем. Приложение для этого отказа не менялось.
+- Kassa CI с миграциями с нуля обнаружил лишние table-grants, которые старые
+  106/144 не отзывали явно. Миграция **167** возвращает intended ACL:
+  authenticated — только SELECT, anon/PUBLIC — без доступа к drawer_opens и
+  location_slugs, service_role — полный доступ. Данные, RLS-политики и RPC
+  не менялись; существовавшая RLS не позволяет назвать одни grants доказанной
+  утечкой данных. Старые два отрицательных теста сохранены, добавлено 10 ACL-тестов.
+- `PASS` локально: ANGLE **745 unit**, **211 browser**, 0 FAIL/CANCELLED/SKIPPED,
+  полный browser около 100 с; Kassa lint, check:schema **167**, **580 тестов /
+  64 файла**, POS build/check:bundle и отдельный Menu build.
+  В отдельной синтетической БД: **80 SQL-файлов / 1461 проверка**, 0 FAIL.
+  Сначала воспроизведён отказ старых ACL, затем тот же набор прошёл после 167.
+  Это локальный прогон; применение всех миграций с нуля дополнительно проверено CI.
+- `PASS` CI функциональных коммитов до main:
+  [ANGLE 34740761138](https://github.com/fairgvard-sketch/angles/actions/runs/34740761138),
+  [Kassa 34740764310](https://github.com/fairgvard-sketch/pos/actions/runs/34740764310).
+  Обе workflow completed/success, включая Kassa database job.
+- `PASS`: повтор SQL-backed billing lab на схеме 167 в новой
+  `angle_billing_lab_release_167_acceptance`. Синтетические владельцы,
+  отказ/оплата/replay/чужой владелец/сумма/Origin/отмена/grace/продление;
+  без pageerror и mobile overflow. HTTP и Chrome закрыты, локальная БД сохранена.
+  Настоящие GoTrue/JWT/PostgREST и SMTP этот стенд по-прежнему не проверяет.
+- До миграций сохранены **roles/schema/data** локально в игнорируемом Git каталоге
+  `kassa/backups/2026-09-13-pre-165-166-HYjZcy`, права каталога 0700, файлов 0600.
+  Data dump включает auth/public/storage; проверены завершение дампа и COPY-блоки
+  auth.users/public.orders без вывода содержимого. FileVault включён.
+  **Restore-test, offsite и PITR не проверены**; наличие дампа не закрывает F5.
+- `PASS` production: project-ref guard подтвердил `qgmnxrgtlpyqglwqmsej`;
+  dry-run показал только **165–167**, без seeds/roles. Guarded `db:push --yes`
+  применил эти три миграции, exit 0. Последующий read-only запрос подтвердил
+  `get_schema_version() = 167`, checkout **disabled**, новые receipt-таблицы пусты,
+  anon SELECT/authenticated INSERT на обеих таблицах запрещены, authenticated
+  SELECT/service_role INSERT разрешены. Контрольные количества orgs/orders/
+  payments/subscriptions/organization_products совпали до/после.
+  Тестовые счета/аккаунты/платежи в production не создавались.
+- Edge Functions не менялись и отдельно не разворачивались. Frontend выпускается
+  существующими Git-интеграциями Vercel; локальный Kassa dist с CI-плейсхолдерами
+  не загружался.
+- `PASS` CI на main тех же функциональных коммитов:
+  [ANGLE 34741197702](https://github.com/fairgvard-sketch/angles/actions/runs/34741197702),
+  [Kassa 34741198564](https://github.com/fairgvard-sketch/pos/actions/runs/34741198564).
+  GitHub Vercel-статусы этих SHA — success для ANGLE, POS и angle-menu.
+  Read-only HTTP-проверка трёх канонических доменов: страницы, перечисленные
+  в HTML JS/CSS/modulepreload возвращают 200 и правильный content-type.
+  Новые entry: кабинет `index-Cv1AIs3r.js`, POS `index-CddUVK6g.js`,
+  Menu `index-BQ0Vcfr2.js`; они отличаются от предрелизных артефактов.
+  POS `jsx-runtime-DGeXAQPT.js` также доступен. Это статический smoke-test,
+  не приёмка клиентских операций или офлайн-обновления установленной кассы.
+- Colima после локальных проверок/дампа возвращена в исходное выключенное
+  состояние; все рабочие и синтетические базы сохранены. Текущий план разделён:
+  здесь A6 → изолированный Auth-контур, Claude F2.1 → отдельно F8.1 после приёмки.
+- Всё ещё **NOT RUN**: живая приёмка A1–A5 через Auth/PostgREST/SMTP,
+  полный A6 с реальными JWT, физический T2/SW/offline/печать и восстановление
+  актуальной резервной копии. Реальный провайдер, цены и налоговая регистрация
+  не приняты. Этот технический выпуск не означает готовность всех функций к продаже.
