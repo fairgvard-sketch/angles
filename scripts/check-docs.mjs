@@ -37,7 +37,8 @@ export function checkDocs({ root, requireKassa = false }) {
     'docs/release-checklist.md', 'docs/documentation-policy.md', 'docs/account-access.md',
     'docs/verification-log.md', 'docs/product-completion-plan.md', 'docs/archive/README.md',
   ].map((file) => join(root, file))
-  const kassaFiles = hasKassa ? ['README.md', 'AGENTS.md', 'docs/README.md', 'docs/billing.md'].map((file) => join(kassa, file)) : []
+  const kassaFiles = hasKassa ? ['README.md', 'AGENTS.md', 'docs/README.md', 'docs/billing.md',
+    'docs/backups.md', 'docs/development.md'].map((file) => join(kassa, file)) : []
   const indexFiles = new Set([
     join(root, 'docs/README.md'), join(root, 'docs/archive/README.md'), join(kassa, 'docs/README.md'),
   ])
