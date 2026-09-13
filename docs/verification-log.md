@@ -529,3 +529,52 @@
   коммит проверяется в чистой извлечённой версии обоих Git-деревьев и CI.
   Перед следующим запуском тестов/миграций в исходных папках разобраться с
   дублями: не выполнять новый db:push по загрязнённому списку миграций.
+
+## 13.09.2026 — F2.1: интеграционная приёмка patch Claude на 168
+
+- A6 финальные документационные main-коммиты **`16717fd` / `2894a19`**
+  опубликованы, CI PASS:
+  [ANGLE 34744274970](https://github.com/fairgvard-sketch/angles/actions/runs/34744274970),
+  [Kassa 34744279529](https://github.com/fairgvard-sketch/pos/actions/runs/34744279529).
+  Production остаётся schema168, checkout disabled.
+- F2.1 Claude получен из `fab0524d-1ec1-4a62-99f9-d60ba4895ffc/scratchpad/f2.1/artifacts`.
+  Исходные SHA-256 manifest/lock совпали с отчётом, apply-check PASS.
+  Применены только package.json, lock и coverage-конфигурация; здесь добавлены
+  `/coverage/` в .gitignore и актуальная инструкция development.
+  Коммит Kassa **`91245d9`**, локальная ветка `codex/f2-1-vitest5`.
+  CLAUDE.md, .claude, видео и untracked-дубли не включены.
+- Lock review: **0 изменений non-dev записей**, resolved URL только npm registry.
+  Vitest/coverage-v8 **5.0.0**; более новая ветка выбрана из-за воспроизведённого
+  Claude npm/arborist сбоя 4.1.11 на Node22.16/npm10.9.2. Матрицу пустых проектов
+  повторно не запускали: прочитаны отчёт и первичные источники
+  [advisory](https://github.com/advisories/GHSA-82fw-gwwq-j7x9),
+  [migration guide](https://vitest.dev/guide/migration/).
+  Требования Node/Vite совместимы; новое default clearMocks описано в справочнике.
+- Независимая копия текущего Git-дерева без .env и дублей:
+  `/private/tmp/kassa-f21-review-SAtcpD`, **Node22.16.0 / npm10.9.2 / schema168**.
+  `PASS` чистый npm ci (648 установленных пакетов), audit all и omit=dev —
+  **0**, package-lock-only npm install без обходов; manifest/lock хеши не изменились.
+  `PASS` lint, check:schema **168**, test:run **64 файла / 580 тестов**, ещё
+  **580 PASS** с coverage. Assertions/jsdom/test setup не менялись.
+- Coverage: **204 файла**, statements25.10%, branches19.01%, functions18.38%,
+  lines26.54%. Пропуск `uniform-format-export/index.ts` с ошибкой parse/import type
+  воспроизведён, exit0 не означает полного отчёта. Не добавляли exclude для
+  скрытия ошибки. Проценты 3.x/5.x напрямую несопоставимы и не доказывают
+  улучшения покрытия; дальнейшая корректная обработка Deno остаётся открытой.
+  Лог `/private/tmp/kassa-f21-acceptance.log`.
+- `PASS` POS build/check:bundle **61.5/129.8 KiB gzip**, отдельный Menu build.
+  Для корректного сравнения создан чистый baseline168 без F2.1:
+  `/private/tmp/kassa-f21-baseline-dtCfjV`; оба варианта собраны с одинаковыми
+  CI-плейсхолдерами, без .env. Совпали все **95 POS и 17 Menu JS/CSS hash names**,
+  **67 файлов Menu совпали побайтно**. Сравнение со старым локальным A6-логом
+  сначала дало разные хеши: тот прогон имел другое окружение и не принят как
+  доказательство изменения bundle. Корректный baseline/после совпали.
+  Логи `/private/tmp/kassa-f21-{pos-build,menu-build,baseline-pos,baseline-menu}.log`.
+- Попытка push новой ветки **отклонена auto-review**: разрешение на main
+  признано недостаточно конкретным для этой ветки/payload публичного GitHub.
+  Отказ не обходился push напрямую в main или сменой адреса. F2.1 **не опубликован**,
+  CI его коммита **NOT RUN**. Для продолжения нужно уточнение разрешения владельца.
+  Предыдущий A6/main/deploy уже выполнен и этим отказом не затронут.
+- SQL не менялся; локальный pgTAP повторно не запускался, Colima остаётся
+  выключенной. T2, Auth/SMTP, restore и coverage Deno entry не объявлены принятыми.
+  После CI F2.1 — отдельное задание Claude F8.1; здесь далее Auth-контур.
