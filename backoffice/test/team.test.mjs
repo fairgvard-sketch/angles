@@ -4,7 +4,7 @@ import { createServer } from 'node:http'
 import { after, before, describe, it } from 'node:test'
 import { fileURLToPath } from 'node:url'
 import { build } from 'esbuild'
-import puppeteer from 'puppeteer'
+import { closeBrowser, closeServer, launchBrowser } from './browser-harness.mjs'
 
 /**
  * Команда в настоящем браузере.
@@ -46,7 +46,11 @@ const SETTINGS = {
 const day = (back) => {
   const d = new Date()
   d.setDate(d.getDate() - back)
-  return d.toISOString().slice(0, 10)
+  // Ключ дня — локальный, как `dateKey` в приложении. `toISOString` брал бы
+  // дату по UTC: восточнее Гринвича после полуночи набор считал бы вчерашнюю
+  // смену позавчерашней и падал бы в зависимости от часа прогона.
+  const p = (n) => String(n).padStart(2, '0')
+  return `${d.getFullYear()}-${p(d.getMonth() + 1)}-${p(d.getDate())}`
 }
 
 const HOURS = {
@@ -134,23 +138,11 @@ function Harness() {
 createRoot(document.getElementById('root')).render(h(Harness))
 `
 
-let browser = null
-let skip = false
-try {
-  /*
-   * `--force-prefers-reduced-motion` — не про доступность, а про
-   * надёжность набора: слои теперь приезжают и уезжают, и клик по кнопке
-   * внутри ещё не доехавшей панели уходит мимо (puppeteer честно
-   * отвечает «node is not clickable»). Здесь проверяется поведение, а
-   * само движение — отдельным набором, где анимация включена обратно.
-   */
-  browser = await puppeteer.launch({
-    headless: true,
-    args: ['--no-sandbox', '--force-prefers-reduced-motion'],
-  })
-} catch (error) {
-  skip = `no browser for puppeteer (${error.message.split('\n')[0]}); run: npx puppeteer browsers install chrome`
-}
+/**
+ * Запуск браузера — общий для всех наборов: `browser-harness.mjs`.
+ * По умолчанию режим обязательный, и отсутствие Chrome роняет прогон.
+ */
+const { browser, skip } = await launchBrowser()
 
 let server
 let origin
@@ -207,8 +199,8 @@ before(async () => {
 })
 
 after(async () => {
-  await browser?.close()
-  server?.close()
+  await closeBrowser(browser)
+  await closeServer(server)
 })
 
 /** Страница с загруженным разделом и чистым журналом вызовов */

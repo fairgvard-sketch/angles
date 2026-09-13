@@ -110,24 +110,32 @@ function Sidebar({
   useEffect(() => {
     if (!open) return undefined
     /*
-     * Фокус переводим через два кадра, а не сразу. Шторка выезжает
-     * трансформом и в закрытом состоянии стоит `visibility: hidden`; в
-     * момент эффекта класс уже проставлен, но стиль ещё не пересчитан, а
-     * `focus()` по скрытому элементу молча ничего не делает — фокус
-     * оставался на бургере, и клавиатурный пользователь открывал меню,
-     * не попадая в него.
+     * Фокус переводим, КОГДА кнопка станет видимой, а не через отмеренное
+     * число кадров. Шторка выезжает трансформом и в закрытом состоянии
+     * стоит `visibility: hidden`; `focus()` по скрытому элементу молча
+     * ничего не делает. Двух кадров хватало не всегда: на занятом
+     * устройстве второй кадр попадает в момент, когда переход `visibility`
+     * ещё на нуле, — и фокус навсегда оставался на бургере, то есть
+     * клавиатурный пользователь открывал меню, не попадая в него.
+     * Поэтому пробуем кадр за кадром, пока фокус действительно не сядет.
      */
-    let second = 0
-    const first = requestAnimationFrame(() => {
-      second = requestAnimationFrame(() => closeRef.current?.focus())
-    })
+    let frame = 0
+    let attempts = 0
+    const focusClose = () => {
+      const button = closeRef.current
+      if (!button) return
+      button.focus()
+      // Предел на случай, если кнопка скрыта не временно, а всегда:
+      // бесконечно дёргать фокус в каждом кадре нельзя.
+      if (document.activeElement !== button && attempts++ < 60) frame = requestAnimationFrame(focusClose)
+    }
+    frame = requestAnimationFrame(focusClose)
     function onKey(event) {
       if (event.key === 'Escape') onClose()
     }
     document.addEventListener('keydown', onKey)
     return () => {
-      cancelAnimationFrame(first)
-      cancelAnimationFrame(second)
+      cancelAnimationFrame(frame)
       document.removeEventListener('keydown', onKey)
     }
   }, [open, onClose, closeRef])

@@ -215,6 +215,8 @@ a { color: inherit; }
 .form-error { margin: -4px 0 0; color: #b42318; font-size: 14px; }
 .auth-footnote { margin: 24px 0 0; color: #666b73; font-size: 14px; }
 .auth-footnote a { color: var(--c-text-strong); font-weight: 750; text-underline-offset: 3px; }
+.auth-actions { display: flex; flex-wrap: wrap; gap: 4px 16px; margin-top: 20px; }
+.auth-actions .text-button { min-height: 44px; padding: 8px 0; text-decoration: underline; text-underline-offset: 3px; }
 
 .app-shell { min-height: 100svh; display: grid; grid-template-columns: 244px minmax(0, 1fr); }
 .sidebar { position: sticky; top: 0; height: 100svh; display: flex; flex-direction: column; border-right: 1px solid var(--c-border-panel); background: var(--c-surface); padding: 22px 16px 16px; }
@@ -932,6 +934,25 @@ a { color: inherit; }
 .save-ok { display: inline-flex; align-items: center; gap: 5px; color: var(--c-success); font-size: 13px; font-weight: 700; }
 .save-ok svg { width: 16px; height: 16px; }
 .primary-button.narrow { width: auto; padding: 0 22px; }
+
+/* Subscription checkout uses the existing form scale; scope mobile wrapping
+   here so financial actions never compress into unreadable buttons. */
+.subscription-panel { margin-top: var(--sp-4); }
+.subscription-panel > p { margin: 0 0 var(--sp-3); }
+.subscription-form { max-width: none; gap: var(--sp-3); }
+.subscription-form select {
+  width: 100%; min-width: 0; min-height: 44px; padding: 0 var(--sp-3);
+  border: 1px solid var(--c-border); border-radius: var(--r-md);
+  background: var(--c-surface); color: var(--c-text); font: inherit;
+}
+.subscription-form select:focus { outline: none; border-color: var(--c-ink); box-shadow: var(--focus-ring); }
+.subscription-panel .sheet-section { margin-top: var(--sp-5); padding-top: var(--sp-4); border-top: 1px solid var(--c-border); gap: var(--sp-3); }
+.subscription-panel .sheet-section p, .subscription-panel .sheet-section h3 { margin: 0; }
+.subscription-panel .form-actions { flex-wrap: wrap; justify-content: flex-start; gap: var(--sp-2); }
+.subscription-panel button { min-height: 44px; }
+@media (max-width: 640px) {
+  .subscription-panel .form-actions > button { width: 100%; white-space: normal; }
+}
 
 /* ── Locations: одна точка, три честные темы ──────────────── */
 .location-settings-picker {

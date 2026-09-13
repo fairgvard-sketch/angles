@@ -1,61 +1,67 @@
-# ANGLE website
+# ANGLE — сайт и кабинет владельца
 
-The editable source is `ANGLE Landing Page.dc.html`. The public site is generated into `dist/` so editor-only runtime code is not shipped to production.
+Этот репозиторий содержит публичный сайт, демо и кабинет `/account/`.
+Связанный репозиторий `../kassa` содержит POS, гостевые страницы Menu / Orders /
+Reserve, общую базу Supabase, Edge Functions и Android-приложение.
 
-## Build locally
+**Начать с [документации системы](docs/README.md).**
+
+- [Что где находится и как связано](docs/system-overview.md)
+- [Запуск и разработка](docs/development.md)
+- [Общий порядок выпуска](docs/release-checklist.md)
+- [План завершения продукта](docs/product-completion-plan.md)
+
+Сейчас доводим существующие функции для использования заведениями. Вход,
+регистрация аккаунтов и восстановление доступа входят в план. Регистрация ПО
+в налоговой и подключение платёжных провайдеров отложены.
+
+## Быстрый запуск
+
+Рекомендуемая общая среда двух репозиториев — Node.js 22 и npm. В корневом
+локальном `.env` задайте публичные параметры **тестового** Supabase-проекта:
+
+```env
+VITE_SUPABASE_URL=https://<test-project-ref>.supabase.co
+VITE_SUPABASE_ANON_KEY=<public-anon-key>
+```
 
 ```bash
-npm install
+npm ci
 npm run build
 python3 -m http.server 8001 --directory dist
 ```
 
-Open `http://127.0.0.1:8001/`.
+Откройте `http://127.0.0.1:8001/` или `http://127.0.0.1:8001/account/`.
+Подробности, отдельный dev-сервер кабинета и гостевые ссылки — в
+[инструкции разработки](docs/development.md).
 
-## Owner back office
+Редактируемый исходник сайта — `ANGLE Landing Page.dc.html`, не `dist/index.html`.
+Сборка удаляет editor-only runtime и создаёт `dist/`, затем собирает кабинет
+в `dist/account/`. `dist/` не редактировать вручную.
 
-The authenticated owner workspace is built into `dist/account/`. It is a
-separate management interface from the POS, but uses the same Supabase project
-and organisation data.
-
-Create a local `.env` or configure these variables in Vercel:
+## Проверки и выпуск
 
 ```bash
-VITE_SUPABASE_URL=https://your-project.supabase.co
-VITE_SUPABASE_ANON_KEY=your-public-anon-key
+npm test
+npm run build
+npm run check:docs
 ```
 
-Before publishing `/account/`, deploy Kassa migrations
-`088_backoffice_memberships.sql` and `089_sales_report_backoffice.sql`.
-The capability-driven navigation and product cards additionally require
-migrations through `105` (product registry, secure provisioning and
-capability gates; see `docs/standalone-products.md` in the Kassa repo).
-The release order is:
+Браузер обязателен по умолчанию: недоступный Chrome завершает `npm test`
+ошибкой. Явный локальный `npm run test:no-browser` разрешает пропуск, если
+браузер не запускается; такой результат не подходит для приёмки выпуска.
+Тесты работают на заглушках и не заменяют проверку реального Auth, БД и писем.
 
-1. Supabase migrations through `105`.
-2. Kassa frontend built against the same schema version.
-3. ANGLE website and owner back office.
+Настройки Vercel заданы в [vercel.json](vercel.json): `npm run build`, выход
+`dist`. `/account/` использует тот же backend, что и Kassa. Порядок выпуска:
+совместимые миграции → Edge Functions → затронутые frontend → smoke-test.
+Не останавливайтесь на миграции 105 из старых планов: версия выпуска берётся
+из [схемы Kassa](../kassa/src/lib/schemaVersion.ts) и её миграций. Полный
+порядок и проверки среды — в [release checklist](docs/release-checklist.md).
 
-Products are activated manually by the operator (`grant_org_product` under
-service_role); the back office only files activation requests. An
-organisation without active products lands on the Pending activation
-screen instead of the operational sections.
-
-The Settings screen writes via `patch_location_settings_web` (migration `091`):
-the owner picks a location explicitly and membership stands in for the POS PIN.
-
-The Overview screen reads `sales_report`. Migration `089` lets an owner or
-manager membership stand in for the POS PIN session; without it the screen
-fails with `staff session required` for web users.
-
-## Deploy on Vercel
-
-1. Push this repository to GitHub.
-2. Import `fairgvard-sketch/angles` in Vercel.
-3. Keep the detected build command `npm run build` and output directory `dist`.
-4. Add the public domain under **Project Settings -> Domains**.
-5. Copy the exact A and CNAME records shown by Vercel into Wix DNS.
-
-The owner workspace is currently available at `/account/`. It can later move
-to `app.<domain>` without changing the shared Supabase identity or organisation
-membership model.
+Клиент не выдаёт себе права: активация подписки происходит только после
+серверного подтверждения оплаты. Первая реализация checkout и локальный
+стенд фейковой оплаты подготовлены в схеме 166, но ещё не выпущены;
+провайдер не подключён, покупки по умолчанию выключены. Ручная выдача доступа
+остаётся операторским исключением. Ни `service_role`, ни другие секреты
+не должны попадать во frontend или документацию.

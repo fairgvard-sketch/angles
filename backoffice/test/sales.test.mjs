@@ -4,7 +4,7 @@ import { createServer } from 'node:http'
 import { after, before, describe, it } from 'node:test'
 import { fileURLToPath } from 'node:url'
 import { build } from 'esbuild'
-import puppeteer from 'puppeteer'
+import { closeBrowser, closeServer, launchBrowser } from './browser-harness.mjs'
 
 /**
  * Отчёт «Продажи» в настоящем браузере.
@@ -110,23 +110,11 @@ const context = {
 createRoot(document.getElementById('root')).render(h(SalesOverview, { context }))
 `
 
-let browser = null
-let skip = false
-try {
-  /*
-   * `--force-prefers-reduced-motion` — не про доступность, а про
-   * надёжность набора: слои теперь приезжают и уезжают, и клик по кнопке
-   * внутри ещё не доехавшей панели уходит мимо (puppeteer честно
-   * отвечает «node is not clickable»). Здесь проверяется поведение, а
-   * само движение — отдельным набором, где анимация включена обратно.
-   */
-  browser = await puppeteer.launch({
-    headless: true,
-    args: ['--no-sandbox', '--force-prefers-reduced-motion'],
-  })
-} catch (error) {
-  skip = `no browser for puppeteer (${error.message.split('\n')[0]}); run: npx puppeteer browsers install chrome`
-}
+/**
+ * Запуск браузера — общий для всех наборов: `browser-harness.mjs`.
+ * По умолчанию режим обязательный, и отсутствие Chrome роняет прогон.
+ */
+const { browser, skip } = await launchBrowser()
 
 let server
 let origin
@@ -177,8 +165,8 @@ before(async () => {
 })
 
 after(async () => {
-  await browser?.close()
-  server?.close()
+  await closeBrowser(browser)
+  await closeServer(server)
 })
 
 async function open(query = '', width = 1280) {

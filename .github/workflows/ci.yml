@@ -1,0 +1,74 @@
+# CI кабинета и сайта: unit-тесты, ОБЯЗАТЕЛЬНЫЕ браузерные наборы и сборка
+# на push в main/codex/** и PR. Этот workflow не делает деплой;
+# Git-интеграция Vercel настраивается отдельно (docs/release-checklist.md).
+#
+# Главное отличие от прежнего локального прогона: `ANGLE_BROWSER=required`.
+# Раньше наборы `backoffice/test/*.test.mjs` ловили ошибку запуска Chrome и
+# пропускали себя, а команда возвращала 0 — «зелёный» результат означал лишь
+# отсутствие браузера. Теперь недоступный Chrome останавливает проверку.
+name: CI
+
+on:
+  push:
+    branches: [main, 'codex/**']
+  pull_request:
+
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  angle:
+    runs-on: ubuntu-latest
+    # Верхняя граница всего job: зависший браузер не должен держать раннер.
+    timeout-minutes: 25
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          cache: npm
+
+      - name: Install
+        run: npm ci
+
+      # Puppeteer тянет браузер и сам, но шаг явный: так в логе видно, какая
+      # версия Chrome поставлена, и отказ загрузки не выглядит падением тестов.
+      - name: Install Chrome for Puppeteer
+        timeout-minutes: 10
+        run: npx puppeteer browsers install chrome
+
+      - name: Unit tests
+        timeout-minutes: 10
+        run: npm run test:unit
+
+      # Тесты поднимают локальный HTTP-сервер и работают с заглушками данных:
+      # ни ключей, ни Supabase, ни живых заказов здесь нет.
+      - name: Browser tests
+        timeout-minutes: 15
+        env:
+          # Пропуск набора из-за отсутствия браузера в CI запрещён.
+          ANGLE_BROWSER: required
+        run: |
+          set -o pipefail
+          if ! npm run test:browser 2>&1 | tee browser-test.log; then
+            msg=$(tail -c 3000 browser-test.log); msg="${msg//$'\n'/%0A}"
+            echo "::error title=browser tests failed::${msg}"
+            exit 1
+          fi
+
+      - name: Build
+        timeout-minutes: 10
+        env:
+          # Плейсхолдеры: сборке нужны только переменные Vite, обращения к
+          # Supabase на этом шаге нет. Реальные ключи в CI не используются.
+          VITE_SUPABASE_URL: https://placeholder.supabase.co
+          VITE_SUPABASE_ANON_KEY: placeholder-anon-key
+        run: npm run build
+
+      # Проверка навигации документации: ссылки рабочих документов и полнота
+      # индекса. Соседней Kassa в этом checkout нет, внешние ссылки пропускаются.
+      - name: Docs index
+        timeout-minutes: 5
+        run: npm run check:docs

@@ -1,4 +1,4 @@
-import { Suspense, lazy, useCallback, useEffect, useMemo, useRef, useState } from 'react'
+import { Suspense, lazy, useCallback, useEffect, useMemo, useRef, useState, useSyncExternalStore } from 'react'
 import {
   Activity,
   BarChart3,
@@ -18,7 +18,9 @@ import {
   Users,
   X,
 } from 'lucide-react'
-import { isSupabaseConfigured, supabase } from './supabase'
+import { accountSession, isSupabaseConfigured, supabase } from './supabase'
+import { AccountFrame, AccountProblem, AuthEntry, PasswordRecovery } from './AccountAuth'
+import { createWorkspaceSetup } from './workspace-setup'
 import {
   NAV_ITEMS, groupedNavigation, hasCapability, isLocationScoped,
 } from './navigation'
@@ -151,91 +153,11 @@ const NAV_ICONS = {
   integrations: CreditCard,
 }
 
-function SignIn() {
-  // mode: signin | signup. Регистрация — вход в digital-only онбординг (100):
-  // владелец без POS создаёт аккаунт сам, дальше Onboarding спрашивает цель.
-  const [mode, setMode] = useState('signin')
-  const [email, setEmail] = useState('')
-  const [password, setPassword] = useState('')
-  const [busy, setBusy] = useState(false)
-  const [error, setError] = useState('')
-  const [notice, setNotice] = useState('')
-
-  async function submit(event) {
-    event.preventDefault()
-    setBusy(true)
-    setError('')
-    setNotice('')
-    if (mode === 'signin') {
-      const { error: signInError } = await supabase.auth.signInWithPassword({ email, password })
-      if (signInError) setError(signInError.message)
-    } else {
-      const { data, error: signUpError } = await supabase.auth.signUp({ email, password })
-      if (signUpError) {
-        setError(signUpError.message)
-      } else if (!data.session) {
-        // Подтверждение почты включено: сессии ещё нет, онбординг — после клика в письме.
-        setNotice('Check your inbox and confirm the email, then sign in to continue.')
-        setMode('signin')
-      }
-      // Если сессия есть — onAuthStateChange поднимет App, дальше Onboarding.
-    }
-    setBusy(false)
-  }
-
-  const isSignup = mode === 'signup'
-  return (
-    <div className="auth-shell">
-      <header className="auth-header"><Brand /></header>
-      <main className="auth-main">
-        <section className="auth-panel" aria-labelledby="sign-in-title">
-          <p className="eyebrow">BACK OFFICE</p>
-          <h1 id="sign-in-title">{isSignup ? 'Create account' : 'Sign in'}</h1>
-          <p className="auth-intro">
-            {isSignup
-              ? 'Publish a menu, take orders and reservations — no terminal required.'
-              : 'Manage your locations, team and online channels.'}
-          </p>
-          <form onSubmit={submit} className="auth-form">
-            <label>
-              <span>Email</span>
-              <input type="email" autoComplete="email" value={email} onChange={(event) => setEmail(event.target.value)} required />
-            </label>
-            <label>
-              <span>Password</span>
-              <input
-                type="password"
-                autoComplete={isSignup ? 'new-password' : 'current-password'}
-                value={password}
-                onChange={(event) => setPassword(event.target.value)}
-                required
-                minLength={6}
-              />
-            </label>
-            {error && <p className="form-error" role="alert">{error}</p>}
-            {notice && <p className="form-hint" role="status">{notice}</p>}
-            <button className="primary-button" type="submit" disabled={busy}>
-              {busy ? (isSignup ? 'Creating…' : 'Signing in…') : 'Continue'}
-            </button>
-          </form>
-          <p className="auth-footnote">
-            {isSignup ? (
-              <>Already with ANGLE? <a href="#signin" onClick={(e) => { e.preventDefault(); setMode('signin'); setError('') }}>Sign in</a></>
-            ) : (
-              <>New to ANGLE? <a href="#signup" onClick={(e) => { e.preventDefault(); setMode('signup'); setError('') }}>Create an account</a></>
-            )}
-          </p>
-        </section>
-      </main>
-    </div>
-  )
-}
-
 // ── Digital-only онбординг (100) ─────────────────────────────
 /**
  * Аккаунт без организации: спрашиваем ЦЕЛЬ клиента, не настройку терминала
  * (продуктовое требование standalone-модулей). Выбранные цели уходят в
- * bootstrap_digital_org: RPC создаёт org+точку+членство и пишет org_id в
+ * create_digital_workspace: RPC создаёт org+точку+членство и пишет org_id в
  * app_metadata; 'pos' сервер отбрасывает — POS подключается на терминале.
  */
 const ONBOARDING_GOALS = [
@@ -244,14 +166,21 @@ const ONBOARDING_GOALS = [
   { id: 'reservations', title: 'Take reservations', detail: 'Table booking requests from your guests.' },
 ]
 
-function Onboarding({ email }) {
-  const [selected, setSelected] = useState(new Set(['menu']))
-  const [orgName, setOrgName] = useState('')
-  const [locationName, setLocationName] = useState('')
-  const [busy, setBusy] = useState(false)
-  const [error, setError] = useState('')
+function Onboarding({ session, onSignOut }) {
+  const setup = useMemo(() => {
+    let storage
+    try { storage = window.sessionStorage } catch { /* optional */ }
+    return createWorkspaceSetup(supabase, { userId: session.user.id,
+      getSession: () => accountSession.getSnapshot().session, storage })
+  }, [session.user.id])
+  const { busy, locked, error, phase } = useSyncExternalStore(setup.subscribe, setup.getSnapshot, setup.getSnapshot)
+  const [selected, setSelected] = useState(() => new Set(setup.getDraft()?.p_products || ['menu']))
+  const [orgName, setOrgName] = useState(() => setup.getDraft()?.p_org_name || '')
+  const [locationName, setLocationName] = useState(() => setup.getDraft()?.p_location_name || '')
+  useEffect(() => { setup.start(); return () => setup.stop() }, [setup])
 
   function toggleGoal(id) {
+    if (busy || locked) return
     setSelected((prev) => {
       const next = new Set(prev)
       if (next.has(id)) {
@@ -263,25 +192,9 @@ function Onboarding({ email }) {
     })
   }
 
-  async function submit(event) {
+  function submit(event) {
     event.preventDefault()
-    setBusy(true)
-    setError('')
-    const { error: rpcError } = await supabase.rpc('bootstrap_digital_org', {
-      p_org_name: orgName.trim(),
-      p_location_name: locationName.trim() || orgName.trim(),
-      p_products: Array.from(selected),
-    })
-    if (rpcError) {
-      setError(rpcError.message)
-      setBusy(false)
-      return
-    }
-    // org_id уже в app_metadata на сервере — обновляем JWT; TOKEN_REFRESHED
-    // в App перезагрузит контекст и откроет кабинет.
-    const { error: refreshError } = await supabase.auth.refreshSession()
-    if (refreshError) setError(refreshError.message)
-    setBusy(false)
+    void setup.submit({ orgName, locationName, products: Array.from(selected) })
   }
 
   return (
@@ -291,8 +204,8 @@ function Onboarding({ email }) {
         <section className="auth-panel" aria-labelledby="onboarding-title">
           <p className="eyebrow">WELCOME</p>
           <h1 id="onboarding-title">What do you want to do?</h1>
-          <p className="auth-intro">Pick everything that applies — you can add more later.</p>
-          <form onSubmit={submit} className="auth-form">
+          <p className="auth-intro">Pick everything that applies — you can add more later. Creating a workspace does not start a paid subscription or activate these products.</p>
+          <form onSubmit={submit} className="auth-form" aria-busy={busy}>
             <div className="goal-grid">
               {ONBOARDING_GOALS.map((goal) => {
                 const isSelected = selected.has(goal.id)
@@ -302,6 +215,7 @@ function Onboarding({ email }) {
                     key={goal.id}
                     className={`goal-card ${isSelected ? 'is-selected' : ''}`}
                     aria-pressed={isSelected}
+                    disabled={busy || locked}
                     onClick={() => toggleGoal(goal.id)}
                   >
                     <span className="goal-check" aria-hidden>{isSelected && <Check />}</span>
@@ -322,7 +236,7 @@ function Onboarding({ email }) {
             </div>
             <label>
               <span>Business name</span>
-              <input value={orgName} onChange={(event) => setOrgName(event.target.value)} required maxLength={120} />
+              <input value={orgName} onChange={(event) => setOrgName(event.target.value)} required maxLength={120} disabled={busy || locked} />
             </label>
             <label>
               <span>Location name</span>
@@ -331,14 +245,15 @@ function Onboarding({ email }) {
                 onChange={(event) => setLocationName(event.target.value)}
                 placeholder={orgName.trim() || 'Same as business name'}
                 maxLength={120}
+                disabled={busy || locked}
               />
             </label>
             {error && <p className="form-error" role="alert">{error}</p>}
-            <button className="primary-button" type="submit" disabled={busy || !orgName.trim()}>
-              {busy ? 'Setting up…' : 'Create workspace'}
+            <button className="primary-button" type="submit" disabled={busy || phase === 'complete' || !orgName.trim()}>
+              {busy ? (phase === 'refreshing' ? 'Opening workspace…' : 'Checking setup…') : locked ? 'Check and continue' : 'Create workspace'}
             </button>
           </form>
-          <p className="auth-footnote">Signed in as {email} · <a href="#signout" onClick={(e) => { e.preventDefault(); supabase.auth.signOut() }}>Sign out</a></p>
+          <p className="auth-footnote">Signed in as {session.user.email} · <a href="#signout" onClick={(e) => { e.preventDefault(); onSignOut() }}>Sign out</a></p>
         </section>
       </main>
     </div>
@@ -487,8 +402,8 @@ function HelpPanel({ context, email, onNavigate, onClose }) {
 
 /**
  * Стабильный экран «Choose a product / Pending activation» (104):
- * организация без активного продукта — валидное состояние (заявка ждёт
- * оператора), а не сломанный кабинет. Операционные разделы не рендерим.
+ * организация без активного продукта — валидное состояние, а не сломанный
+ * кабинет. Выбор продукта не доказывает оплату; рабочие разделы не рендерим.
  */
 function ActivationHome({ context, onReloadContext }) {
   const requests = Array.isArray(context?.product_requests) ? context.product_requests : []
@@ -502,7 +417,7 @@ function ActivationHome({ context, onReloadContext }) {
         <h1>{context.organization?.name || 'ANGLE business'}</h1>
         <p>
           {requests.length > 0
-            ? 'Your workspace is ready. The ANGLE team is activating your products — this usually takes less than a business day.'
+            ? 'Your workspace is ready and your product choices are saved. Product access requires a subscription activated after confirmed payment.'
             : 'Your workspace is ready. Choose a product to get started.'}
         </p>
       </section>
@@ -601,7 +516,7 @@ function storeLocation(id) {
   }
 }
 
-function Dashboard({ session, context, onReloadContext }) {
+function Dashboard({ session, context, onReloadContext, onSignOut: signOut }) {
   const [help, setHelp] = useState(false)
   // Организация без активного продукта (104): стабильный экран выбора/
   // ожидания активации вместо пустых операционных разделов.
@@ -759,10 +674,6 @@ function Dashboard({ session, context, onReloadContext }) {
 
   useEffect(() => { if (locationId) storeLocation(locationId) }, [locationId])
 
-  async function signOut() {
-    await supabase.auth.signOut()
-  }
-
   // Вкладка живёт в адресе у КАЖДОГО раздела с вкладками: перезагрузка и
   // ссылка в поддержку должны открывать тот же экран, а не первый таб.
   const scopedProps = { locationId, onLocationChange: changeLocation }
@@ -918,74 +829,27 @@ function Loading() {
   return <main className="loading-state"><Brand /><span className="spinner" aria-label="Loading" /></main>
 }
 
-function AccessDenied({ message }) {
-  return (
-    <main className="center-state">
-      <Brand />
-      <h1>Back office access is not enabled</h1>
-      <p>{message || 'This account is not linked to an ANGLE organisation.'}</p>
-      <button className="primary-button narrow" onClick={() => supabase.auth.signOut()}>Sign out</button>
-    </main>
-  )
-}
+const UNCONFIGURED = { status: 'unconfigured' }
+const noSubscription = () => () => {}
+const unconfiguredSnapshot = () => UNCONFIGURED
 
 export default function App() {
-  const [session, setSession] = useState(null)
-  const [context, setContext] = useState(null)
-  const [loading, setLoading] = useState(true)
-  const [contextError, setContextError] = useState('')
-
-  async function loadContext(currentSession) {
-    if (!currentSession) {
-      setContext(null)
-      setLoading(false)
-      return
-    }
-    // Аккаунт без организации (свежая регистрация): RPC упадёт с
-    // 'not authenticated' — вместо запроса показываем онбординг (100).
-    if (!currentSession.user?.app_metadata?.org_id) {
-      setContext(null)
-      setContextError('')
-      setLoading(false)
-      return
-    }
-    setLoading(true)
-    setContextError('')
-    const { data, error } = await supabase.rpc('get_backoffice_context')
-    if (error) {
-      setContextError(error.message)
-      setContext(null)
-    } else {
-      setContext(data)
-    }
-    setLoading(false)
-  }
-
-  useEffect(() => {
-    if (!isSupabaseConfigured) {
-      setLoading(false)
-      return undefined
-    }
-    supabase.auth.getSession().then(({ data }) => {
-      setSession(data.session)
-      loadContext(data.session)
-    })
-    const { data: subscription } = supabase.auth.onAuthStateChange((_event, nextSession) => {
-      setSession(nextSession)
-      queueMicrotask(() => loadContext(nextSession))
-    })
-    return () => subscription.subscription.unsubscribe()
-  }, [])
-
-  const content = useMemo(() => {
-    if (!isSupabaseConfigured) return <ConfigurationMissing />
-    if (loading) return <Loading />
-    if (!session) return <SignIn />
-    // Без организации в JWT — digital-only онбординг (100), не AccessDenied.
-    if (!session.user?.app_metadata?.org_id) return <Onboarding email={session.user.email} />
-    if (!context) return <AccessDenied message={contextError} />
-    return <Dashboard session={session} context={context} onReloadContext={() => loadContext(session)} />
-  }, [session, context, loading, contextError])
-
-  return content
+  const state = useSyncExternalStore(accountSession?.subscribe || noSubscription,
+    accountSession?.getSnapshot || unconfiguredSnapshot, unconfiguredSnapshot)
+  if (!isSupabaseConfigured) return <ConfigurationMissing />
+  if (state.status === 'loading' || state.status === 'recovery-loading') return <Loading />
+  if (state.status === 'anonymous') return <AuthEntry client={supabase} />
+  if (state.status.endsWith('-error')) return <AccountProblem state={state} controller={accountSession} client={supabase} />
+  if (state.status === 'recovery') return <PasswordRecovery key={state.session.user.id} session={state.session} controller={accountSession} />
+  if (state.status === 'password-updated') return (
+    <AccountFrame title="Password updated" intro="Your new password has been saved.">
+      <div className="auth-form">
+        <button className="primary-button" onClick={() => accountSession.continueAfterRecovery()}>Continue to workspace</button>
+        <button className="text-button" onClick={() => accountSession.signOut()}>Sign out</button>
+      </div>
+    </AccountFrame>
+  )
+  if (state.status === 'onboarding') return <Onboarding key={state.session.user.id} session={state.session} onSignOut={accountSession.signOut} />
+  return <Dashboard key={state.session.user.id} session={state.session} context={state.context}
+    onReloadContext={accountSession.reloadContext} onSignOut={accountSession.signOut} />
 }

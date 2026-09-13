@@ -5,7 +5,11 @@
   "type": "module",
   "scripts": {
     "build": "node scripts/build-site.mjs && vite build --config backoffice/vite.config.js",
-    "test": "node --import ./backoffice/test/register.mjs --test backoffice/src/*.test.js backoffice/src/ui/*.test.js backoffice/test/*.test.mjs"
+    "test": "npm run test:unit && npm run test:browser",
+    "test:unit": "node --import ./backoffice/test/register.mjs --test --test-timeout=60000 backoffice/src/*.test.js backoffice/src/ui/*.test.js",
+    "test:browser": "node --import ./backoffice/test/register.mjs --test --test-timeout=120000 backoffice/test/*.test.mjs",
+    "test:no-browser": "ANGLE_BROWSER=optional npm test",
+    "check:docs": "node --test scripts/check-docs.test.mjs && node scripts/check-docs.mjs"
   },
   "dependencies": {
     "@supabase/supabase-js": "^2.57.4",

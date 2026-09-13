@@ -3,7 +3,7 @@ import { readFileSync } from 'node:fs'
 import { createServer } from 'node:http'
 import { after, before, describe, it } from 'node:test'
 import { build } from 'esbuild'
-import puppeteer from 'puppeteer'
+import { closeBrowser, closeServer, launchBrowser } from './browser-harness.mjs'
 
 /**
  * Проверки, которых не бывает без настоящего браузера.
@@ -53,26 +53,10 @@ const GUEST_PAGE = `<!doctype html><html><head><meta charset="utf-8">
 </script></body></html>`
 
 /**
- * Без установленного Chrome набор пропускается с внятной причиной, а не
- * красит прогон в красный на машине, где браузера просто нет.
+ * Запуск браузера — общий для всех наборов: `browser-harness.mjs`.
+ * По умолчанию режим обязательный, и отсутствие Chrome роняет прогон.
  */
-let browser = null
-let skip = false
-try {
-  /*
-   * `--force-prefers-reduced-motion` — не про доступность, а про
-   * надёжность набора: слои теперь приезжают и уезжают, и клик по кнопке
-   * внутри ещё не доехавшей панели уходит мимо (puppeteer честно
-   * отвечает «node is not clickable»). Здесь проверяется поведение, а
-   * само движение — отдельным набором, где анимация включена обратно.
-   */
-  browser = await puppeteer.launch({
-    headless: true,
-    args: ['--no-sandbox', '--force-prefers-reduced-motion'],
-  })
-} catch (error) {
-  skip = `no browser for puppeteer (${error.message.split('\n')[0]}); run: npx puppeteer browsers install chrome`
-}
+const { browser, skip } = await launchBrowser()
 
 let appServer
 let guestServer
@@ -922,9 +906,9 @@ before(async () => {
 })
 
 after(async () => {
-  await browser?.close()
-  appServer?.close()
-  guestServer?.close()
+  await closeBrowser(browser)
+  await closeServer(appServer)
+  await closeServer(guestServer)
 })
 
 
@@ -1456,18 +1440,65 @@ describe('mobile navigation drawer', { skip }, () => {
    * пункты достижимы, край подсказывает прокрутку, а фокус ведёт себя
    * как у любого оверлея.
    */
+  /**
+   * Что именно не сложилось: открыта ли шторка, где фокус, идут ли кадры,
+   * жива ли страница и не упал ли скрипт. Без этого ожидание падало
+   * молча — «истекло 30 секунд» и ни одного факта о причине.
+   */
+  const drawerState = (page) => page.evaluate(() => new Promise((resolve) => {
+    const sidebar = document.querySelector('.sidebar')
+    const active = document.activeElement
+    const done = (frames) => resolve({
+      url: location.pathname,
+      readyState: document.readyState,
+      open: !!sidebar?.classList.contains('is-open'),
+      sidebarVisibility: sidebar ? getComputedStyle(sidebar).visibility : 'нет .sidebar',
+      burgerExpanded: document.querySelector('.mobile-menu')?.getAttribute('aria-expanded'),
+      closeButton: !!document.querySelector('.sidebar-close'),
+      activeElement: active
+        ? `${active.tagName}.${active.className || '—'} [${active.getAttribute('aria-label') || '—'}]`
+        : 'нет',
+      pageVisibility: document.visibilityState,
+      documentHasFocus: document.hasFocus(),
+      frames,
+    })
+    // Фокус в шторку переводится через два requestAnimationFrame: в скрытой
+    // вкладке кадров нет вообще, и фокус не переедет никогда.
+    const timer = setTimeout(() => done('кадров нет за 1000 мс'), 1000)
+    requestAnimationFrame(() => requestAnimationFrame(() => {
+      clearTimeout(timer)
+      done('идут')
+    }))
+  }))
+
   const openDrawer = async () => {
     const page = await browser.newPage()
+    const pageErrors = []
+    page.on('pageerror', (error) => pageErrors.push(`pageerror: ${error.message}`))
+    page.on('console', (message) => {
+      if (message.type() === 'error') pageErrors.push(`console: ${message.text()}`)
+    })
     await page.setViewport({ width: 390, height: 844 })
     await page.goto(`${appOrigin}/shell`, { waitUntil: 'networkidle0' })
     await page.click('.mobile-menu')
     // Ждём открытое состояние, а не отмеренную паузу: под нагрузкой
     // фиксированные 400 мс истекали раньше, чем шторка успевала открыться
     // и забрать фокус, и проверка падала на ровном месте
-    await page.waitForFunction(() => (
-      document.querySelector('.sidebar')?.classList.contains('is-open')
-      && document.activeElement?.getAttribute('aria-label') === 'Close navigation'
-    ))
+    try {
+      await page.waitForFunction(() => (
+        document.querySelector('.sidebar')?.classList.contains('is-open')
+        && document.activeElement?.getAttribute('aria-label') === 'Close navigation'
+      ))
+    } catch (error) {
+      const state = await drawerState(page).catch((e) => ({ диагностика: e.message }))
+      // Страницу закрываем сами: упавший тест не должен оставлять вкладку —
+      // она перетягивает на себя видимость и роняет следующие сценарии.
+      await page.close().catch(() => {})
+      throw new Error(
+        `шторка не открылась или не забрала фокус: ${JSON.stringify({ ...state, pageErrors })}`,
+        { cause: error },
+      )
+    }
     return page
   }
 

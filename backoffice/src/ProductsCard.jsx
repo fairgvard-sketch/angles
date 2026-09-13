@@ -1,12 +1,14 @@
 import { useState } from 'react'
 import { supabase } from './supabase'
 import { PRODUCT_META, productState } from './navigation'
+import SubscriptionPanel from './SubscriptionPanel'
 
 /**
  * Карточка продуктов (100/104/105): жизненный цикл каждой карточки —
  * Active / Developer / Included with ANGLE Orders / Pending activation /
- * Available as add-on. Биллинга нет: «запросить» создаёт заявку
- * (request_product_activation), активирует оператор ANGLE. Карточка —
+ * Available as add-on. Старое «запросить» сохраняет интерес к продукту
+ * (request_product_activation), но не подтверждает оплату. Владелец открывает
+ * SubscriptionPanel для покупки/продления; ручные grants — исключения. Карточка —
  * маркетинг/UX-состояние; настоящие запреты живут на сервере
  * (module_disabled).
  *
@@ -61,8 +63,10 @@ function ProductRow({ context, product, onReloadContext }) {
 }
 
 export default function ProductsCard({ context, onReloadContext, heading = true }) {
+  const [billingOpen, setBillingOpen] = useState(false)
   if (!Array.isArray(context?.products)) return null
   return (
+    <>
     <section className="panel form-panel">
       {heading && (
         <div className="panel-heading">
@@ -74,6 +78,11 @@ export default function ProductsCard({ context, onReloadContext, heading = true 
           <ProductRow key={product.id} context={context} product={product} onReloadContext={onReloadContext} />
         ))}
       </div>
+      {(context.member?.role || context.role) === 'owner' && <button className="secondary-button" onClick={() => setBillingOpen(open => !open)}>
+        {billingOpen ? 'Hide subscriptions' : 'Manage subscriptions'}
+      </button>}
     </section>
+    {billingOpen && <SubscriptionPanel key={context.organization.id} context={context} onReloadContext={onReloadContext} />}
+    </>
   )
 }
