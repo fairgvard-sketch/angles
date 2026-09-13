@@ -465,3 +465,67 @@
   Auth/SMTP, физический T2 и restore-test актуальной копии — **NOT RUN**.
 - На момент локальной приёмки production остаётся на 167; применение 168,
   push/main и деплой этим прогоном не подтверждаются. CI и итог выпуска — ниже.
+
+### Выпуск A6/168 — 13.09.2026
+
+- Функциональные коммиты: ANGLE **`ffc8f6b`**, Kassa **`b1f0a9e`**.
+  `PASS` CI рабочих веток:
+  [ANGLE 34743251412](https://github.com/fairgvard-sketch/angles/actions/runs/34743251412),
+  [Kassa 34743431535](https://github.com/fairgvard-sketch/pos/actions/runs/34743431535).
+  Kassa заново применила миграции с нуля и выполнила pgTAP, дополнив локальную
+  проверку от schema-only baseline. У обоих checkout CI только закоммиченные файлы.
+- Отправку рабочих веток первоначально остановил автоматический reviewer.
+  До повторной оценки выполнена read-only сверка: это существующие публичные
+  `fairgvard-sketch/angles` и `fairgvard-sketch/pos`, те же origin/main ранее
+  разрешённого выпуска. Повторные отправки разрешены и выполнены; запрет не
+  обходился сменой адреса или преждевременным push в main.
+- Production preflight: guard подтвердил `qgmnxrgtlpyqglwqmsej`, схема 167,
+  checkout disabled. Во всех восьми проверенных типах связей каталога нет
+  cross-tenant references; действующих digital-аккаунтов без membership и
+  устройств без catalog capability не обнаружено. Читались агрегаты, не PII.
+  Первый диагностический SELECT ошибочно называл `orgs` как `organizations`;
+  он завершился ошибкой без изменений, исправленный preflight прошёл.
+- Свежий backup схемы 167: `kassa/backups/2026-09-13-pre-168-WDIHXj`.
+  roles **297 B**, schema **942485 B**, data **536557 B**; auth/public/storage,
+  COPY auth.users/orders и footer проверены. Каталог 0700, файлы 0600,
+  FileVault On, Git-ignored. CLI автоматически повторила подключение через
+  IPv4 pooler после недоступного IPv6; все три дампа завершились exit 0.
+  Предупреждение о циклическом FK guests сохранено как условие restore-runbook,
+  не как доказательство успешного восстановления. Restore/offsite/PITR **NOT RUN**.
+- `PASS` guarded dry-run: только **168**, без seeds/roles. Затем разрешённый
+  `npm run db:push -- --yes` применил 168, exit 0. Postcheck: schema **168**,
+  checkout **disabled**, 36 catalogue policies, 8 operational read policies,
+  3 image policies, 6 tenant triggers и 6 helpers с явным `public, pg_temp`.
+  Ungated save/bulk bodies недоступны authenticated; save body также закрыто
+  для service_role, публичная обёртка authenticated доступна, anon запрещена.
+  Контрольные количества orgs/orders/payments/subscriptions/product grants/
+  checkout requests и preflight-агрегаты совпали до/после. Тестовых аккаунтов,
+  платежей и других клиентских операций в production не создавали.
+- После schema postcheck выполнен fast-forward и push **main обоих репозиториев**.
+  `PASS` CI тех же функциональных SHA на main:
+  [ANGLE 34743758772](https://github.com/fairgvard-sketch/angles/actions/runs/34743758772),
+  [Kassa 34743773369](https://github.com/fairgvard-sketch/pos/actions/runs/34743773369).
+  Vercel success для ANGLE, POS и angle-menu. Edge Functions/APK не менялись,
+  локальный dist с placeholder env не публиковался.
+- `PASS` read-only smoke канонических `/`, `/account/`, POS `/setup`, Menu `/`:
+  HTML и все перечисленные JS/CSS возвращают 200 с правильными content types.
+  Кабинет **`index-DctEONLV.js`**, POS **`index-C7Mk36eb.js`**;
+  Menu **`index-BQ0Vcfr2.js`** ожидаемо не изменился (168 не меняет его bundle).
+  Legacy entry/polyfills и POS modulepreload jsx-runtime доступны. Это не
+  приёмка физического T2, service-worker update или живых клиентских операций.
+- Временных A6 HTTP-контейнеров не осталось. Colima возвращена в исходное
+  выключенное состояние без удаления исходной базы и новых лабораторий.
+  Документация синхронизирована, устаревшие текущие отметки «первый CI NOT RUN»
+  исправлены; исторические результаты сохранены отдельно.
+- Следующая работа здесь: изолированный GoTrue с перехватом писем и настоящим
+  signup/recovery/onboarding; затем оставшиеся A6 API/device/location случаи
+  и restore. Claude продолжает F2.1 в копии; после приёмки — отдельный F8.1.
+  Полный A6 и готовность продукта к продаже этим техническим выпуском не закрыты.
+- После функционального выпуска извне появились untracked-копии с суффиксом
+  ` 2` в обоих рабочих деревьях (docs, код, тесты, включая копии 165/166).
+  Владелец подтвердил, что копии создал Claude; они не создавались этой работой, не удалены
+  и не включены в коммиты. Из-за 32 неиндексированных Markdown-копий локальный
+  check:docs завершился ошибкой; его правила не ослаблялись. Документационный
+  коммит проверяется в чистой извлечённой версии обоих Git-деревьев и CI.
+  Перед следующим запуском тестов/миграций в исходных папках разобраться с
+  дублями: не выполнять новый db:push по загрязнённому списку миграций.
