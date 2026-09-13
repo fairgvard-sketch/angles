@@ -1760,3 +1760,15 @@ catalogue-after.log, auth-isolated.log, full-tests-final.log, build.log,
 HTML/PNG полей и настоящего каталога на четырёх ширинах. Снимки просмотрены.
 Это локальный Chrome/синтетика, не Safari/iPhone, T2, живой Auth или закрытие
 B2/B3. CI и публикация проверяются отдельно после push.
+
+**Выпуск подтверждён:** ANGLE `98e37a5` отправлен в main;
+[CI34779045863](https://github.com/fairgvard-sketch/angles/actions/runs/34779045863)
+success (все шаги, включая обязательный browser, завершились19:55:22 UTC).
+[Vercel](https://vercel.com/vandal2/angles/ASMw28vtncreiNqSAcNT3w5qB4EX)
+success. HTTP-проверка19:53:49 UTC: `/account` и CSS200, production
+`index-v3WNLDCP.css` побайтово совпал с принятой сборкой (198464B,
+SHA256 `f8f5ad518b802b545e24022bc15dad19ffeddc978d623bcb5f9999a302ef4c3d`).
+Доказательство — `public-style-check.json` в каталоге артефактов выше.
+Kassa осталась на `cb56f48`, её tracked-дерево не менялось; миграции,
+платежи, серверные данные и публикации POS/Menu не затронуты.
+Временный локальный сервер предпросмотра завершён.
