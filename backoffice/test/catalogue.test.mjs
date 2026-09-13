@@ -183,6 +183,50 @@ async function open(tab = 'items', width = 1280) {
 
 const byLabel = (label) => `[aria-label="${label}"]`
 
+describe('каталог: отступы и высота фильтров', { skip }, () => {
+  for (const width of [320, 375, 768, 1280]) {
+    it(`реальный каталог не обрезает короткие подписи при ${width}px`, async (t) => {
+      const page = await open('items', width)
+      t.after(() => page.close())
+      const state = await page.evaluate(() => {
+        const ctx = document.createElement('canvas').getContext('2d')
+        const selects = [...document.querySelectorAll('.cat-toolbar select')]
+        return {
+          overflow: document.documentElement.scrollWidth - innerWidth,
+          controls: selects.map((el) => {
+            const s = getComputedStyle(el)
+            ctx.font = `${s.fontWeight} ${s.fontSize} ${s.fontFamily}`
+            return {
+              label: el.selectedOptions[0].text,
+              text: ctx.measureText(el.selectedOptions[0].text).width,
+              room: el.clientWidth - parseFloat(s.paddingLeft) - parseFloat(s.paddingRight),
+              end: s.paddingInlineEnd,
+              appearance: s.appearance,
+            }
+          }),
+          heights: [...document.querySelectorAll('.cat-toolbar select, .cat-toolbar .cat-chip, .cat-toolbar .secondary-button')].map((el) => el.getBoundingClientRect().height),
+        }
+      })
+      assert.equal(state.overflow, 0)
+      assert.equal(state.controls.length, 3)
+      for (const control of state.controls) {
+        assert.equal(control.appearance, 'none', control.label)
+        assert.equal(control.end, '36px', control.label)
+        assert.ok(control.text <= control.room, JSON.stringify(control))
+      }
+      assert.equal(new Set(state.heights).size, 1, 'одна высота фильтров и действий')
+      assert.deepEqual(page.errors, [])
+      if (process.env.ANGLE_UI_ARTIFACT_DIR) {
+        await page.screenshot({ path: `${process.env.ANGLE_UI_ARTIFACT_DIR}/catalogue-${width}.png`, fullPage: true })
+        const toolbar = await page.$('.cat-toolbar')
+        await toolbar.screenshot({ path: `${process.env.ANGLE_UI_ARTIFACT_DIR}/toolbar-${width}.png` })
+      }
+      await page.select('.cat-toolbar select', 'c1')
+      await page.waitForFunction(() => window.__FILTERS__.zn === 'c1')
+    })
+  }
+})
+
 /**
  * Заменить содержимое поля.
  *

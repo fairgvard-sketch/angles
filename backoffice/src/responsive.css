@@ -390,6 +390,62 @@ button[aria-busy='true'] {
 }
 
 /* ── Forms ───────────────────────────────────────────────── */
+/* Keep the real native picker and keyboard behaviour. Only its closed
+   face is styled: the OS arrow ignores padding and otherwise hugs the
+   border. Two small strokes use currentColor, including disabled fields.
+   Listboxes/multiple selects deliberately keep their native appearance. */
+select:not([multiple]):is(:not([size]), [size='0'], [size='1']) {
+  -webkit-appearance: none;
+  appearance: none;
+  min-width: 0;
+  max-width: 100%;
+  padding-inline-start: var(--bo-select-start, 12px);
+  padding-inline-end: 36px;
+  text-overflow: ellipsis;
+  background-image:
+    linear-gradient(45deg, transparent calc(50% - .75px), currentColor 0, currentColor calc(50% + .75px), transparent 0),
+    linear-gradient(135deg, transparent calc(50% - .75px), currentColor 0, currentColor calc(50% + .75px), transparent 0);
+  background-size: 6px 6px;
+  background-position: right 18px center, right 12px center;
+  background-repeat: no-repeat;
+}
+
+.topbar-location,
+.cat-location { --bo-select-start: 0px; }
+
+select:not([multiple]):is(:not([size]), [size='0'], [size='1']):dir(rtl) {
+  background-position: left 12px center, left 18px center;
+}
+
+/* High-contrast mode can suppress CSS backgrounds. Let the browser draw
+   the arrow again, instead of leaving a field with no dropdown cue. */
+@media (forced-colors: active) {
+  select:not([multiple]):is(:not([size]), [size='0'], [size='1']) {
+    -webkit-appearance: auto;
+    appearance: auto;
+    background-image: none;
+  }
+}
+
+/* Filters and their neighbouring actions share one baseline and height. */
+.cat-toolbar :is(select, .cat-chip, .secondary-button, .text-button) {
+  height: var(--bo-control);
+  min-height: var(--bo-control);
+}
+
+@media (max-width: 1024px) {
+  .cat-toolbar :is(select, .cat-chip, .secondary-button, .text-button) {
+    height: var(--bo-touch);
+    min-height: var(--bo-touch);
+  }
+}
+
+@media (max-width: 720px) {
+  /* Do not truncate short defaults like “All categories” just to fit two
+     filters into a 320px screen. Long user-provided names still ellipsize. */
+  .cat-toolbar > .cat-select-filter { flex-basis: 160px; }
+}
+
 .settings-form,
 .drawer-form,
 .form-dialog-body {
@@ -445,7 +501,7 @@ button[aria-busy='true'] {
 
 :where(input, select, textarea):disabled {
   cursor: not-allowed;
-  background: var(--bo-disabled-bg);
+  background-color: var(--bo-disabled-bg);
   color: var(--c-text-muted);
   opacity: 1;
 }
