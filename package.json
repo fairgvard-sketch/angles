@@ -6,8 +6,9 @@
   "scripts": {
     "build": "node scripts/build-site.mjs && vite build --config backoffice/vite.config.js",
     "test": "npm run test:unit && npm run test:browser",
-    "test:unit": "node --import ./backoffice/test/register.mjs --test --test-timeout=60000 backoffice/src/*.test.js backoffice/src/ui/*.test.js",
+    "test:unit": "node --import ./backoffice/test/register.mjs --test --test-timeout=60000 backoffice/src/*.test.js backoffice/src/ui/*.test.js scripts/auth-lab.test.mjs",
     "test:browser": "node --import ./backoffice/test/register.mjs --test --test-timeout=120000 backoffice/test/*.test.mjs",
+    "test:auth:lab": "node scripts/test-auth-lab.mjs",
     "test:no-browser": "ANGLE_BROWSER=optional npm test",
     "check:docs": "node --test scripts/check-docs.test.mjs && node scripts/check-docs.mjs"
   },
