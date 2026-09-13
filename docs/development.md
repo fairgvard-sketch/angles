@@ -116,6 +116,22 @@ CI работает с заглушками данных и локальным �
 доставку Auth-писем, production SMTP, RLS реального сервера и печать.
 Зелёный CI подтверждается только запуском CI, а не локальным прогоном.
 
+Для правок QR-настроек короткий регрессионный прогон:
+
+```bash
+ANGLE_BROWSER=required node --import ./backoffice/test/register.mjs --test --test-timeout=60000 backoffice/test/qr-channel-state.test.mjs
+```
+
+Набор монтирует настоящий QR-раздел в React StrictMode с подставным Supabase
+transport: повтор загрузки, поздние save/rollback/slug после смены точки или
+канала, возврат A → B → A и обычное сохранение с повторным чтением.
+Также проверяется Menu-only: без управления заказами/столами, но с общим QR,
+ссылкой и рабочим сохранением оформления. Гостевой iframe подменяется,
+внешние запросы перехватываются. Ширины
+1280/375/320 проверяются для ошибки загрузки и Menu-only; это не полная мобильная приёмка.
+Набор автоматически входит в `test:browser`; production SQL/API и гостевой
+сценарий этими проверками не подтверждаются.
+
 `check:docs` проверяет ссылки и полноту индекса только управляемого набора
 документации; границы проверки описаны в [правилах](documentation-policy.md).
 Шаг `check:docs` в CI ожидает, что рабочие документы из индекса закоммичены
@@ -149,7 +165,9 @@ Recovery и подтверждение почты реализованы лок�
 требует локальный Docker через Unix socket и уже подготовленный Supabase Kassa
 (`supabase_db_kassa`, `supabase_auth_kassa`, `supabase_rest_kassa`). Не запускать
 `db reset` ради этого теста. Допустимые baseline/образы закреплены в
-[`scripts/auth-lab.mjs`](../scripts/auth-lab.mjs); неизвестные версии требуют review.
+[`scripts/auth-lab.mjs`](../scripts/auth-lab.mjs); список проверенных миграций
+общий с billing/HTTP lab — [`lab-migrations.mjs`](../scripts/lab-migrations.mjs).
+Сейчас лаборатории создают схему 169; неизвестные версии требуют review.
 
 ```bash
 docker pull axllent/mailpit:v1.31.1

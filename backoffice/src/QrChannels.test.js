@@ -21,7 +21,8 @@ import QrChannels, { GuestPreview, OnlineTab, ReserveTab } from './QrChannels.js
 const context = {
   organization: { name: 'Test cafe' },
   locations: [{ id: 'loc-1', name: 'Main', timezone: 'Asia/Jerusalem' }],
-  capabilities: ['pos_operate', 'catalog_manage', 'public_menu'],
+  // These pre-existing tests exercise enabled ordering, not Menu-only.
+  capabilities: ['pos_operate', 'catalog_manage', 'public_menu', 'online_orders'],
 }
 
 const noop = () => {}
@@ -168,6 +169,7 @@ describe('QR-меню: настройки на месте', () => {
     assert.match(html, /Instagram/)
     assert.match(html, /Facebook/)
     assert.match(html, /Hero video/)
+    assert.match(html, /optimized automatically/)
     assert.match(html, /Menu background/)
   })
 
@@ -176,6 +178,35 @@ describe('QR-меню: настройки на месте', () => {
     assert.match(html, /Manage catalogue/)
     // Раздела без доступа к каталогу не обещаем
     assert.doesNotMatch(renderOnline({ onManageCatalogue: null }), /Manage catalogue/)
+  })
+})
+
+describe('Menu-only does not advertise unavailable ordering', () => {
+  for (const enabled of [true, false, undefined]) {
+    it(`browse-only controls do not depend on stored enabled=${enabled}`, () => {
+      const html = renderOnline({
+        context: { ...context, products: ['menu'], capabilities: ['catalog_manage', 'public_menu'] },
+        settings: { online_orders: { enabled } },
+      })
+      assert.match(html, /Browse-only menu/)
+      assert.doesNotMatch(html, /channel-switch|Ordering is live|Ordering is paused/)
+      assert.doesNotMatch(html, /How guests order|Opening hours|Table QR codes/)
+      for (const label of ['Copy link', 'Download QR', 'Open page', 'Manage catalogue', 'Look of the guest page', 'Put the menu on your website']) {
+        assert.ok(html.includes(label), label)
+      }
+    })
+  }
+  it('appearance remains editable for Menu-only, including legacy product context', () => {
+    const html = renderOnline({context:{ ...context, capabilities:undefined, products:['menu'] },openGroup:'look'})
+    assert.match(html, /Display name/)
+    assert.match(html, /Hero video/)
+    assert.doesNotMatch(html, /channel-switch/)
+  })
+  it('Orders without a separate Menu purchase retains ordering controls', () => {
+    const html = renderOnline({context:{ ...context, products:['online_orders'], capabilities:['catalog_manage','public_menu','online_orders'] }})
+    assert.match(html, /channel-switch/)
+    assert.match(html, /Ordering is live/)
+    assert.match(html, /How guests order/)
   })
 })
 

@@ -6,17 +6,13 @@ import { createServer, request as httpRequest } from 'node:http'
 import { readFile, readdir } from 'node:fs/promises'
 import { fileURLToPath } from 'node:url'
 import { build } from 'esbuild'
+import { LAB_SCHEMA_VERSION, LAB_MIGRATIONS, validateLabMigrations } from './lab-migrations.mjs'
 
 const root = fileURLToPath(new URL('../', import.meta.url))
 const kassa = fileURLToPath(new URL('../../kassa/', import.meta.url))
 const dbContainer = 'supabase_db_kassa'
-const migrations = ['165_workspace_onboarding_idempotency.sql', '166_subscription_checkout.sql',
-  '167_explicit_drawer_slug_privileges.sql', '168_digital_account_catalog_boundaries.sql']
-export function validateAuthMigrations(names) {
-  const unknown = names.filter(name => /^\d+_[a-z0-9_]+\.sql$/.test(name)
-    && Number(name.split('_')[0]) >= 165 && !migrations.includes(name))
-  if (unknown.length) throw new Error('Review changed/new Kassa migrations before extending Auth lab')
-}
+const migrations = LAB_MIGRATIONS
+export const validateAuthMigrations = validateLabMigrations
 export function validateAuthDatabase(value) {
   if (!/^angle_auth_lab_[a-z0-9_]{1,40}$/.test(value || '')) throw new Error('Use a NEW angle_auth_lab_<suffix> database')
   return value
@@ -63,7 +59,7 @@ export async function startAuthLab({ database, signal }) {
     throw new Error('Refusing to overwrite an existing database')
   }
   const version = Number(source('SELECT get_schema_version();'))
-  if (!Number.isInteger(version) || version < 164 || version > 168) throw new Error('Reviewed local baseline: 164–168 only')
+  if (!Number.isInteger(version) || version < 164 || version > LAB_SCHEMA_VERSION) throw new Error('Reviewed local baseline: 164–169 only')
   validateAuthMigrations(await readdir(kassa + 'supabase/migrations'))
   // Explicit reviewed names exclude unrelated files and user-created " 2" copies.
   const pending = await Promise.all(migrations.filter(name => Number(name.slice(0, 3)) > version)
@@ -88,8 +84,8 @@ export async function startAuthLab({ database, signal }) {
     '--table=public.reserved_slugs', '--table=supabase_migrations.schema_migrations', '--table=auth.schema_migrations']))
   for (const migration of pending) sql(`BEGIN; ${migration.text}\nINSERT INTO supabase_migrations.schema_migrations(version,name,statements)
     VALUES (${quote(migration.name.slice(0, 3))},${quote(migration.name)},ARRAY[]::TEXT[]); COMMIT;`)
-  if (sql('SELECT get_schema_version();') !== '168' || sql('SELECT count(*) FROM auth.users;') !== '0'
-    || sql('SELECT count(*) FROM orgs;') !== '0') throw new Error('Expected schema 168 and empty synthetic data set')
+  if (sql('SELECT get_schema_version();') !== String(LAB_SCHEMA_VERSION) || sql('SELECT count(*) FROM auth.users;') !== '0'
+    || sql('SELECT count(*) FROM orgs;') !== '0') throw new Error('Expected schema 169 and empty synthetic data set')
   sql("CREATE TABLE public.angle_auth_lab_marker(marker TEXT CHECK(marker='synthetic-only')); INSERT INTO public.angle_auth_lab_marker VALUES ('synthetic-only'); REVOKE ALL ON public.angle_auth_lab_marker FROM PUBLIC, anon, authenticated;")
   const secret = randomBytes(48).toString('hex')
   const encoded = [{ alg: 'HS256', typ: 'JWT' }, { role: 'anon', exp: Math.floor(Date.now() / 1000) + 7200 }]

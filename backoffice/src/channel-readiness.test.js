@@ -108,6 +108,12 @@ describe('блокеры страницы брони', () => {
 })
 
 describe('заголовок полосы', () => {
+  it('browse-only menu does not promise guest ordering', () => {
+    assert.equal(blockerSummary([{ id: 'a' }], 'menu'), 'One thing to fix before guests can browse the menu')
+    const blockers = menuBlockers({categories:[],items:[],locationId:'loc-1',tables:[],settings:{types:['here']},orderingAvailable:false})
+    assert.deepEqual(blockers.map(b=>b.id), ['no-categories'])
+    assert.doesNotMatch(blockers[0].detail, /order/i)
+  })
   it('считает и называет канал', () => {
     assert.equal(blockerSummary([{ id: 'a' }], 'online'), 'One thing to fix before guests can order')
     assert.equal(

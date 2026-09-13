@@ -4,6 +4,7 @@ import assert from 'node:assert/strict'
 import { spawnSync } from 'node:child_process'
 import { createHmac, randomBytes } from 'node:crypto'
 import { startBillingLab, validateLabDatabase } from './billing-lab.mjs'
+import { LAB_SCHEMA_VERSION } from './lab-migrations.mjs'
 
 const database = validateLabDatabase(process.argv[2])
 if (!database.startsWith('angle_billing_lab_a6_')) throw new Error('Use a NEW angle_billing_lab_a6_<suffix> database')
@@ -17,7 +18,7 @@ function docker(args, env = process.env) {
 const lab = await startBillingLab({ database, initialize: true })
 let created = false
 try {
-  assert.equal(await lab.sql('SELECT get_schema_version();'), '168')
+  assert.equal(await lab.sql('SELECT get_schema_version();'), String(LAB_SCHEMA_VERSION))
   await lab.close()
   await lab.sql("UPDATE billing_checkout_settings SET mode='disabled';")
   // Reuse ONLY the installed local PostgREST image/network/database transport.
@@ -41,7 +42,8 @@ try {
   assert.equal(port.HostIp,'127.0.0.1')
   const origin=`http://127.0.0.1:${port.HostPort}`
   function token(owner, key=secret) {
-    const body=[{alg:'HS256',typ:'JWT'},{role:'authenticated',sub:owner.user,app_metadata:{org_id:owner.org},exp:Math.floor(Date.now()/1000)+600}]
+    const body=[{alg:'HS256',typ:'JWT'},{role:'authenticated',sub:owner.user,app_metadata:{org_id:owner.org,
+      ...(owner.deviceLocation ? {location_id:owner.deviceLocation} : {})},exp:Math.floor(Date.now()/1000)+600}]
       .map(value=>Buffer.from(JSON.stringify(value)).toString('base64url')).join('.')
     return body+'.'+createHmac('sha256',key).update(body).digest('base64url')
   }
@@ -87,6 +89,40 @@ try {
   equal((await request('orgs?select=id')).data,[],'membership deletion cannot resurrect stale token access')
   equal((await request('locations?select=id',{authorization:token(b)})).data,[{id:b.location}],'other tenant is still authorized')
   equal(await lab.sql(`SELECT name FROM menu_items WHERE id='${ids.ib}';`),'B item','foreign data unchanged after HTTP mutations')
+  // A6.2: use the same signed tokens before/after account removal; a token
+  // refresh or GoTrue login would hide the stale-token defect being exercised.
+  await lab.sql(`INSERT INTO organization_members(org_id,auth_user_id,role) VALUES ('${a.org}','${a.user}','owner');`)
+  const d1={org:a.org,user:'a6920000-0000-4000-8000-000000000001',deviceLocation:a.location}
+  const d2={org:a.org,user:'a6920000-0000-4000-8000-000000000002',deviceLocation:'a6930000-0000-4000-8000-000000000001'}
+  const deviceId='a6940000-0000-4000-8000-000000000001', deviceUuid='a6950000-0000-4000-8000-000000000001'
+  await lab.sql(`INSERT INTO locations(id,org_id,name) VALUES ('${d2.deviceLocation}','${a.org}','A second point');
+    INSERT INTO auth.users(id,raw_app_meta_data) VALUES
+    ('${d1.user}','${JSON.stringify({org_id:a.org,location_id:d1.deviceLocation})}'),
+    ('${d2.user}','${JSON.stringify({org_id:a.org,location_id:d2.deviceLocation})}');
+    INSERT INTO devices(id,org_id,location_id,auth_user_id,device_uuid,name,outbox_pending) VALUES
+    ('${deviceId}','${a.org}','${d1.deviceLocation}','${d1.user}','${deviceUuid}','A device',0);`)
+  const deviceJwt=token(d1), otherDeviceJwt=token(d2)
+  const deviceRpc=(name,body={},authorization=deviceJwt)=>request('rpc/'+name,{method:'POST',body,authorization})
+  equal((await deviceRpc('auth_org_id')).data,a.org,'live device resolves tenant over HTTP')
+  equal((await deviceRpc('register_device',{p_device_uuid:deviceUuid})).status,200,'same device registration remains idempotent')
+  equal((await deviceRpc('register_device',{p_device_uuid:deviceUuid},otherDeviceJwt)).data.message,'device_identity_conflict','another account cannot claim a known device UUID')
+  equal(await lab.sql(`SELECT auth_user_id FROM devices WHERE id='${deviceId}';`),d1.user,'rejected registration leaves ownership intact')
+  equal((await request('devices?id=eq.'+deviceId,{method:'PATCH',body:{location_id:b.location},authorization:deviceJwt})).data.code,'23514','device location cannot cross tenant through direct PATCH')
+  equal((await deviceRpc('get_backoffice_fleet')).data.message,'staff session required','device claim alone does not grant web management')
+  equal((await deviceRpc('set_device_archived_web',{p_device_id:deviceId,p_archived:true},jwt)).status,200,'owner may archive device over HTTP')
+  equal((await deviceRpc('auth_org_id')).data,a.org,'archive remains cosmetic over HTTP')
+  equal((await deviceRpc('delete_device_web',{p_device_id:deviceId},jwt)).data.access_revoked,true,'dedicated account deletion reports revocation')
+  equal((await deviceRpc('auth_org_id')).data,null,'deleted account same JWT loses organization immediately')
+  equal((await deviceRpc('auth_location_id')).data,null,'deleted account same JWT loses location immediately')
+  equal((await request('locations?select=id',{authorization:deviceJwt})).data,[],'deleted account cannot read via direct HTTP RLS')
+  equal((await deviceRpc('org_billing_state')).data.message,'not authenticated','deleted account cannot use SECURITY DEFINER billing RPC')
+  equal((await deviceRpc('register_device',{p_device_uuid:deviceUuid})).data.message,'not authenticated','deleted account cannot resurrect its device')
+  equal((await deviceRpc('auth_location_id',{},otherDeviceJwt)).data,d2.deviceLocation,'other device identity survives deletion')
+  await lab.sql(`UPDATE auth.users SET banned_until=NOW()+INTERVAL '1 day' WHERE id='${d2.user}';`)
+  equal((await deviceRpc('auth_org_id',{},otherDeviceJwt)).data,null,'banned account same JWT is denied')
+  await lab.sql(`UPDATE auth.users SET banned_until=NULL WHERE id='${d2.user}';`)
+  equal((await deviceRpc('auth_org_id',{},otherDeviceJwt)).data,a.org,'unbanned live device works again')
+  equal((await deviceRpc('register_device',{p_device_uuid:'a6950000-0000-4000-8000-000000000002'},otherDeviceJwt)).status,200,'fresh device registration succeeds over HTTP')
   console.log(`PASS ${checks} real HTTP/JWT checks; synthetic database retained: ${database}`)
 } finally {
   await lab.close()

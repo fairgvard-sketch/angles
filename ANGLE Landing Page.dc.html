@@ -26,16 +26,6 @@
     .site-nav.is-on-light .site-brand img { filter:none; }
     .site-nav.is-on-light .site-nav-links a, .site-nav.is-on-light .site-nav-actions a { color:#0B0B0B !important; }
     .site-nav.is-on-light .mobile-menu-toggle { color:#0B0B0B; }
-    .hero-logo-carousel { position:absolute; left:0; right:0; bottom:0; z-index:2; padding:18px 0 22px; overflow:hidden; background:linear-gradient(180deg, rgba(0,0,0,0) 0%, rgba(0,0,0,0.3) 100%); border-top:1px solid rgba(255,255,255,0.14); }
-    .hero-logo-label { margin:0 auto 16px; padding:0 32px; max-width:1460px; box-sizing:border-box; text-align:center; font-size:10px; font-weight:600; letter-spacing:0.18em; color:rgba(255,255,255,0.68); }
-    .hero-logo-viewport { overflow:hidden; -webkit-mask-image:linear-gradient(90deg, transparent 0%, #000 5%, #000 95%, transparent 100%); mask-image:linear-gradient(90deg, transparent 0%, #000 5%, #000 95%, transparent 100%); }
-    .hero-logo-track { --logo-gap:72px; display:flex; align-items:center; gap:var(--logo-gap); width:max-content; animation:hero-logo-scroll 28s linear infinite; will-change:transform; }
-    .hero-logo-set { display:flex; align-items:center; gap:var(--logo-gap); flex:none; }
-    .hero-logo-item { width:118px; height:38px; flex:0 0 118px; opacity:0.88; }
-    .hero-logo-item img { display:block; width:100%; height:100%; object-fit:contain; }
-    .hero-logo-carousel:hover .hero-logo-track { animation-play-state:paused; }
-    @keyframes hero-logo-scroll { from { transform:translateX(0); } to { transform:translateX(calc(-50% - (var(--logo-gap) / 2))); } }
-    @media (prefers-reduced-motion:reduce) { .hero-logo-track { animation:none; } }
     .mobile-menu-toggle { display:none; width:42px; height:42px; padding:0; border:0; background:transparent; color:#0B0B0B; cursor:pointer; place-items:center; }
     .mobile-menu-icon, .mobile-menu-icon::before, .mobile-menu-icon::after { display:block; width:21px; height:2px; background:currentColor; transition:transform 220ms ease, opacity 220ms ease; }
     .mobile-menu-icon { position:relative; }
@@ -466,10 +456,6 @@
       .hero-description { max-width:330px !important; font-size:16px !important; line-height:1.5 !important; }
       .hero-actions { width:100%; max-width:390px; gap:10px !important; margin-top:4px !important; }
       .hero-actions a { flex:1; box-sizing:border-box; padding:13px 10px !important; text-align:center; white-space:nowrap; }
-      .hero-logo-carousel { padding:12px 0 16px; }
-      .hero-logo-label { margin-bottom:12px; padding:0 20px; font-size:9px; letter-spacing:0.12em; }
-      .hero-logo-track { --logo-gap:40px; animation-duration:22s; }
-      .hero-logo-item { width:92px; height:30px; flex-basis:92px; }
 
       .guest-experience { padding:78px 0; }
       .guest-experience-inner { padding:0 20px; }
@@ -604,29 +590,6 @@
         <div class="hero-actions" style="display:flex; gap:14px; margin-top:8px">
           <a href="#" style="background:#FFFFFF; color:#0B0B0B; font-size:15px; font-weight:500; padding:15px 28px; border-radius:var(--btn-radius, 6px)">Get started</a>
           <a href="#" style="background:rgba(0,0,0,0.14); border:1px solid rgba(255,255,255,0.58); color:#FFFFFF; font-size:15px; font-weight:500; padding:14px 28px; border-radius:var(--btn-radius, 6px); backdrop-filter:blur(8px); -webkit-backdrop-filter:blur(8px)">Book a demo</a>
-        </div>
-      </div>
-    </div>
-    <div class="hero-logo-carousel" data-screen-label="Trusted logos carousel">
-      <div class="hero-logo-label">TRUSTED BY RESTAURANTS IN ISRAEL</div>
-      <div class="hero-logo-viewport">
-        <div class="hero-logo-track">
-          <div class="hero-logo-set">
-            <div class="hero-logo-item"><img src="uploads/logo-cofix-white.png" alt="Cofix"></div>
-            <div class="hero-logo-item hero-logo-item--bulochka"><img src="uploads/logo-landwer-white.png" alt="Bulochka"></div>
-            <div class="hero-logo-item"><img src="uploads/logo-roladin-white.png" alt="Roladin"></div>
-            <div class="hero-logo-item"><img src="uploads/logo-aroma-white.png" alt="Aroma"></div>
-            <div class="hero-logo-item"><img src="uploads/logo-greg-white.png" alt="Greg Cafe"></div>
-            <div class="hero-logo-item"><img src="uploads/logo-japanika-white.png" alt="Japanika"></div>
-          </div>
-          <div class="hero-logo-set" aria-hidden="true">
-            <div class="hero-logo-item"><img src="uploads/logo-cofix-white.png" alt=""></div>
-            <div class="hero-logo-item hero-logo-item--bulochka"><img src="uploads/logo-landwer-white.png" alt=""></div>
-            <div class="hero-logo-item"><img src="uploads/logo-roladin-white.png" alt=""></div>
-            <div class="hero-logo-item"><img src="uploads/logo-aroma-white.png" alt=""></div>
-            <div class="hero-logo-item"><img src="uploads/logo-greg-white.png" alt=""></div>
-            <div class="hero-logo-item"><img src="uploads/logo-japanika-white.png" alt=""></div>
-          </div>
         </div>
       </div>
     </div>

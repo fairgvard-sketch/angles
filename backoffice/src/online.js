@@ -1,5 +1,6 @@
 import { supabase } from './supabase'
 import { patchLocationSettings } from './settings'
+import { HERO_VIDEO_INPUT_TYPES, HERO_VIDEO_MAX_INPUT_BYTES } from './hero-video'
 
 /**
  * QR-каналы гостя: онлайн-заказы (050/051) и бронирование столов (053–063).
@@ -199,12 +200,11 @@ export async function saveOnlineOrders(locationId, patch) {
 // ── Hero-видео витрины ───────────────────────────────────────
 
 /**
- * Ограничения совпадают с кассой (OnlineOrdersDetail): браузер ничего не
- * перекодирует, поэтому принимаем только форматы, которые одинаково играют
- * на iOS и Android. MOV с камеры сначала экспортируют в MP4.
+ * После клиентской оптимизации сюда приходит совместимый MP4/WebM. Повторная
+ * проверка формата и размера остаётся границей перед Storage upload.
  */
-export const HERO_VIDEO_TYPES = { 'video/mp4': 'mp4', 'video/webm': 'webm' }
-export const HERO_VIDEO_MAX_BYTES = 30 * 1024 * 1024
+export const HERO_VIDEO_TYPES = HERO_VIDEO_INPUT_TYPES
+export const HERO_VIDEO_MAX_BYTES = HERO_VIDEO_MAX_INPUT_BYTES
 
 /**
  * Загрузка ролика в тот же бакет menu-images, что и фото товара (007):

@@ -6,6 +6,7 @@ import { randomUUID } from 'node:crypto'
 import { readFile, readdir } from 'node:fs/promises'
 import { fileURLToPath } from 'node:url'
 import { build } from 'esbuild'
+import { LAB_SCHEMA_VERSION, LAB_MIGRATIONS, validateLabMigrations } from './lab-migrations.mjs'
 
 const root = fileURLToPath(new URL('../', import.meta.url))
 const kassa = fileURLToPath(new URL('../../kassa/', import.meta.url))
@@ -46,6 +47,9 @@ export async function startBillingLab({ database, initialize = false, port = 0 }
   if (initialize) {
     const exists = await databaseClient('postgres')(`SELECT count(*) FROM pg_database WHERE datname=${quote(database)};`)
     if (exists !== '0') throw new Error('Refusing to overwrite an existing database; omit --init for an existing lab')
+    validateLabMigrations(await readdir(kassa + 'supabase/migrations'))
+    const baseline = Number(await databaseClient('postgres')('SELECT get_schema_version();'))
+    if (!Number.isInteger(baseline) || baseline < 164 || baseline > LAB_SCHEMA_VERSION) throw new Error('Lab requires a known local baseline 164–169')
     await command(['exec', container, 'createdb', '-U', 'postgres', database])
     // Read local schema and technical dictionaries only. No customer records.
     await sql(await command(['exec', container, 'pg_dump', '-U', 'postgres', '-d', 'postgres', '--schema-only']))
@@ -53,11 +57,10 @@ export async function startBillingLab({ database, initialize = false, port = 0 }
       '--table=public.product_catalog', '--table=public.product_capabilities', '--table=public.product_prices',
       '--table=public.reserved_slugs', '--table=supabase_migrations.schema_migrations']))
     const version = Number(await sql('SELECT get_schema_version();'))
-    if (!Number.isInteger(version) || version < 164 || version > 168) throw new Error('Lab requires a known local baseline 164–168')
-    for (const name of (await readdir(kassa + 'supabase/migrations')).filter(name => /^\d+_.+\.sql$/.test(name)).sort()) {
+    if (version !== baseline) throw new Error('Local source schema changed during clone')
+    for (const name of LAB_MIGRATIONS) {
       const next = Number(name.split('_')[0])
       if (next <= version) continue
-      if (next > 168) throw new Error('Review new migrations before extending the billing lab')
       const migration = await readFile(kassa + 'supabase/migrations/' + name, 'utf8')
       await sql(`BEGIN; ${migration}\nINSERT INTO supabase_migrations.schema_migrations(version,name,statements)
         VALUES (${quote(String(next))},${quote(name)},ARRAY[]::TEXT[]); COMMIT;`)
@@ -65,9 +68,9 @@ export async function startBillingLab({ database, initialize = false, port = 0 }
     await sql("CREATE TABLE public.angle_billing_lab_marker(marker TEXT PRIMARY KEY CHECK(marker='synthetic-only')); INSERT INTO public.angle_billing_lab_marker VALUES ('synthetic-only'); REVOKE ALL ON public.angle_billing_lab_marker FROM PUBLIC, anon, authenticated;")
   }
   if (await sql('SELECT marker FROM public.angle_billing_lab_marker;') !== 'synthetic-only') throw new Error('Not an initialized billing lab')
-  // 167 fixes table ACLs; 168 narrows digital identity/catalogue access. The
+  // 167 fixes table ACLs; 168–169 narrow digital/device identity access. The
   // synthetic active owners and service-only payment path remain authorized.
-  if (!['166', '167', '168'].includes(await sql('SELECT get_schema_version();'))) throw new Error('Lab schema must be 166, 167 or 168')
+  if (!['166', '167', '168', '169'].includes(await sql('SELECT get_schema_version();'))) throw new Error('Lab schema must be 166–169')
   const users = [
     { user: 'a1000000-0000-4000-8000-000000000001', org: 'a2000000-0000-4000-8000-000000000001', location: 'a3000000-0000-4000-8000-000000000001', name: 'Test Cafe A' },
     { user: 'a1000000-0000-4000-8000-000000000002', org: 'a2000000-0000-4000-8000-000000000002', location: 'a3000000-0000-4000-8000-000000000002', name: 'Test Cafe B' },

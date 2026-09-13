@@ -1,6 +1,7 @@
 import assert from 'node:assert/strict'
 import { test } from 'node:test'
 import { validateAuthDatabase, validateAuthMigrations, localDatabaseUri, startAuthLab } from './auth-lab.mjs'
+import { LAB_MIGRATIONS, LAB_SCHEMA_VERSION, validateLabMigrations } from './lab-migrations.mjs'
 
 test('Auth lab accepts only an explicit synthetic database name', () => {
   assert.equal(validateAuthDatabase('angle_auth_lab_local_1'), 'angle_auth_lab_local_1')
@@ -26,7 +27,15 @@ test('cancelled startup cannot create a database or containers', async () => {
 test('Auth lab refuses newer schema work but never applies untracked space-suffix copies', () => {
   assert.doesNotThrow(() => validateAuthMigrations(['164_baseline.sql', '165_workspace_onboarding_idempotency.sql',
     '165_workspace_onboarding_idempotency 2.sql', '166_subscription_checkout.sql',
-    '167_explicit_drawer_slug_privileges.sql', '168_digital_account_catalog_boundaries.sql']))
+    '167_explicit_drawer_slug_privileges.sql', '168_digital_account_catalog_boundaries.sql', '169_device_identity_boundaries.sql']))
   assert.throws(() => validateAuthMigrations(['169_new_feature.sql']), /Review/)
   assert.throws(() => validateAuthMigrations(['168_other_implementation.sql']), /Review/)
+})
+test('Auth and billing labs share a reviewed allowlist excluding space-suffix copies', () => {
+  assert.equal(LAB_SCHEMA_VERSION, 169)
+  assert.equal(LAB_MIGRATIONS.length, 5)
+  assert.doesNotThrow(() => validateLabMigrations([...LAB_MIGRATIONS, '169_device_identity_boundaries 2.sql']))
+  assert.ok(LAB_MIGRATIONS.every(name => /^\d{3}_[a-z0-9_]+\.sql$/.test(name)))
+  assert.throws(() => validateLabMigrations(['170_future.sql']), /Review/)
+  assert.throws(() => validateLabMigrations(['169_unreviewed.sql']), /Review/)
 })

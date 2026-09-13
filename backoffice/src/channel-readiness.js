@@ -22,7 +22,7 @@ import { LAUNCH_STEPS } from './launch'
  * гостю показывается ровно её меню. Поэтому считаем позиции в
  * категориях ЭТОЙ точки, а не всё, что есть у организации.
  */
-export function menuBlockers({ categories, items, locationId, tables, settings } = {}) {
+export function menuBlockers({ categories, items, locationId, tables, settings, orderingAvailable = true } = {}) {
   const blockers = []
   if (!Array.isArray(categories) || !Array.isArray(items)) return blockers
 
@@ -36,7 +36,7 @@ export function menuBlockers({ categories, items, locationId, tables, settings }
     blockers.push({
       id: 'no-categories',
       title: 'The menu for this location is empty',
-      detail: 'Guests open the link and see nothing to order.',
+      detail: 'Guests open the link and see an empty menu.',
       action: { label: 'Manage catalogue', view: 'menu' },
     })
   } else if (onSale.length === 0) {
@@ -45,7 +45,7 @@ export function menuBlockers({ categories, items, locationId, tables, settings }
       title: inLocation.length === 0
         ? 'No items in this location’s menu'
         : `All ${inLocation.length} items are hidden`,
-      detail: 'Guests open the link and see nothing to order.',
+      detail: 'Guests open the link and see an empty menu.',
       action: { label: 'Manage catalogue', view: 'menu' },
     })
   }
@@ -53,7 +53,7 @@ export function menuBlockers({ categories, items, locationId, tables, settings }
   // Столы нужны только тому, кто обещал гостям обслуживание за столом
   const types = settings?.types
   const wantsTables = Array.isArray(types) ? types.includes('here') : false
-  if (wantsTables && Array.isArray(tables) && tables.length === 0) {
+  if (orderingAvailable && wantsTables && Array.isArray(tables) && tables.length === 0) {
     blockers.push({
       id: 'no-tables',
       title: 'Dine-in is on, but there are no tables',
@@ -101,7 +101,8 @@ export function reserveBlockers(checklist) {
 export function blockerSummary(blockers, channel) {
   const count = blockers.length
   if (count === 0) return null
-  const what = channel === 'reserve' ? 'guests can book' : 'guests can order'
+  const what = channel === 'reserve' ? 'guests can book'
+    : channel === 'menu' ? 'guests can browse the menu' : 'guests can order'
   return count === 1
     ? `One thing to fix before ${what}`
     : `${count} things to fix before ${what}`

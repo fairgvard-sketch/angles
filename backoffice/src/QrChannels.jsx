@@ -33,8 +33,9 @@ import {
 import { hasCapability } from './navigation'
 import { fetchCategories, fetchItems } from './menu'
 import { fetchLaunchChecklist } from './launch'
+import { optimizeHeroVideo } from './hero-video'
 import { blockerSummary, menuBlockers, reserveBlockers } from './channel-readiness'
-import { PageHeader } from './ui/Layout'
+import { PageHeader, StatusBadge } from './ui/Layout'
 import { Button } from './ui/Button'
 import Skeleton, { SkeletonBar, SkeletonPanel } from './ui/Skeleton'
 
@@ -120,7 +121,7 @@ function ChannelBlockers({ blockers, channel, onGo }) {
   )
 }
 
-function ChannelBar({ title, enabled, onToggle, onLabel, offLabel, url, qrUrl, qrName, offNote }) {
+function ChannelBar({ title, enabled, onToggle, onLabel, offLabel, url, qrUrl, qrName, offNote, staticLabel, staticNote }) {
   const [copyState, copy] = useCopy(url)
   const codeUrl = qrUrl || url
 
@@ -129,7 +130,7 @@ function ChannelBar({ title, enabled, onToggle, onLabel, offLabel, url, qrUrl, q
       <div className="channel-bar-main">
         <div className="channel-bar-state">
           <h2>{title}</h2>
-          <button
+          {staticLabel ? <StatusBadge tone="off" label={staticLabel} /> : <button
             type="button"
             className={`channel-switch${enabled ? ' is-on' : ''}`}
             aria-pressed={enabled}
@@ -137,7 +138,7 @@ function ChannelBar({ title, enabled, onToggle, onLabel, offLabel, url, qrUrl, q
           >
             <i aria-hidden />
             {enabled ? onLabel : offLabel}
-          </button>
+          </button>}
           {/* Автосохранение — обещание, которое экран обязан назвать
               вслух: кнопки «Опубликовать» здесь нет и не будет. */}
           <span className="channel-bar-auto">Changes save automatically</span>
@@ -177,7 +178,8 @@ function ChannelBar({ title, enabled, onToggle, onLabel, offLabel, url, qrUrl, q
           </div>
         </div>
 
-        {!enabled && (
+        {staticNote && <p className="form-hint">{staticNote}</p>}
+        {!staticLabel && !enabled && (
           <p className="channel-off-note" role="status">
             <AlertTriangle aria-hidden />
             {offNote}
@@ -399,22 +401,32 @@ function BackgroundPresets({ value, onChange }) {
  * он загрузил ролик — на витрине результат одинаковый.
  */
 function HeroVideoField({ context, url, onChange }) {
-  const [uploading, setUploading] = useState(false)
+  const [uploadPhase, setUploadPhase] = useState(null)
+  const [optimizeProgress, setOptimizeProgress] = useState(0)
   const [error, setError] = useState('')
   const [linkOpen, setLinkOpen] = useState(false)
+  const busy = uploadPhase !== null
+  const uploadLabel = uploadPhase === 'optimizing'
+    ? `Optimizing ${optimizeProgress}%…`
+    : uploadPhase === 'uploading'
+      ? 'Uploading…'
+      : url ? 'Replace video' : 'Upload video'
 
   async function onFile(event) {
     const file = event.target.files?.[0]
     event.target.value = ''          // тот же файл можно выбрать повторно
     if (!file) return
-    setUploading(true)
+    setUploadPhase('optimizing')
+    setOptimizeProgress(0)
     setError('')
     try {
-      onChange(await uploadHeroVideo(context, file))
+      const optimized = await optimizeHeroVideo(file, setOptimizeProgress)
+      setUploadPhase('uploading')
+      onChange(await uploadHeroVideo(context, optimized))
     } catch (e) {
       setError(e.message)
     } finally {
-      setUploading(false)
+      setUploadPhase(null)
     }
   }
 
@@ -441,22 +453,22 @@ function HeroVideoField({ context, url, onChange }) {
       )}
 
       <div className="photo-row">
-        <label className={`file-button${uploading ? ' is-busy' : ''}`}>
-          {uploading ? 'Uploading…' : url ? 'Replace video' : 'Upload video'}
+        <label className={`file-button${busy ? ' is-busy' : ''}`}>
+          {uploadLabel}
           <input
             type="file"
             accept="video/mp4,video/webm"
             onChange={onFile}
             hidden
-            disabled={uploading}
+            disabled={busy}
           />
         </label>
-        {url && !uploading && (
+        {url && !busy && (
           <button type="button" className="secondary-button" onClick={() => onChange(null)}>
             Remove
           </button>
         )}
-        <span className="hint">MP4 · WebM · up to 30 MB</span>
+        <span className="hint">MP4 · WebM · up to 30 MB / 30 sec · optimized automatically</span>
       </div>
 
       {error && <p className="hero-video-error">{error}</p>}
@@ -759,6 +771,10 @@ export function OnlineTab({
   context, locationId, settings, tables, patch, slug, onSlugSaved,
   url, openGroup, onOpenGroup, onManageCatalogue,
 }) {
+  // public_menu не означает online_orders: Menu — витрина без корзины.
+  // Используем тот же effective capability, что навигация и публичный API,
+  // а не сохранённый тумблер, который мог остаться от прежнего доступа.
+  const canOrder = hasCapability(context, 'online_orders')
   const enabled = onlineEnabled(settings)
   const types = orderTypes(settings)
   const online = settings.online_orders || {}
@@ -781,6 +797,8 @@ export function OnlineTab({
         url={url}
         qrName="counter"
         offNote="Ordering is paused — guests who scan the code see the menu but cannot order."
+        staticLabel={canOrder ? null : 'Browse-only menu'}
+        staticNote={canOrder ? null : 'Guests can browse the menu without a cart or checkout. Online ordering is not included in this workspace’s current access.'}
       />
 
       <h2 className="setting-section-title">Guest experience</h2>
@@ -795,7 +813,7 @@ export function OnlineTab({
           <SlugBlock locationId={locationId} slug={slug} onSaved={onSlugSaved} />
         </SettingGroup>
 
-        <SettingGroup
+        {canOrder && <SettingGroup
           {...group('ordering')}
           icon={ShoppingBag}
           title="How guests order"
@@ -818,9 +836,9 @@ export function OnlineTab({
               Turn ordering on above to choose fulfilment options.
             </p>
           )}
-        </SettingGroup>
+        </SettingGroup>}
 
-        <SettingGroup
+        {canOrder && <SettingGroup
           {...group('hours')}
           icon={Clock}
           title="Opening hours"
@@ -837,7 +855,7 @@ export function OnlineTab({
               Turn ordering on above to set opening hours.
             </p>
           )}
-        </SettingGroup>
+        </SettingGroup>}
 
         <SettingGroup
           {...group('look')}
@@ -908,7 +926,7 @@ export function OnlineTab({
 
       <h2 className="setting-section-title">Ways guests open the menu</h2>
       <div className="setting-rows">
-        <SettingGroup
+        {canOrder && <SettingGroup
           {...group('tables')}
           icon={Table}
           title="Table QR codes"
@@ -945,7 +963,7 @@ export function OnlineTab({
               No active tables yet. Add them in Reservations → Tables &amp; zones.
             </p>
           )}
-        </SettingGroup>
+        </SettingGroup>}
 
         <SettingGroup
           {...group('embed')}
@@ -1809,16 +1827,31 @@ function DeliveryGroup({ locationId, open, onToggle, id }) {
  * канала, справа его живое превью. Какой именно канал — решает раздел
  * (`channel`), а не вкладка внутри: у каналов разные адреса в кабинете.
  */
-export default function QrChannels({ context, locationId, channel = 'online', onNavigate }) {
+export default function QrChannels(props) {
+  const locationId = props.locationId || props.context?.locations?.[0]?.id || null
+  const channel = props.channel === 'reserve' ? 'reserve' : 'online'
+  // Все локальные формы, отложенные save/rollback и onSlugSaved принадлежат
+  // одному workspace. Смена точки/канала пересоздаёт и владельца состояния,
+  // а не только OnlineTab: поздний callback прежнего экрана не меняет новый.
+  // A → B → A тоже создаёт новый экземпляр, старый запрос его не «узнаёт».
+  const scope = JSON.stringify([props.context?.organization?.id ?? null, locationId, channel])
+  return <QrChannelWorkspace key={scope} {...props} locationId={locationId} channel={channel} />
+}
+
+function QrChannelWorkspace({ context, locationId, channel, onNavigate }) {
   const locations = context?.locations || []
   const activeId = locationId || locations[0]?.id || null
   const tab = channel === 'reserve' ? 'reserve' : 'online'
+  const canOrder = hasCapability(context, 'online_orders')
+  const needsTables = tab === 'reserve' || canOrder
   const [settings, setSettings] = useState(null)
   // Адрес заведения — канонический источник для гостевой страницы
   const [businessAddress, setBusinessAddress] = useState('')
   const [tables, setTables] = useState([])
   const [slug, setSlug] = useState('')
   const [error, setError] = useState('')
+  const [loadError, setLoadError] = useState('')
+  const [loadAttempt, setLoadAttempt] = useState(0)
   const [saved, setSaved] = useState(false)
   // Открыта максимум одна группа: экран остаётся коротким, и владелец
   // не теряет герой со ссылкой из виду. Состояние живёт здесь, чтобы
@@ -1837,7 +1870,8 @@ export default function QrChannels({ context, locationId, channel = 'online', on
     setTables([])
     setSlug('')
     setError('')
-    Promise.all([fetchLocation(activeId), fetchTables(activeId), fetchLocationSlug(activeId)])
+    setLoadError('')
+    Promise.all([fetchLocation(activeId), needsTables ? fetchTables(activeId) : Promise.resolve([]), fetchLocationSlug(activeId)])
       .then(([data, tableRows, locationSlug]) => {
         if (!cancelled) {
           setSettings(data.settings || {})
@@ -1846,9 +1880,11 @@ export default function QrChannels({ context, locationId, channel = 'online', on
           setSlug(locationSlug)
         }
       })
-      .catch((loadError) => { if (!cancelled) setError(loadError.message) })
+      .catch((failure) => {
+        if (!cancelled) setLoadError(failure?.message || 'We could not load the channel settings.')
+      })
     return () => { cancelled = true }
-  }, [activeId])
+  }, [activeId, loadAttempt, needsTables])
 
   /*
    * Данные готовности грузятся по вкладке, а не все сразу: каталог
@@ -1925,6 +1961,7 @@ export default function QrChannels({ context, locationId, channel = 'online', on
       locationId: activeId,
       tables,
       settings: settings?.online_orders,
+      orderingAvailable: canOrder,
     })
     : reserveBlockers(checklist)
   // Каталог редактируется в своём разделе. Ярлык показываем только
@@ -1939,11 +1976,13 @@ export default function QrChannels({ context, locationId, channel = 'online', on
       {/* Место под отклик зарезервировано: «Saved» не должен сдвигать
           весь экран на строку вниз каждый раз, когда он появляется. */}
       <div className="qr-feedback">
-        {error && <p className="form-error" role="alert">{error}</p>}
+        {(error || loadError) && <p className="form-error" role="alert">{loadError || error}</p>}
+        {loadError && <Button variant="secondary" onClick={() => setLoadAttempt((n) => n + 1)}>Retry loading</Button>}
         {saved && !error && <p className="save-ok inline" role="status"><Check aria-hidden /> Saved</p>}
       </div>
 
       {settings === null ? (
+        loadError ? <p className="empty-state">Channel settings are unavailable. Check your connection and retry.</p> :
         /* Канал в две колонки: слева настройки, справа телефон с
            превью. Раньше здесь стояла строка «Loading…» и экран
            прибавлял 741px, когда настройки приходили. */
@@ -1970,7 +2009,7 @@ export default function QrChannels({ context, locationId, channel = 'online', on
             {/* Готовность канала — до настроек: бесполезно править вид
                 страницы, на которой гостю нечего заказать. */}
             <ChannelBlockers
-              channel={tab}
+              channel={tab === 'online' && !canOrder ? 'menu' : tab}
               blockers={blockers}
               onGo={(action) => {
                 // Блокер ведёт либо в другой раздел, либо в группу

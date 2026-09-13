@@ -4,6 +4,7 @@ import assert from 'node:assert/strict'
 import { randomUUID } from 'node:crypto'
 import { createClient } from '@supabase/supabase-js'
 import { startAuthLab, validateAuthDatabase } from './auth-lab.mjs'
+import { LAB_SCHEMA_VERSION } from './lab-migrations.mjs'
 import { launchBrowser, closeBrowser } from '../backoffice/test/browser-harness.mjs'
 
 const database = validateAuthDatabase(process.argv[2])
@@ -288,5 +289,7 @@ try {
   assert.deepEqual(errors, [])
   assert.deepEqual(external, [])
   pass('exactly two synthetic owners/workspaces; no page errors or external browser requests')
-  console.log(`Integration PASS: ${checks} scenarios, schema 168; retained ${database}. Production SMTP/provider/T2 NOT TESTED.`)
+  const schema = Number(lab.sql('SELECT get_schema_version();'))
+  assert.equal(schema, LAB_SCHEMA_VERSION)
+  console.log(`Integration PASS: ${checks} scenarios, schema ${schema}; retained ${database}. Production SMTP/provider/T2 NOT TESTED.`)
 } finally { clearTimeout(deadline); await cleanup() }
