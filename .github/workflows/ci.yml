@@ -54,7 +54,8 @@ jobs:
           set -o pipefail
           if ! npm run test:browser 2>&1 | tee browser-test.log; then
             # Preserve the failed assertion, not just successful tests at EOF.
-            msg=$({ grep -A 28 -B 2 'not ok' browser-test.log || true; tail -n 12 browser-test.log; } | head -c 12000)
+            msg=$({ grep -A 28 -B 2 'not ok' browser-test.log || true; tail -n 12 browser-test.log; })
+            msg="${msg:0:12000}"
             msg="${msg//'%'/'%25'}"; msg="${msg//$'\r'/%0D}"; msg="${msg//$'\n'/%0A}"
             echo "::error title=browser tests failed::${msg}"
             exit 1

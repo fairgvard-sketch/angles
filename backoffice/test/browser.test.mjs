@@ -113,7 +113,12 @@ const SUPABASE_STUB = `
   const salesDay = (args) => {
     const midnight = new Date(); midnight.setHours(0, 0, 0, 0)
     const yesterday = args?.p_from && new Date(args.p_from).getTime() < midnight.getTime()
-    const hour = new Date().getHours()
+    // sales_report buckets are in the location zone, not the Chrome/runner
+    // zone. Otherwise a UTC runner puts the current sales in a completed
+    // Jerusalem hour and changes the comparison from +50% to +113%.
+    const hour = Number(new Intl.DateTimeFormat('en-GB', {
+      hour: '2-digit', hourCycle: 'h23', timeZone: LOCATION.timezone,
+    }).format(new Date()))
     const at = (h) => Math.max(0, Math.min(23, h))
     return yesterday
       ? { summary: { gross_sales: 100000, refunds: 0, orders_count: 10, avg_check: 10000 },
@@ -1174,10 +1179,19 @@ describe('dashboard', { skip }, () => {
    * серверном рендере эффекты не выполняются, и проверить нечего.
    * Поэтому здесь настоящий браузер и подставной Supabase.
    */
-  const open = async (caps = null) => {
+  const open = async (caps = null, timezone = 'UTC') => {
     const page = await browser.newPage()
+    await page.emulateTimezone(timezone)
     await page.setViewport({ width: 1440, height: 900 })
-    await page.evaluateOnNewDocument((c) => { window.__CAPS__ = c }, caps)
+    await page.evaluateOnNewDocument((c) => {
+      window.__CAPS__ = c
+      const NativeDate = Date
+      const now = NativeDate.parse('2026-09-13T09:30:00Z') // 12:30 at the location
+      window.Date = class extends NativeDate {
+        constructor(...args) { super(...(args.length ? args : [now])) }
+        static now() { return now }
+      }
+    }, caps)
     await page.goto(`${appOrigin}/dashboard`, { waitUntil: 'networkidle0' })
     // Сетка появляется вместе с данными: до неё виджетов не существует
     await page.waitForSelector('.dash-grid')
@@ -1190,7 +1204,9 @@ describe('dashboard', { skip }, () => {
     strip: document.querySelector('.dash-today-strip')?.textContent ?? null,
     bars: document.querySelectorAll('.dash-curve-bar').length,
     compare: document.querySelector('.dash-curve-line .stat-delta')?.textContent?.trim() ?? null,
-    hour: new Date().getHours(),
+    hour: Number(new Intl.DateTimeFormat('en-GB', {
+      hour: '2-digit', hourCycle: 'h23', timeZone: 'Asia/Jerusalem',
+    }).format(new Date())),
     attention: [...document.querySelectorAll('.dash-attention-text strong')].map((e) => e.textContent),
     panels: [...document.querySelectorAll('.panel-heading h2')].map((e) => e.textContent),
     partial: document.querySelector('.dash-partial')?.textContent ?? null,
@@ -1244,6 +1260,17 @@ describe('dashboard', { skip }, () => {
     assert.ok(!state.panels.includes('Devices'))
     assert.ok(!state.attention.some((t) => /reporting|order is waiting/.test(t)))
     await page.close()
+  })
+
+  it('сравнение по часам точки одинаково при разных часовых поясах браузера', async () => {
+    for (const timezone of ['UTC', 'Asia/Jerusalem', 'America/Los_Angeles']) {
+      const page = await open(null, timezone)
+      try {
+        const state = await page.evaluate(read)
+        assert.equal(state.hour, 12, 'fixture freezes a completed business-hour window')
+        assert.equal(state.compare, '+50%', timezone)
+      } finally { await page.close() }
+    }
   })
 
   it('menu-клиенту не показывают блок дня: мерить ему нечем', async () => {
