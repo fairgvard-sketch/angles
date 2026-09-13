@@ -666,3 +666,119 @@ Colima возвращена в исходное состояние OFF. Посл
 добавлен отдельный guard против будущих/переименованных миграций Kassa;
 он проверен unit-тестом и на фактическом списке файлов (копии ` 2` игнорируются).
 Чистый проверочный снимок: `/private/tmp/angle-auth-docs-Y8I8dM/`.
+
+## 13.09.2026 — приёмка F8.1: patch пока не принят, требуется R1
+
+Исходные HEAD: ANGLE `c8bf93b`, Kassa `91245d9`. Отчёт и patch Claude
+получены из `/private/tmp/claude-501/-Users-enotov-Desktop-kassa/9dbacc8c-25d2-4158-92c9-87998e9a7ffb/scratchpad/`.
+В исходную Kassa ничего не применялось; её tracked-отличие по-прежнему только
+пользовательский `CLAUDE.md`. Runtime/БД/production не менялись, push/deploy
+по F8.1 не выполнялись.
+
+Независимые проверки здесь, Node 22.16.0:
+
+- `git apply --check f8.1-startup-js-budget.patch` на Kassa main — exit 0.
+- 19 исходных тестов Claude через Node runner — 19 PASS.
+- 8 новых регрессий через **настоящий CLI** на синтетических dist — 0 PASS,
+  8 FAIL, общий exit 1. Это ошибки проверяемого скрипта, не тесты продукта.
+
+| Сценарий | Ожидалось | Получено |
+|---|---|---|
+| Нет module-entry, но есть modulepreload | exit 1 | exit 0 / OK |
+| `import "/assets/missing.js"` | exit 1 | exit 0 / OK |
+| `import "https://cdn.example.test/shared.js"` | exit 1 | exit 0 / OK |
+| `import "./missing.js#v1"` | exit 1 | exit 0 / OK |
+| Существующий `./shared.js?v=1` | exit 0, файл учтён | exit 1, ищется имя с query |
+| Текст `import "./ghost.js"` внутри JS-строки | exit 0 | exit 1, ложная зависимость |
+| Module-script внутри HTML-комментария | exit 0 | exit 1, ложный entry |
+| Текст `System.register` внутри JS-строки | exit 0 | exit 1, ложная legacy-зависимость |
+
+Код воспроизведения и полный лог:
+`/private/tmp/angle-f81-review-DkbhLb/review-regressions.mjs` и
+`/private/tmp/angle-f81-review-DkbhLb/review-regressions.log`.
+Регрессии не требуют браузера/сборки и не меняют настоящий dist. Причины
+подтверждены чтением кода: проверка `modern.length` допускает preload без
+entry; regex импортов не различает синтаксис/строки и отсекает адреса до
+валидации; query ошибочно остаётся частью файлового пути.
+
+Два замечания Claude также подтверждены чтением конфигурации: Node-набор
+не входит в `test:run`/CI, а `coverage.exclude` не исключает `.test.mjs`.
+Решение и ограниченное расширение области записаны в задании F8.1-R1 общего
+плана: отдельный `test:bundle`, общий `test:all`/CI, только тестовые расширения
+в coverage.exclude. Coverage самого CLI в Vitest и Node-прогон не смешивать.
+Полные build/580 тестов/coverage повторно здесь не запускались: сначала
+исправляются воспроизведённые блокеры приёмки. Заявленные Claude размеры
+и хеши в этой итерации не выдаются за независимую проверку здесь.
+`git diff --check` — PASS. `check:docs --require-kassa` в исходном дереве
+по-прежнему даёт 32 ошибки только сохранённых ` 2.md`; все 232 локальные
+ссылки проверены, новых ошибок ссылок/классификации от этой правки нет.
+
+## 13.09.2026 — F8.1-R1 принят: статический граф, обязательные тесты и обе сборки
+
+База Kassa `91245d9`, ANGLE `c8bf93b`. Совокупный R1 Claude получен из
+`/private/tmp/claude-501/-Users-enotov-Desktop-kassa/4dfd3f83-eb73-405c-a201-7b9b29e8c458/scratchpad/work/`.
+Проверочная копия здесь — чистый `git archive 91245d9`, без `.env`, backups,
+пользовательских дублей и исходного `node_modules`; Node 22.16.0/npm 10.9.2,
+чистый `npm ci` из lock. Исходные 35 тестов R1 и неизменённые 8 независимых
+регрессий предыдущей приёмки — PASS.
+
+Дополнительное чтение и четыре новых CLI-регрессии выявили ещё четыре ложных
+OK в R1: внешний статический импорт внутри `data:`, data-entry вместо файла
+в HTML, пропущенный статический импорт inline HTML-модуля и повреждённый JS
+(`import {`). До правки — 0/4 PASS. Исправлено здесь в рамках тех же файлов:
+`data:text/javascript,` допускается только после разбора и проверки отсутствия
+статических зависимостей; иные формы дают отказ. HTML data-entry отвергается,
+ошибка парсера больше не выдаётся за полный граф. Артефакты не исполняются.
+
+Первый вариант guard отвергал реальный POS HTML: detector Vite присутствует
+также в inline HTML, а не только внутри entry. Это **ошибка промежуточной
+проверки**, не дефект приложения; исправлена по фактическому выводу и исходнику
+установленного `@vitejs/plugin-legacy`. Dependency-free detector разрешён в
+обоих местах, вложенные зависимости по-прежнему дают отказ. Добавлено 7 тестов
+без ослабления прежних assertions; финальный набор — 42 теста.
+
+Независимые финальные проверки в объединённой чистой копии:
+
+| Проверка | Результат |
+|---|---|
+| `npm ci` | PASS, 648 пакетов; SHA-256 lock совпадает с исходным |
+| `npm run test:all` | PASS: 580 Vitest / 64 файла + 42 Node-теста, 0 skipped |
+| 8 прежних + 4 новых CLI-регрессии | 12 PASS |
+| `npm run lint` / `npm run check:schema` | PASS / v168 |
+| POS build + budget | PASS: modern 62.0 / 240 KiB, legacy 130.3 / 310 KiB |
+| Menu build + budget | PASS: modern 61.5 / 240 KiB, legacy 129.5 / 310 KiB |
+| `npm audit --json` | 0 уязвимостей, включая dev |
+| `npm run test:run -- --coverage` | PASS, 580 тестов; известный Deno parse-warning сохранён |
+| Docs в чистом совместном снимке | 70 документов, 233 ссылки, 0 ошибок |
+
+POS precache 136, Menu 58 entries; имена entry совпадают с R1 baseline Claude:
+POS `index-DOxngdrt.js`, Menu `index-CeHYBQC9.js`. Полное сравнение хешей
+до/после — доказательство в отчёте Claude; здесь независимо проверены сборки,
+состав графов и отсутствие runtime/lock-изменений, но отдельный baseline build
+повторно не делался.
+
+Coverage финального объединения: statements **24.70%**, branches **18.77%**,
+functions **18.24%**, lines **26.10%**. Это не 24.74% из отчёта R1: здесь
+добавлены guards. Исходный F2.1 baseline — 25.10/19.01/18.38/26.54;
+рабочий скрипт остаётся в знаменателе, его отдельный Node-runner не входит в
+Vitest coverage. Исключён только `.test/.spec.mjs`, не `scripts/**`.
+`uniform-format-export/index.ts` всё ещё пропускается самим coverage-parser:
+метрика неполна, причина не скрыта новым exclude.
+
+Kassa **`c7dd34026ddb299c9200836398f3b957c21ff9b9`** отправлен в `origin/main`
+по разрешению владельца. В коммите ровно семь согласованных файлов; SQL,
+runtime, зависимости/lock и budgets не менялись. `CLAUDE.md`, все ` 2`-копии
+и остальные пользовательские untracked-файлы сохранены вне коммита.
+GitHub Actions нового SHA — [34748759332](https://github.com/fairgvard-sketch/pos/actions/runs/34748759332),
+пока **queued**, не PASS; старый зелёный запуск на `91245d9` не считается
+подтверждением этого выпуска. Автоматические Vercel-статусы `pos` и
+`angle-menu` на `c7dd340` — success. Read-only smoke: POS `/setup` и корень
+Menu — HTTP 200; production entry остались `index-C7Mk36eb.js` и
+`index-BQ0Vcfr2.js`. Это проверка доступности HTML, не ручная приёмка функций.
+
+Логи и независимые регрессии: `/private/tmp/angle-f81-r1-accept-B0hoL5/`
+(`test-all-final.log`, `regressions-final.log`, `inline-before.log`,
+`lint-final.log`, `schema.log`, `build-pos.log`, `build-menu.log`,
+`budget-pos.log`, `budget-menu.log`, `coverage-final.log`, `audit.json`).
+Физический T2/печать, cold-start/SW, внешний SMTP и F5 restore не выполнялись.
+Production БД и checkout в этом блоке не менялись; миграций нет.
