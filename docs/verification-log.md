@@ -1633,3 +1633,88 @@ Colima и production в ходе подготовки задания не исп
 ранее принятого кода, не новый полный прогон. Исходные видео, ` 2`-дубли и
 `.claude/launch.json` сохраняются вне релиза. Backup/миграция/main/CI/Vercel
 на момент этой записи ещё не завершены; результат фиксируется отдельно.
+
+## 13.09.2026 — выпуск170 и B1/B3: production, main, CI и публикации PASS
+
+Разрешённый выпуск завершён. Kassa **`cb56f483416b8785e0fea745453cf6f69e634f18`**
+(10 файлов) и ANGLE **`ef345e0c62d17b3e9531d06a55070e1d2faeab25`**
+(12 файлов) отправлены fast-forward в main. Новые функциональные правки
+после принятого снимка не добавлялись; пользовательские дубли/сырые видео
+и локальные Claude-настройки не включены и не удалены.
+
+Артефакты выпуска: `/private/tmp/angle-a62-accept-9oeEFO/`.
+Совместный docs guard:8 PASS,70 документов /268 ссылок /0 ошибок.
+Для CLI использован чистый список миграций и ссылки на исходные env/привязку;
+секреты не копировались в исходники/артефакты Claude и не выводились в чат.
+
+**До изменения production:** project-ref guard подтвердил
+`qgmnxrgtlpyqglwqmsej`, схема169, checkout disabled. У2 устройств/2 Auth-user
+нулевые missing/null/foreign/duplicate/banned/mismatched привязки.
+Проверялись агрегаты и контрольные суммы, не содержимое client_errors/ops_errors.
+
+Свежий штатный backup:
+`/Users/enotov/Desktop/kassa/backups/2026-09-13T19-20-55.686Z-ziqX2u`.
+Завершён19:22:07 UTC; manifest complete, SHA256/размеры/права PASS,
+100 COPY-таблиц, включая auth.users/orders/payments/devices. Roles297B,
+schema960174B, data547290B; каталог0700/файлы0600, Git-ignored, FileVault On.
+Restore этой новой копии, offsite, PITR и файлы Storage этим не подтверждены.
+Colima включена только для backup22:19–22:24 IDT, затем выключена;
+существующие лабораторные БД не сбрасывались и не удалялись.
+
+**Миграция:** guarded dry-run показал ровно170, без seeds/roles;
+`npm run db:push -- --yes` применил её до обновления клиентов. SHA256
+SQL в исходниках и снимке совпал:
+`7a0b5f2623139ee97629b55e956bc81a65d4819e9e426703fac9081abd4c7201`.
+Read-only postcheck: схема170, одна запись ledger, тела обеих функций
+побайтово соответствуют исходнику по digest; SECURITY DEFINER/search_path,
+закрытые таблица/view/helper и разрешённый authenticated-ingest проверены.
+Контрольные агрегаты/хеши до/после одинаковы:330 заказов,126 оплат,
+привязки устройств, продукты/подписки/checkout requests. Checkout disabled
+сохранён. Ingest не вызывался в production, тестовых записей не создавалось.
+Логи: `backup170.log`, `migration170-dry-run.log`, `migration170.log`,
+`preflight170.json`, `after170.json`, `postcheck170.json`.
+
+**CI на функциональных коммитах — success, проверено19:27 UTC:**
+
+- [Kassa CI34777631850](https://github.com/fairgvard-sketch/pos/actions/runs/34777631850):
+  frontend и database, включая миграции с нуля и pgTAP.
+- [ANGLE CI34777627472](https://github.com/fairgvard-sketch/angles/actions/runs/34777627472):
+  обязательные unit/browser, сборка и docs.
+
+**Vercel — success на тех же SHA:**
+[POS](https://vercel.com/vandal2/pos/KQ8RVCfijrgQBPS6RPDN5E76v4xi),
+[Menu](https://vercel.com/vandal2/angle-menu/5DjZ5HwUqmr7AVtoDhZDmjNKoR73),
+[ANGLE](https://vercel.com/vandal2/angles/4kD19sAYfPJ3VhNhZTQSwKhb4EwH).
+Использована действующая Git-интеграция, новый хостинг не создавался.
+Edge Functions/APK не менялись и не перевыпускались.
+
+**HTTP smoke19:29 UTC — PASS:** главная, кабинет, POS/setup, гостевая Menu
+отдают HTML200;17 same-origin JS/CSS отвечают200 с правильным content-type.
+Hero MP4 —200,1 070 121B, immutable cache; карусель логотипов не вернулась.
+Кабинет `index-CMhfIZks.js`, POS `index-DR_UC7dF.js`, Menu `index-D5jjuRiZ.js`.
+Доказательства — `status-*.json` и `public-smoke.json` в снимке выпуска.
+
+Это проверка публикаций/HTTP, не реальный Auth/почта, browser-сессия
+обычного владельца, работающая касса, обновление SW или физический T2.
+F5 остаётся обязательным до первого заведения с реальными операциями,
+включая бесплатный пилот; платежи и налоговая регистрация не подключались.
+
+## 13.09.2026 — B3, первичный baseline открытой корзины (исправление впереди)
+
+На неизменённом Kassa `cb56f48` добавлены только внешние синтетические probes:
+`/private/tmp/angle-b3-review-VQnBOs/cart-baseline.test.mjs`, лог `baseline.log`.
+Функция `reconcileCart.ts` транспилирована установленным TypeScript и проверена
+Node-runner без браузера/сети/Auth/БД. Код обоих проектов не менялся.
+
+4 положительных контроля PASS: неизменённая строка, новая цена, исчезнувшая
+опция, пустая необязательная группа.4 новых сценария FAIL: переименование
+размера/модификатора с тем же ID сохраняет старую подпись; новая обязательная
+группа без выбора и уменьшенный max_select оставляют невалидный состав в
+результате сверки. Это отсутствие проверки ограничений выбранного состава,
+не доказательство фактического приёма такого заказа сервером.
+
+По чтению вызывающего эффекта PublicOrderPage результат простого переименования
+товара тоже отбрасывается, если нет удаления/изменения цены. Это пока статическое
+наблюдение, не воспроизведённый browser-тест. Следующий шаг — совместная матрица
+server/UI, затем исправление с положительными контролями. B2/B3 не закрыты;
+эти новые проверки не входят в зелёный regression suite выпущенного170.
