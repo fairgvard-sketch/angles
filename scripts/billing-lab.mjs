@@ -53,11 +53,11 @@ export async function startBillingLab({ database, initialize = false, port = 0 }
       '--table=public.product_catalog', '--table=public.product_capabilities', '--table=public.product_prices',
       '--table=public.reserved_slugs', '--table=supabase_migrations.schema_migrations']))
     const version = Number(await sql('SELECT get_schema_version();'))
-    if (!Number.isInteger(version) || version < 164 || version > 167) throw new Error('Lab requires a known local baseline 164–167')
+    if (!Number.isInteger(version) || version < 164 || version > 168) throw new Error('Lab requires a known local baseline 164–168')
     for (const name of (await readdir(kassa + 'supabase/migrations')).filter(name => /^\d+_.+\.sql$/.test(name)).sort()) {
       const next = Number(name.split('_')[0])
       if (next <= version) continue
-      if (next > 167) throw new Error('Review new migrations before extending the billing lab')
+      if (next > 168) throw new Error('Review new migrations before extending the billing lab')
       const migration = await readFile(kassa + 'supabase/migrations/' + name, 'utf8')
       await sql(`BEGIN; ${migration}\nINSERT INTO supabase_migrations.schema_migrations(version,name,statements)
         VALUES (${quote(String(next))},${quote(name)},ARRAY[]::TEXT[]); COMMIT;`)
@@ -65,8 +65,9 @@ export async function startBillingLab({ database, initialize = false, port = 0 }
     await sql("CREATE TABLE public.angle_billing_lab_marker(marker TEXT PRIMARY KEY CHECK(marker='synthetic-only')); INSERT INTO public.angle_billing_lab_marker VALUES ('synthetic-only'); REVOKE ALL ON public.angle_billing_lab_marker FROM PUBLIC, anon, authenticated;")
   }
   if (await sql('SELECT marker FROM public.angle_billing_lab_marker;') !== 'synthetic-only') throw new Error('Not an initialized billing lab')
-  // 167 only restores explicit drawer/slug ACLs; checkout is unchanged.
-  if (!['166', '167'].includes(await sql('SELECT get_schema_version();'))) throw new Error('Lab schema must be 166 or 167')
+  // 167 fixes table ACLs; 168 narrows digital identity/catalogue access. The
+  // synthetic active owners and service-only payment path remain authorized.
+  if (!['166', '167', '168'].includes(await sql('SELECT get_schema_version();'))) throw new Error('Lab schema must be 166, 167 or 168')
   const users = [
     { user: 'a1000000-0000-4000-8000-000000000001', org: 'a2000000-0000-4000-8000-000000000001', location: 'a3000000-0000-4000-8000-000000000001', name: 'Test Cafe A' },
     { user: 'a1000000-0000-4000-8000-000000000002', org: 'a2000000-0000-4000-8000-000000000002', location: 'a3000000-0000-4000-8000-000000000002', name: 'Test Cafe B' },

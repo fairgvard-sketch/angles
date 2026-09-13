@@ -398,3 +398,70 @@
   полный A6 с реальными JWT, физический T2/SW/offline/печать и восстановление
   актуальной резервной копии. Реальный провайдер, цены и налоговая регистрация
   не приняты. Этот технический выпуск не означает готовность всех функций к продаже.
+
+## 13.09.2026 — A6: digital-границы, каталог и прямой REST
+
+- База: ANGLE `ddaa19b`, Kassa `34b7947`; ветки `codex/a6-access-boundaries`.
+  F2.1 передан Claude; manifest/lock, зависимости и Vitest не менялись.
+  Чужие `CLAUDE.md`, `.claude/launch.json` и видео сохранены вне нашего patch.
+- Подтверждены серверные пробелы: 129 потеряла capability-гейт `save_menu_item`,
+  128 не проверяла продукт в массовой правке; прямые catalogue writes обходили
+  продукт/manage-роль; UUID FK допускали связи с чужими родителями; direct reads
+  Orders/Reserve и старый digital JWT обходили соответствующие ограничения.
+  Исходная 30-сценарная SQL-матрица на 167: **22 FAIL / 8 PASS** (часть поздних
+  отказов — следствия более ранних разрешённых мутаций, не 22 разных дефекта).
+  Лог `/private/tmp/angle-a6-baseline-167.log`.
+- Миграция **168**: digital `auth_org_id()` проверяет активное членство, каталожные
+  REST-пути проверяют capability/роль, save/bulk имеют закрытые ungated-тела,
+  связи каталога проверяют tenant родителя; прямые Orders/Reserve reads —
+  capability точки. Storage write-гейт сохраняет оформление Reserve без Menu;
+  публичность готовых гостевых изображений не менялась. Нет удаления/переноса
+  данных, смены режима оплаты, изменения PIN/hot-flow или финансовой логики.
+  У новых SECURITY DEFINER helpers явный `public, pg_temp`; тест подмены
+  membership-таблицы через временную схему отвергается.
+- `PASS`: **81 SQL-файл / 1513 проверок**, включая **52 A6-сценария**, на новой
+  `angle_billing_lab_a6_final_20260913` (schema-only локальный baseline 164,
+  технические справочники, затем 165–168). Каждый файл в rollback-транзакции;
+  проверены exit/signal, отсутствие `not ok` и совпадение TAP-плана.
+  Лог `/private/tmp/angle-a6-sql-168-final.log`.
+  Четыре старые fixture-настройки получили необходимый активный продукт
+  (bulk/partial/recipes/CRM reservation reads), assertions данных сохранены.
+  Три ожидания отказа без членства теперь `not authenticated`: отказ происходит
+  раньше, в общем tenant helper, а не только в backoffice-RPC.
+- Один промежуточный SQL-прогон завис в Docker-клиенте уже после завершения
+  запроса PostgreSQL. Остановлен только подтверждённый клиент этого прогона;
+  такой прогон не принят как чистый. Повтор с лимитом 30 с на файл и строгой
+  проверкой status/signal прошёл, затем полностью повторён на окончательной 168.
+- `PASS`: **17 настоящих HTTP/JWT-проверок** отдельного PostgREST v14.5,
+  последний прогон `angle_billing_lab_a6_http_final_20260913`.
+  Проверены подпись JWT/anon, unpaid RPC/direct read, чужие строки/родители,
+  read-only роль, отзыв/удаление членства с тем же подписанным JWT, SD-RPC,
+  работоспособность другого tenant. Токены выпущены тестом с одноразовым ключом,
+  **не GoTrue**. Подключение только к новой локальной БД через localhost;
+  production/.env не использовались. Временный HTTP-контейнер удалён в finally,
+  БД сохранена. Скрипт — `scripts/test-account-access-http.mjs`.
+- Клиент: context RPC связан с исходным access token; ответ другой организации
+  не публикуется. Две новые unit-регрессии сначала FAIL, после правки PASS.
+  `PASS`: ANGLE **747 unit**, полный required-browser **219**, 0 FAIL/CANCELLED/
+  SKIPPED, около 108 с; build PASS. Из них 7 новых UI-сценариев проверяют
+  запрещённые deep links, выход/вход, поздние ответы и смену организации.
+  Первый изолированный Chrome-запуск внутри файловой песочницы упал до тестов
+  с TargetCloseError; разрешённый запуск вне неё и полный прогон прошли.
+  Проверки/таймауты harness не ослаблялись. Browser log:
+  `/private/tmp/angle-a6-browser-full.log`.
+- `PASS`: Kassa lint, check:schema **168**, **580 тестов / 64 файла**, POS build,
+  check:bundle **61.5 / 129.8 KiB gzip**, отдельный Menu build. Использованы
+  CI-плейсхолдеры env; локальный dist содержит Menu и не предназначен для
+  загрузки как POS. Остаток Vitest-аудита — задача Claude, здесь не пересчитывался.
+- `PASS`: прежний SQL-backed billing acceptance на новой
+  `angle_billing_lab_a6_payment_20260913`, схема 168: unpaid/decline/paid,
+  replay/concurrency/foreign owner/amount/Origin/cancel/grace/expiry/renewal;
+  desktop/mobile без pageerror/overflow. Это по-прежнему не настоящий провайдер.
+- Справочники аккаунта, БД/продуктов/биллинга, AGENTS и план обновлены.
+  Полный A6 остаётся открытым: реальный GoTrue/письма, оставшаяся инвентаризация
+  API, совмещённые POS/device identities и multi-location-подписки требуют
+  отдельной приёмки. Legacy device JWT с location_id и мягкий PIN hot-flow
+  намеренно не менялись; отзыв digital membership не объявляется отзывом устройства.
+  Auth/SMTP, физический T2 и restore-test актуальной копии — **NOT RUN**.
+- На момент локальной приёмки production остаётся на 167; применение 168,
+  push/main и деплой этим прогоном не подтверждаются. CI и итог выпуска — ниже.

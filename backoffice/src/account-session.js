@@ -151,10 +151,16 @@ export function createAccountSession(client, {
     try {
       const result = await deadline(() => {
         const request = client.rpc('get_backoffice_context')
+        // A shared SDK client can change account while a request is scheduled.
+        // Bind this read to the session whose UI is waiting for the response.
+        request.setHeader?.('Authorization', `Bearer ${session.access_token}`)
         return request.abortSignal ? request.abortSignal(abort.signal) : request
       }, timeoutMs, () => abort.abort())
       if (stopped || version !== contextVersion) return
       if (result.error || !result.data) throw result.error || new Error('Empty workspace context')
+      if (result.data.organization?.id !== session.user.app_metadata.org_id) {
+        throw new Error('Workspace context does not match this session')
+      }
       publish({ status: 'ready', context: result.data, error: '' })
     } catch (error) {
       if (!stopped && version === contextVersion) {

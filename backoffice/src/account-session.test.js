@@ -93,6 +93,22 @@ test('ordinary owner loads context and repeated focus sign-in does not unmount i
   assert.equal(f.state(), before)
   assert.equal(f.calls.length, 1)
 })
+test('a mismatched workspace response is never published for the current account', async (t) => {
+  const f = setup(t, { rpc: async () => ({ data: { organization: { id: 'org-b' } }, error: null }) })
+  await until(() => f.state().status !== 'loading')
+  assert.equal(f.state().status, 'context-error')
+  assert.equal(f.state().context, null)
+})
+test('context RPC is bound to the access token captured for this account', async (t) => {
+  const headers = []
+  const f = setup(t, { rpc: () => ({
+    setHeader(name, value) { headers.push([name, value]); return this },
+    abortSignal() { return this },
+    then(resolve) { return Promise.resolve({ data: { organization: { id: 'org-a' } }, error: null }).then(resolve) },
+  }) })
+  await until(() => f.state().status === 'ready')
+  assert.deepEqual(headers, [['Authorization', 'Bearer a-token']])
+})
 test('failed session read is visible even if INITIAL_SESSION is null', async (t) => {
   const f = setup(t, { auth: { getSession: async () => ({ data: { session: null }, error: { code: 'request_timeout' } }) } })
   f.emit('INITIAL_SESSION', null)
