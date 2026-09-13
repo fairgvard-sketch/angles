@@ -74,6 +74,24 @@ export async function fetchChannels(locationId) {
   }
 }
 
+/** Same visibility rules as public-menu: active categories, available items.
+ * Only identifiers/flags are read here; prices/photos/options remain in the
+ * existing editor. A read failure is unknown, never an empty catalogue. */
+export async function fetchMenuSetup(locationId) {
+  const { data, error } = await supabase
+    .from('menu_categories')
+    .select('id, menu_items (id, is_available)')
+    .eq('location_id', locationId)
+    .eq('is_active', true)
+  if (error) throw new Error(error.message)
+  if (!Array.isArray(data)) throw new Error('Catalogue response missing')
+  return {
+    categoryCount: data.length,
+    availableCount: data.reduce((count, category) => count
+      + (category.menu_items || []).filter(item => item.is_available === true).length, 0),
+  }
+}
+
 /** Зона отчёта: точки, если она известна, иначе браузера */
 function salesZone(tz) {
   return tz || Intl.DateTimeFormat().resolvedOptions().timeZone || 'Asia/Jerusalem'
@@ -128,6 +146,7 @@ export async function loadDashboard(context, locationId, { tz } = {}) {
   if ((can('public_menu') || can('online_orders') || can('public_reservations')) && locationId) {
     jobs.channels = fetchChannels(locationId)
   }
+  if (can('catalog_manage') && can('public_menu') && locationId) jobs.menuSetup = fetchMenuSetup(locationId)
 
   const keys = Object.keys(jobs)
   const results = await Promise.allSettled(keys.map((key) => jobs[key]))

@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import {
   AlertTriangle, ArrowDownRight, ArrowUpRight, CalendarDays, ChevronRight, Info,
-  Minus, MonitorSmartphone, QrCode, ShoppingBag, Wifi,
+  Minus, QrCode, ShoppingBag, Wifi,
 } from 'lucide-react'
 import {
   attentionItems, chartSummary, dayStamp, fetchDaySales, fleetSummary, heroKind,
@@ -17,6 +17,7 @@ import { Button } from './ui/Button'
 import { EmptyState, PageHeader, Panel, StatusBadge } from './ui/Layout'
 import PartyCount from './ui/PartyCount'
 import Skeleton, { SkeletonBar, SkeletonPanel } from './ui/Skeleton'
+import MenuSetup from './MenuSetup'
 
 /**
  * Главная кабинета: как идёт день и что требует решения.
@@ -45,8 +46,9 @@ const ATTENTION_ICON = { alert: AlertTriangle, warn: AlertTriangle, info: Info }
  * чтобы сообщить, что новостей нет. Место при этом фиксированное —
  * владелец всегда знает, куда смотреть.
  */
-function Attention({ items, onNavigate }) {
+function Attention({ items, onNavigate, showClear = true }) {
   if (items.length === 0) {
+    if (!showClear) return null
     return (
       <p className="dash-clear">
         <Info aria-hidden /> Nothing needs a decision right now.
@@ -164,7 +166,16 @@ function Today({ label, value, curve, bars, comparison, strip, loading, failed }
 
 // ── Экран ───────────────────────────────────────────────────
 
-export default function HomeDashboard({ context, locationId, onNavigate, children }) {
+export default function HomeDashboard(props) {
+  const { context, locationId } = props
+  // Scope changes unmount the old dashboard before any new request finishes:
+  // no previous location's link, totals or setup hints under the new heading.
+  const scope = JSON.stringify([context.organization?.id, context.member?.id,
+    context.member?.auth_user_id, locationId, context.capabilities, context.products])
+  return <ScopedDashboard key={scope} {...props} />
+}
+
+function ScopedDashboard({ context, locationId, onNavigate, children }) {
   const [data, setData] = useState(null)
   const [yesterday, setYesterday] = useState(null)
   const [loading, setLoading] = useState(true)
@@ -182,12 +193,17 @@ export default function HomeDashboard({ context, locationId, onNavigate, childre
    * секунд висел бы процент от старой.
    */
   const yesterdayRef = useRef({ key: null, report: null })
+  const requestRef = useRef(0)
 
   const load = useCallback(async (silent = false) => {
+    const request = ++requestRef.current
+    const current = () => requestRef.current === request
     if (!silent) setLoading(true)
     setError('')
     try {
-      setData(await loadDashboard(context, locationId, { tz }))
+      const result = await loadDashboard(context, locationId, { tz })
+      if (!current()) return
+      setData(result)
       const stamp = Date.now()
       setNow(stamp)
 
@@ -204,18 +220,19 @@ export default function HomeDashboard({ context, locationId, onNavigate, childre
       if (!yesterdayRef.current.report) {
         try {
           const report = await fetchDaySales(locationId, { tz, offsetDays: -1 })
+          if (!current()) return
           yesterdayRef.current = { key, report }
           setYesterday(report)
         } catch {
           // Сравнение необязательно: без него блок «сегодня» живёт целиком,
           // а неверный процент был бы хуже отсутствующего.
-          setYesterday(null)
+          if (current()) setYesterday(null)
         }
       }
     } catch (e) {
-      setError(e.message)
+      if (current()) setError(e.message)
     } finally {
-      setLoading(false)
+      if (current()) setLoading(false)
     }
   }, [context, locationId, tz])
 
@@ -223,10 +240,14 @@ export default function HomeDashboard({ context, locationId, onNavigate, childre
     load()
     // Пока экран открыт — тихо освежаем: заказ и бронь приходят без нас
     const timer = setInterval(() => load(true), 60_000)
-    return () => clearInterval(timer)
+    return () => { clearInterval(timer); requestRef.current += 1 }
   }, [load])
 
   const can = (capability) => hasCapability(context, capability)
+  const showMenuSetup = Boolean(locationId && location && can('catalog_manage') && can('public_menu'))
+  const guestUrl = data?.channels
+    ? `${PUBLIC_MENU_ORIGIN}/${can('public_menu') ? 'order' : 'reserve'}/${data.channels.slug || data.channels.locationId}`
+    : null
   const orders = ordersSummary(data?.orders, now, tz)
   const bookings = reservationsSummary(data?.reservations, now)
   const fleet = fleetSummary(data?.fleet)
@@ -305,7 +326,7 @@ export default function HomeDashboard({ context, locationId, onNavigate, childre
             кабинета, где её можно переключить. */}
         <p className="dash-day">
           {todayLabel(now, tz)}
-          <span className="dash-updated">updated {timeLabel(new Date(now).toISOString(), tz)}</span>
+          {data && <span className="dash-updated">updated {timeLabel(new Date(now).toISOString(), tz)}</span>}
           {/* Частичный отказ — состояние продукта, а не ошибка: остальные
               виджеты обязаны остаться на экране. */}
           {data?.failed?.length > 0 && (
@@ -314,6 +335,9 @@ export default function HomeDashboard({ context, locationId, onNavigate, childre
             </span>
           )}
           {error && <span className="dash-partial">{error}</span>}
+          {(error || data?.failed?.length > 0) && (
+            <Button variant="text" busy={loading} onClick={() => load()}>Retry loading</Button>
+          )}
         </p>
       </PageHeader>
 
@@ -348,7 +372,13 @@ export default function HomeDashboard({ context, locationId, onNavigate, childre
         </Skeleton>
       ) : (
         <>
-          <Attention items={attention} onNavigate={onNavigate} />
+          <Attention items={attention} onNavigate={onNavigate}
+            showClear={!error && !data?.failed?.length && !(showMenuSetup && !data?.menuSetup?.availableCount)} />
+
+          {showMenuSetup && (
+            <MenuSetup context={context} location={location} catalogue={data?.menuSetup}
+              guestUrl={guestUrl} onNavigate={onNavigate} />
+          )}
 
           {kind && (
             <Today
@@ -504,7 +534,7 @@ export default function HomeDashboard({ context, locationId, onNavigate, childre
                         которого она не покупала. */}
                     <a
                       className="text-button"
-                      href={`${PUBLIC_MENU_ORIGIN}/${can('public_menu') ? 'order' : 'reserve'}/${data.channels.slug || data.channels.locationId}`}
+                      href={guestUrl}
                       target="_blank"
                       rel="noreferrer"
                     >
@@ -512,14 +542,6 @@ export default function HomeDashboard({ context, locationId, onNavigate, childre
                     </a>
                   </div>
                 </div>
-              </Panel>
-            )}
-
-            {!can('pos_operate') && !can('orders_desk') && !can('reservations_desk') && (
-              <Panel title="Devices">
-                <EmptyState>
-                  <MonitorSmartphone aria-hidden /> This workspace has no register — everything runs from here.
-                </EmptyState>
               </Panel>
             )}
           </div>

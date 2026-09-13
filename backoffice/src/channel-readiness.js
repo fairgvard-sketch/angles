@@ -19,15 +19,15 @@ import { LAUNCH_STEPS } from './launch'
  * Блокеры гостевого меню точки.
  *
  * Каталог общий на организацию, но категория принадлежит точке —
- * гостю показывается ровно её меню. Поэтому считаем позиции в
- * категориях ЭТОЙ точки, а не всё, что есть у организации.
+ * гостю показывается ровно её меню. Поэтому считаем позиции в активных
+ * категориях ЭТОЙ точки — как public-menu, а не весь каталог организации.
  */
 export function menuBlockers({ categories, items, locationId, tables, settings, orderingAvailable = true } = {}) {
   const blockers = []
   if (!Array.isArray(categories) || !Array.isArray(items)) return blockers
 
   const mine = new Set(
-    categories.filter((c) => !locationId || c.location_id === locationId).map((c) => c.id)
+    categories.filter((c) => c.is_active === true && (!locationId || c.location_id === locationId)).map((c) => c.id)
   )
   const inLocation = items.filter((i) => mine.has(i.category_id))
   const onSale = inLocation.filter((i) => i.is_available)
@@ -44,7 +44,7 @@ export function menuBlockers({ categories, items, locationId, tables, settings, 
       id: 'nothing-on-sale',
       title: inLocation.length === 0
         ? 'No items in this location’s menu'
-        : `All ${inLocation.length} items are hidden`,
+        : inLocation.length === 1 ? 'The only item is hidden' : `All ${inLocation.length} items are hidden`,
       detail: 'Guests open the link and see an empty menu.',
       action: { label: 'Manage catalogue', view: 'menu' },
     })

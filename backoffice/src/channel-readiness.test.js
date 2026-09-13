@@ -12,8 +12,8 @@ import { blockerSummary, menuBlockers, reserveBlockers } from './channel-readine
  */
 
 const categories = [
-  { id: 'c1', location_id: 'loc-1', name: 'Кофе' },
-  { id: 'c2', location_id: 'loc-2', name: 'Чужая точка' },
+  { id: 'c1', location_id: 'loc-1', name: 'Кофе', is_active: true },
+  { id: 'c2', location_id: 'loc-2', name: 'Чужая точка', is_active: true },
 ]
 const items = [
   { id: 'i1', category_id: 'c1', is_available: true },
@@ -69,6 +69,33 @@ describe('блокеры гостевого меню', () => {
   it('без данных каталога молчит, а не пугает', () => {
     assert.deepEqual(menuBlockers({}), [])
     assert.deepEqual(menuBlockers({ categories: null, items: null }), [])
+  })
+
+  it('inactive categories do not make the public menu ready', () => {
+    const blockers = menuBlockers({
+      categories: categories.map(c => ({ ...c, is_active: false })), items, locationId: 'loc-1',
+    })
+    assert.equal(blockers[0]?.id, 'no-categories')
+  })
+
+  it('only is_active=true matches the public-menu visibility rule', () => {
+    for (const is_active of [false, null, undefined]) {
+      const blockers = menuBlockers({
+        categories: [{ ...categories[0], is_active }], items, locationId: 'loc-1',
+      })
+      assert.equal(blockers[0]?.id, 'no-categories')
+    }
+  })
+
+  it('items in inactive categories do not mask a stop-listed active menu', () => {
+    const blockers = menuBlockers({
+      categories: [categories[0], { id: 'inactive', location_id: 'loc-1', is_active: false }],
+      items: [{ id: 'hidden', category_id: 'c1', is_available: false },
+        { id: 'available', category_id: 'inactive', is_available: true }],
+      locationId: 'loc-1',
+    })
+    assert.equal(blockers[0]?.id, 'nothing-on-sale')
+    assert.equal(blockers[0]?.title, 'The only item is hidden')
   })
 })
 

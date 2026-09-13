@@ -116,7 +116,22 @@ CI работает с заглушками данных и локальным �
 доставку Auth-писем, production SMTP, RLS реального сервера и печать.
 Зелёный CI подтверждается только запуском CI, а не локальным прогоном.
 
-Для правок QR-настроек короткий регрессионный прогон:
+Для маршрута первого запуска и загрузки Dashboard отдельно:
+
+```bash
+ANGLE_BROWSER=required node --import ./backoffice/test/register.mjs --test --test-timeout=60000 backoffice/test/menu-setup.test.mjs
+node --import ./backoffice/test/register.mjs --test backoffice/src/channel-readiness.test.js
+```
+
+`menu-setup.test.mjs` монтирует настоящий Dashboard и его загрузчики с
+синтетическим transport в StrictMode. Проверяет переходы к текущим редакторам,
+Menu-only / Orders / Reserve, активность категорий и стоп-лист, отказ/повтор,
+поздние ответы A → B → A, смену организации/прав и порядок фоновых обновлений.
+Перехвачены все внешние запросы. Это не сквозная приёмка редакторов, публичного
+API или RLS: сохранение, реальный гость, телефон и T2 проверяются отдельно.
+Раскрытие подсказки проверяется клавиатурой, вёрстка — на 320/375/1280 px.
+
+Для самого QR-раздела:
 
 ```bash
 ANGLE_BROWSER=required node --import ./backoffice/test/register.mjs --test --test-timeout=60000 backoffice/test/qr-channel-state.test.mjs

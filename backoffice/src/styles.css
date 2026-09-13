@@ -398,6 +398,22 @@ a { color: inherit; }
 }
 .dash-clear svg { width: 16px; height: 16px; flex: none; color: var(--c-icon-faint); }
 
+/* A short first-run route, collapsed for an established menu. Existing editors
+   own every mutation; this panel contains no separate completion state. */
+.menu-setup { margin-bottom: var(--sp-3); }
+.menu-setup summary { cursor: pointer; padding: var(--sp-3) 22px; min-height: var(--h-touch); }
+.menu-setup summary strong { font-size: 16px; }
+.menu-setup summary span { display: block; margin-top: 4px; color: var(--c-text-muted); font-size: 13px; }
+.menu-setup-note { margin: 0; color: var(--c-text-subtle); font-size: 13px; }
+.menu-setup details > .menu-setup-note { padding: 0 22px var(--sp-3); }
+.menu-setup ol { margin: 0; padding: 0 22px var(--sp-2) 44px; }
+.menu-setup li { padding: var(--sp-3) 0; border-top: 1px solid var(--c-border-hair); font-size: 14px; }
+.menu-setup li::marker { color: var(--c-text-subtle); }
+.menu-setup li p { margin: 4px 0 10px; color: var(--c-text-muted); line-height: 1.5; }
+.menu-setup li button, .menu-setup li a { max-width: 100%; }
+.menu-setup .button-label { white-space: normal; }
+.menu-setup { overflow-wrap: anywhere; }
+
 /* Как идёт день. Главное число набрано той же шкалой, что чистая выручка
    в Sales: это одна и та же величина, и разный размер разводил бы два
    экрана по важности. */
