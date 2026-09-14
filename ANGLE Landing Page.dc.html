@@ -61,6 +61,10 @@
     .solution-card.is-active:hover .solution-card-link-arrow { transform:translateX(4px); }
     .guest-experience { padding:120px 0; background:#000000; color:#FFFFFF; }
     .guest-experience-inner { width:100%; max-width:1460px; margin:0 auto; padding:0 32px; box-sizing:border-box; }
+    .guest-copy-cta { display:inline-flex; align-items:center; gap:12px; margin-top:28px; padding:13px 18px; border-radius:6px; background:#FFFFFF; color:#0B0B0B; font-size:14px; font-weight:650; transition:transform 220ms ease, opacity 220ms ease; }
+    .guest-copy-cta:hover { opacity:0.86; transform:translateY(-2px); }
+    .guest-copy-cta:focus-visible { outline:2px solid #FFFFFF; outline-offset:4px; }
+    .guest-qr-sales-image { position:absolute; inset:0; width:100%; height:100%; display:block; object-fit:cover; object-position:right center; }
     .guest-experience-layout { display:grid; grid-template-columns:minmax(330px, 0.72fr) minmax(0, 1.28fr); align-items:center; gap:clamp(52px, 7vw, 112px); }
     .guest-experience-copy { min-width:0; }
     .guest-experience-kicker { margin:0 0 24px; font-size:13px; font-weight:600; letter-spacing:0.18em; color:#9A9A94; }
@@ -518,6 +522,7 @@
       .hero-title { font-size:42px !important; }
       .product-click-title { font-size:36px; }
       .guest-experience-title { font-size:38px; }
+      .guest-qr-sales-image { object-position:69% center; }
       .guest-tabs { gap:16px; }
       .guest-tab { font-size:13px; }
       .guest-preview { min-height:590px; }
@@ -693,12 +698,13 @@
 
           <div class="guest-copy-panels">
             <div class="guest-copy-panel is-active" id="guest-copy-qr" role="tabpanel" aria-labelledby="guest-tab-qr" data-guest-copy="qr">
-              <p>A printable location QR opens the live ANGLE menu, where guests can configure items and send an order without an app.</p>
+              <p>A video-first QR menu lets guests browse, configure and send an order from their own phone — without waiting for staff or installing an app.</p>
               <ul>
-                <li>Categories, item availability and current prices</li>
-                <li>Sizes and modifiers before adding to the basket</li>
-                <li>Here, takeaway or delivery when enabled</li>
+                <li>Fewer queues and less routine work for the team</li>
+                <li>Appetising visuals, live prices and item availability</li>
+                <li>Smart modifiers and recommendations that grow the order</li>
               </ul>
+              <a class="guest-copy-cta" href="https://menu.angle.co.il/order/fe2eebf0-65e3-45b4-a81f-331359d71955" target="_blank" rel="noopener noreferrer">Open live menu <span aria-hidden="true">↗</span></a>
             </div>
             <div class="guest-copy-panel" id="guest-copy-reservations" role="tabpanel" aria-labelledby="guest-tab-reservations" hidden data-guest-copy="reservations">
               <p>Guests scan, choose a date, party size, exact time and seating zone, then receive confirmation on the same phone.</p>
@@ -742,32 +748,7 @@
           </div>
 
           <div class="guest-preview-panel guest-preview-qr is-active" data-guest-panel="qr" aria-hidden="false">
-            <div class="guest-scene-label">QR TO LIVE MENU · ORDER SENT TO ANGLE</div>
-            <div class="guest-qr-placard">
-              <span>ONLINE MENU</span>
-              <img class="guest-qr-code" src="uploads/angle-menu-qr.svg" alt="Demo QR code for the online menu">
-              <strong>Scan to open menu</strong>
-              <small>Prices and availability stay live</small>
-            </div>
-            <div class="guest-flow-stack" aria-hidden="true">
-              <div class="guest-flow-step"><span>Scan the location QR</span></div>
-              <div class="guest-flow-step"><span>Choose size and modifiers</span></div>
-              <div class="guest-flow-step"><span>Send the order to ANGLE</span></div>
-            </div>
-            <div class="iphone17 is-menu" aria-label="QR menu shown on iPhone 17 Pro Max">
-              <div class="iphone17-screen">
-                <div class="iphone17-island"></div>
-                <div class="iphone17-status">
-                  <span class="iphone17-status-left"><span>20:24</span></span>
-                  <span class="iphone17-status-right"><span class="iphone17-cellular" aria-hidden="true"><i></i><i></i><i></i><i></i></span><svg class="iphone17-wifi" viewBox="0 0 24 18" aria-hidden="true"><path d="M2 5.5C7.7.5 16.3.5 22 5.5"></path><path d="M5.5 9c3.8-3.2 9.2-3.2 13 0"></path><path d="M9 12.5c1.8-1.5 4.2-1.5 6 0"></path><path d="M12 16h.01"></path></svg><span class="iphone17-battery"><span class="iphone17-battery-level"></span>58</span></span>
-                </div>
-                <div class="menu-demo" aria-label="Interactive QR menu flow from category selection to order confirmation">
-                  <div class="angle-menu-demo" data-angle-menu-demo>
-                    <img class="angle-menu-demo-fallback" src="uploads/qr-menu-step-1.png" alt="ANGLE QR menu on iPhone">
-                  </div>
-                </div>
-              </div>
-            </div>
+            <img class="guest-qr-sales-image" src="uploads/qr-menu-sales-banner-dynamic-island.png" alt="ANGLE QR menu shown across video cover, product catalogue, cappuccino configuration and smart cart screens, all on phones with Dynamic Island" loading="lazy" decoding="async">
           </div>
         </div>
       </div>
