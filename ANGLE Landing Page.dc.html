@@ -64,7 +64,61 @@
     .guest-copy-cta { display:inline-flex; align-items:center; gap:12px; margin-top:28px; padding:13px 18px; border-radius:6px; background:#FFFFFF; color:#0B0B0B; font-size:14px; font-weight:650; transition:transform 220ms ease, opacity 220ms ease; }
     .guest-copy-cta:hover { opacity:0.86; transform:translateY(-2px); }
     .guest-copy-cta:focus-visible { outline:2px solid #FFFFFF; outline-offset:4px; }
-    .guest-qr-sales-image { position:absolute; inset:0; width:100%; height:100%; display:block; object-fit:cover; object-position:right center; }
+    .qr-showcase-stage { position:absolute; inset:0; overflow:hidden; background:radial-gradient(circle at 52% 38%, #FFFFFF 0, #F6F6F4 30%, transparent 58%), linear-gradient(145deg, #EEF0F3, #DDE1E7); }
+    .qr-showcase-stage::before { content:""; position:absolute; inset:8% 6%; border:1px solid rgba(13,18,28,0.08); border-radius:50%; transform:rotate(-9deg); }
+    .qr-showcase-phone { position:absolute; box-sizing:border-box; aspect-ratio:9 / 18.2; padding:5px; border:1px solid #424650; border-radius:clamp(24px, 4vw, 42px); background:#0A0B0E; color:#111827; box-shadow:0 28px 54px rgba(20,28,42,0.25); }
+    .qr-showcase-phone--catalog { z-index:2; left:2.5%; top:18%; width:28%; transform:rotate(-4deg); }
+    .qr-showcase-phone--video { z-index:5; left:32.5%; top:4%; width:34%; transform:rotate(-0.8deg); }
+    .qr-showcase-phone--product { z-index:4; right:13%; top:14%; width:26%; transform:rotate(3deg); }
+    .qr-showcase-phone--cart { z-index:3; right:1.2%; top:27%; width:22%; transform:rotate(6deg); }
+    .qr-showcase-screen { position:relative; height:100%; overflow:hidden; border-radius:calc(clamp(24px, 4vw, 42px) - 6px); background:#FFFFFF; }
+    .qr-showcase-island { position:absolute; z-index:10; top:8px; left:50%; width:25%; min-width:42px; max-width:72px; height:15px; transform:translateX(-50%); border-radius:999px; background:#050506; box-shadow:inset 0 0 0 1px rgba(255,255,255,0.04); }
+    .qr-showcase-status { position:absolute; z-index:9; top:8px; left:9px; right:9px; display:flex; align-items:center; justify-content:space-between; color:#111827; font-size:8px; line-height:1; font-weight:750; letter-spacing:-0.02em; }
+    .qr-showcase-status span:last-child { letter-spacing:-0.12em; }
+    .qr-showcase-header { height:58px; padding:29px 10px 0; box-sizing:border-box; display:flex; align-items:center; justify-content:space-between; border-bottom:1px solid #ECEEF1; font-size:9px; }
+    .qr-showcase-header strong { font-size:11px; }
+    .qr-showcase-logo { width:21px; height:21px; display:grid; place-items:center; border-radius:50%; background:#111318; color:#FFFFFF; font:700 9px/1 Georgia, serif; }
+    .qr-showcase-categories { display:flex; gap:4px; padding:8px 7px 6px; overflow:hidden; direction:rtl; }
+    .qr-showcase-categories span { flex:0 0 auto; padding:5px 7px; border-radius:999px; background:#F0F1F3; font-size:7px; font-weight:700; }
+    .qr-showcase-categories span:first-child { border:1px solid #111827; background:#FFFFFF; }
+    .qr-showcase-title { margin:7px 10px 8px; direction:rtl; font-size:15px; line-height:1.1; }
+    .qr-showcase-catalog-grid { display:grid; grid-template-columns:repeat(2, minmax(0, 1fr)); gap:6px; padding:0 7px 8px; direction:rtl; }
+    .qr-showcase-catalog-card { overflow:hidden; border:1px solid #ECEEF1; border-radius:10px; background:#FFFFFF; box-shadow:0 4px 10px rgba(17,24,39,0.06); }
+    .qr-showcase-catalog-card img { width:100%; height:58px; display:block; object-fit:contain; background:#E9E2D6; }
+    .qr-showcase-catalog-card div { padding:5px 6px 6px; }
+    .qr-showcase-catalog-card strong, .qr-showcase-catalog-card small { display:block; }
+    .qr-showcase-catalog-card strong { font-size:8px; line-height:1.15; }
+    .qr-showcase-catalog-card small { margin-top:3px; color:#5B6170; font-size:7px; }
+    .qr-showcase-video { position:absolute; inset:0; width:100%; height:100%; display:block; object-fit:cover; background:#17120E; }
+    .qr-showcase-video-shade { position:absolute; inset:0; background:linear-gradient(180deg, rgba(0,0,0,0.02) 42%, rgba(0,0,0,0.78) 100%); }
+    .qr-showcase-video-brand { position:absolute; z-index:4; left:14px; right:14px; bottom:88px; color:#FFFFFF; text-align:center; text-shadow:0 2px 12px rgba(0,0,0,0.55); }
+    .qr-showcase-video-brand strong { display:block; font:600 30px/1 Georgia, serif; }
+    .qr-showcase-video-brand span { display:block; font-size:9px; font-weight:700; letter-spacing:0.14em; }
+    .qr-showcase-play { position:absolute; z-index:4; left:50%; top:44%; width:48px; height:48px; display:grid; place-items:center; transform:translate(-50%, -50%); border:2px solid rgba(255,255,255,0.92); border-radius:50%; background:rgba(0,0,0,0.18); color:#FFFFFF; font-size:18px; padding-left:3px; box-sizing:border-box; }
+    .qr-showcase-order { position:absolute; z-index:4; left:18%; right:18%; bottom:24px; min-height:42px; display:grid; place-items:center; border-radius:999px; background:#FFFFFF; color:#111827; font-size:12px; font-weight:750; }
+    .qr-showcase-product { height:100%; padding-top:26px; box-sizing:border-box; direction:rtl; }
+    .qr-showcase-product-hero { height:36%; display:grid; place-items:center; background:#E9E2D6; }
+    .qr-showcase-product-hero img { width:84%; height:84%; object-fit:contain; }
+    .qr-showcase-product-body { padding:10px; }
+    .qr-showcase-product-body h3 { margin:0; font-size:18px; }
+    .qr-showcase-product-body > span { display:block; margin-top:4px; color:#606778; font-size:9px; }
+    .qr-showcase-option-label { margin:11px 0 5px; font-size:8px; font-weight:750; }
+    .qr-showcase-options { display:flex; flex-wrap:wrap; gap:5px; }
+    .qr-showcase-options span { padding:5px 7px; border-radius:7px; background:#F1F2F4; font-size:7px; }
+    .qr-showcase-options span.is-selected { border:1px solid #111827; background:#FFFFFF; }
+    .qr-showcase-add { position:absolute; left:9px; right:9px; bottom:10px; min-height:34px; display:grid; place-items:center; border-radius:9px; background:#111827; color:#FFFFFF; font-size:9px; font-weight:750; }
+    .qr-showcase-cart { height:100%; padding:35px 9px 9px; box-sizing:border-box; direction:rtl; }
+    .qr-showcase-cart h3 { margin:0 0 13px; font-size:16px; }
+    .qr-showcase-cart-item { display:grid; grid-template-columns:42px 1fr; gap:7px; align-items:center; padding-bottom:10px; border-bottom:1px solid #E5E7EB; }
+    .qr-showcase-cart-item img { width:42px; height:42px; object-fit:contain; border-radius:8px; background:#E9E2D6; }
+    .qr-showcase-cart-item strong, .qr-showcase-cart-item small { display:block; }
+    .qr-showcase-cart-item strong { font-size:8px; }
+    .qr-showcase-cart-item small { margin-top:3px; color:#687083; font-size:7px; }
+    .qr-showcase-cart-total { display:flex; justify-content:space-between; margin-top:9px; font-size:10px; font-weight:800; }
+    .qr-showcase-recommend-title { margin:12px 0 7px; font-size:8px; font-weight:750; }
+    .qr-showcase-recommendations { display:grid; grid-template-columns:1fr 1fr; gap:5px; direction:ltr; }
+    .qr-showcase-recommendations img { width:100%; height:54px; object-fit:contain; border-radius:8px; background:#E9E2D6; }
+    .qr-showcase-checkout { position:absolute; left:8px; right:8px; bottom:9px; min-height:32px; display:flex; align-items:center; justify-content:space-between; padding:0 9px; border-radius:9px; background:#111827; color:#FFFFFF; font-size:8px; font-weight:750; direction:rtl; }
     .guest-experience-layout { display:grid; grid-template-columns:minmax(330px, 0.72fr) minmax(0, 1.28fr); align-items:center; gap:clamp(52px, 7vw, 112px); }
     .guest-experience-copy { min-width:0; }
     .guest-experience-kicker { margin:0 0 24px; font-size:13px; font-weight:600; letter-spacing:0.18em; color:#9A9A94; }
@@ -522,10 +576,17 @@
       .hero-title { font-size:42px !important; }
       .product-click-title { font-size:36px; }
       .guest-experience-title { font-size:38px; }
-      .guest-qr-sales-image { object-position:69% center; }
       .guest-tabs { gap:16px; }
       .guest-tab { font-size:13px; }
       .guest-preview { min-height:590px; }
+      .qr-showcase-stage { display:flex; align-items:center; gap:14px; overflow-x:auto; padding:12px 18px 18px; box-sizing:border-box; scroll-snap-type:x mandatory; scroll-padding-inline:18px; overscroll-behavior-inline:contain; scrollbar-width:none; -webkit-overflow-scrolling:touch; }
+      .qr-showcase-stage::before { inset:9% -35%; }
+      .qr-showcase-stage::-webkit-scrollbar { display:none; }
+      .qr-showcase-phone, .qr-showcase-phone--catalog, .qr-showcase-phone--video, .qr-showcase-phone--product, .qr-showcase-phone--cart { position:relative; inset:auto; flex:0 0 74%; width:auto; transform:none; scroll-snap-align:center; }
+      .qr-showcase-phone--video { order:1; }
+      .qr-showcase-phone--catalog { order:2; }
+      .qr-showcase-phone--product { order:3; }
+      .qr-showcase-phone--cart { order:4; }
       .guest-site-hero-copy h3 { font-size:27px; }
       .guest-site-hero-copy p { font-size:10px; }
       .guest-site-menu-item:nth-child(3) { display:none; }
@@ -748,7 +809,67 @@
           </div>
 
           <div class="guest-preview-panel guest-preview-qr is-active" data-guest-panel="qr" aria-hidden="false">
-            <img class="guest-qr-sales-image" src="uploads/qr-menu-sales-banner-dynamic-island.png" alt="ANGLE QR menu shown across video cover, product catalogue, cappuccino configuration and smart cart screens, all on phones with Dynamic Island" loading="lazy" decoding="async">
+            <div class="qr-showcase-stage" role="img" aria-label="Live ANGLE QR menu shown across video, catalogue, cappuccino configuration and cart screens">
+              <div class="qr-showcase-phone qr-showcase-phone--catalog" aria-hidden="true">
+                <div class="qr-showcase-screen">
+                  <div class="qr-showcase-island"></div>
+                  <div class="qr-showcase-status"><span>9:41</span><span>▮▮▮ ◉ ▰</span></div>
+                  <div class="qr-showcase-header"><span>חזרה ←</span><strong>Bulochka</strong><span class="qr-showcase-logo">B</span></div>
+                  <div class="qr-showcase-categories"><span>משקאות חמים</span><span>מאפים</span><span>כריכים</span></div>
+                  <h3 class="qr-showcase-title">משקאות חמים</h3>
+                  <div class="qr-showcase-catalog-grid">
+                    <div class="qr-showcase-catalog-card"><img src="uploads/qr-demo/cappuccino.png" alt=""><div><strong>קפוצ'ינו</strong><small>₪ 14</small></div></div>
+                    <div class="qr-showcase-catalog-card"><img src="uploads/qr-demo/americano.png" alt=""><div><strong>אמריקנו</strong><small>₪ 12</small></div></div>
+                    <div class="qr-showcase-catalog-card"><img src="uploads/qr-demo/iced-coffee.png" alt=""><div><strong>קפה קר</strong><small>₪ 17</small></div></div>
+                    <div class="qr-showcase-catalog-card"><img src="uploads/qr-demo/raf.png" alt=""><div><strong>ראף</strong><small>₪ 22</small></div></div>
+                  </div>
+                </div>
+              </div>
+
+              <div class="qr-showcase-phone qr-showcase-phone--video" aria-hidden="true">
+                <div class="qr-showcase-screen">
+                  <video class="qr-showcase-video" src="uploads/bulochka-menu-hero.mp4" autoplay muted loop playsinline preload="metadata" tabindex="-1"></video>
+                  <div class="qr-showcase-video-shade"></div>
+                  <div class="qr-showcase-island"></div>
+                  <div class="qr-showcase-status" style="color:#FFFFFF"><span>9:41</span><span>▮▮▮ ◉ ▰</span></div>
+                  <span class="qr-showcase-play">▶</span>
+                  <div class="qr-showcase-video-brand"><span>FEEL HOME</span></div>
+                  <div class="qr-showcase-order">להזמין</div>
+                </div>
+              </div>
+
+              <div class="qr-showcase-phone qr-showcase-phone--product" aria-hidden="true">
+                <div class="qr-showcase-screen">
+                  <div class="qr-showcase-island"></div>
+                  <div class="qr-showcase-status"><span>9:41</span><span>▮▮▮ ◉ ▰</span></div>
+                  <div class="qr-showcase-product">
+                    <div class="qr-showcase-product-hero"><img src="uploads/qr-demo/cappuccino.png" alt=""></div>
+                    <div class="qr-showcase-product-body">
+                      <h3>קפוצ'ינו</h3><span>₪ 14 · הפוך בישראלי</span>
+                      <div class="qr-showcase-option-label">גודל</div><div class="qr-showcase-options"><span class="is-selected">קטן · ₪14</span><span>גדול · ₪16</span></div>
+                      <div class="qr-showcase-option-label">בסיס חלב</div><div class="qr-showcase-options"><span>סויה</span><span>שיבולת שועל</span></div>
+                      <div class="qr-showcase-option-label">קצף</div><div class="qr-showcase-options"><span>מעט</span><span>הרבה</span></div>
+                    </div>
+                    <div class="qr-showcase-add">להוסיף · ₪ 14</div>
+                  </div>
+                </div>
+              </div>
+
+              <div class="qr-showcase-phone qr-showcase-phone--cart" aria-hidden="true">
+                <div class="qr-showcase-screen">
+                  <div class="qr-showcase-island"></div>
+                  <div class="qr-showcase-status"><span>9:41</span><span>▮▮▮ ◉ ▰</span></div>
+                  <div class="qr-showcase-cart">
+                    <h3>ההזמנה שלך</h3>
+                    <div class="qr-showcase-cart-item"><img src="uploads/qr-demo/cappuccino.png" alt=""><div><strong>קפוצ'ינו</strong><small>קטן · 1 × ₪14</small></div></div>
+                    <div class="qr-showcase-cart-total"><span>סה״כ</span><span>₪ 14</span></div>
+                    <div class="qr-showcase-recommend-title">אולי תרצו להוסיף</div>
+                    <div class="qr-showcase-recommendations"><img src="uploads/qr-demo/sandwich-salmon.png" alt=""><img src="uploads/qr-demo/salad-bulgarit.png" alt=""></div>
+                    <div class="qr-showcase-checkout"><span>מעבר לתשלום</span><span>₪ 14</span></div>
+                  </div>
+                </div>
+              </div>
+            </div>
           </div>
         </div>
       </div>
