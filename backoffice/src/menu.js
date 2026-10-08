@@ -40,7 +40,7 @@ export async function fetchCategories() {
 export async function fetchItems() {
   const { data, error } = await supabase
     .from('menu_items')
-    .select('id, category_id, station_id, name, description, price, image_url, is_available, is_favorite, ask_modifiers, sku, sort_order, item_variants (id, name, price, is_default, sort_order), menu_item_modifier_groups (group_id, sort_order)')
+    .select('id, category_id, station_id, course, name, description, price, image_url, is_available, is_favorite, ask_modifiers, sku, sort_order, item_variants (id, name, price, is_default, sort_order), menu_item_modifier_groups (group_id, sort_order)')
     .order('sort_order')
   if (error) throw new Error(error.message)
   return data
@@ -109,7 +109,7 @@ export async function uploadItemImage(context, file) {
   return supabase.storage.from('menu-images').getPublicUrl(path).data.publicUrl
 }
 
-function itemPayload(input) {
+export function itemPayload(input) {
   return {
     name: input.name,
     description: input.description || null,
@@ -124,6 +124,9 @@ function itemPayload(input) {
     // прислано, а редактор кабинета им управляет.
     sku: input.sku ?? null,
     // cost/stock кабинет не редактирует — ключей нет, сервер их сохранит
+    // Курс подачи (Kassa 179): ключ только от редактора, который им
+    // управляет, — иначе сервер (179) курс не трогает
+    ...('course' in input ? { course: input.course ?? null } : {}),
   }
 }
 

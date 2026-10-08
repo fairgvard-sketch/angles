@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react'
 import { ChevronDown, ImageOff, Plus, Trash2 } from 'lucide-react'
 import { agorotToShekels, shekelsToAgorot, bulkErrorText } from './menu'
-import { GAP_LABELS, itemGaps, money, priceLabel, sizesLabel } from './catalog'
+import { GAP_LABELS, courseLabel, itemGaps, money, priceLabel, sizesLabel } from './catalog'
 import Drawer from './ui/Drawer'
 import ConfirmDialog from './ui/ConfirmDialog'
 import { Button } from './ui/Button'
@@ -103,6 +103,10 @@ function ItemDetails({ item, stations, modifierGroups }) {
           <dt>Preparation station</dt>
           <dd>{station?.name ?? 'Not routed to a station'}</dd>
         </div>
+        <div>
+          <dt>Course</dt>
+          <dd>{courseLabel(item.course)}</dd>
+        </div>
       </dl>
 
       {variants.length > 0 && (
@@ -145,6 +149,8 @@ export default function ItemEditor({
   const [price, setPrice] = useState(priceInput(item.price))
   const [categoryId, setCategoryId] = useState(item.category_id || categories[0]?.id || '')
   const [stationId, setStationId] = useState(item.station_id || '')
+  // Курс подачи на счёте стола (Kassa 179): '' — без курса
+  const [course, setCourse] = useState(item.course ? String(item.course) : '')
   const [description, setDescription] = useState(item.description || '')
   const [available, setAvailable] = useState(item.is_available ?? true)
   const [askModifiers, setAskModifiers] = useState(item.ask_modifiers ?? false)
@@ -182,6 +188,7 @@ export default function ItemEditor({
     setPrice(priceInput(item.price))
     setCategoryId(item.category_id || categories[0]?.id || '')
     setStationId(item.station_id || '')
+    setCourse(item.course ? String(item.course) : '')
     setDescription(item.description || '')
     setAvailable(item.is_available ?? true)
     setAskModifiers(item.ask_modifiers ?? false)
@@ -239,6 +246,7 @@ export default function ItemEditor({
         description: description.trim() || null,
         category_id: categoryId,
         station_id: stationId || null,
+        course: course ? Number(course) : null,
         price: basePrice,
         image_url: imageUrl || null,
         sku: sku.trim() || null,
@@ -370,6 +378,16 @@ export default function ItemEditor({
               </select>
             </label>
           </div>
+
+          <label><span>Course</span>
+            <select value={course} onChange={(e) => setCourse(e.target.value)}>
+              <option value="">{courseLabel(null)}</option>
+              {[1, 2, 3].map((n) => <option key={n} value={String(n)}>{courseLabel(n)}</option>)}
+            </select>
+          </label>
+          <p className="hint">
+            On a table bill, course 1 goes to the kitchen at once; later courses wait until the waiter taps Fire on the POS. The waiter can still change the course of a single order line.
+          </p>
 
           <label className="check-field">
             <input type="checkbox" checked={available} onChange={(e) => setAvailable(e.target.checked)} />

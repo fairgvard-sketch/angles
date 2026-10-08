@@ -126,6 +126,18 @@ export function sizesLabel(item) {
   return sizes > 0 ? `${sizes} size${sizes === 1 ? '' : 's'}` : null
 }
 
+// ── Курс подачи (Kassa 179) ──────────────────────────────────
+
+/**
+ * Курс подачи позиции на счёте стола: курс 1 уходит на кухню сразу,
+ * следующие ждут Fire официанта на кассе. Пусто — без курса.
+ */
+export function courseLabel(course) {
+  return course === 1 || course === 2 || course === 3
+    ? `Course ${course}`
+    : 'No course — sent right away'
+}
+
 // ── Модификаторы ─────────────────────────────────────────────
 
 /**
