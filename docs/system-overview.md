@@ -11,6 +11,7 @@
 | Сайт, демо и страница входа | `anglesite`: `ANGLE Landing Page.dc.html`, `demo/`, `login.html` | `angle.co.il` |
 | Кабинет владельца | `anglesite/backoffice/src/` | `angle.co.il/account/` |
 | POS сотрудников | `kassa/src/App.tsx` | `pos.angle.co.il` |
+| Телефон официанта (заказ к столу) | `kassa/src/waiter/` | `pos.angle.co.il/waiter` |
 | Гостевые Menu / Orders / Reserve | `kassa/src/PublicApp.tsx`, сборка `VITE_APP_SURFACE=menu` | `menu.angle.co.il` |
 | Auth, SQL, RLS, RPC, Realtime и публичные API | `kassa/supabase/` | общий Supabase-проект |
 | Обёртка терминала и встроенная печать | `kassa/android/` + frontend-мост | APK открывает POS-origin |
@@ -29,6 +30,11 @@
   записывается, но сам по себе не даёт доступа.
 - POS имеет сессию устройства и отдельную PIN-сессию сотрудника. Доступ к
   привилегированным операциям проверяется сервером, не только меню интерфейса.
+- Телефон официанта допускается в точку одноразовым QR-кодом из Devices →
+  Waiter phones и получает отдельный аккаунт без организации: RLS ему ничего
+  не отдаёт, работают только функции заказа к столу. Официант входит своим
+  PIN; тикеты кухни печатает касса T2. Подробности —
+  [waiter-phone](../../kassa/docs/waiter-phone.md).
 - Гость открывает `/order/:locId` или `/reserve/:locId`. Публичный UI обращается
   к ограниченным Edge Functions, а не получает административный доступ к БД.
 - Организация — граница изоляции клиентов. Точки внутри одной организации

@@ -11,6 +11,7 @@ import {
 } from './devices'
 import { Button, IconButton } from './ui/Button'
 import ConfirmDialog from './ui/ConfirmDialog'
+import WaiterPhones from './WaiterPhones'
 import { RowMenu } from './ui/RowMenu'
 import Skeleton, { SkeletonBar, SkeletonPanel, SkeletonRow } from './ui/Skeleton'
 import {
@@ -408,6 +409,10 @@ export default function DevicesManager({ context }) {
           )}
         </>
       )}
+
+      {/* Телефоны официантов (касса 180) — не терминалы: без телеметрии
+          и очереди, только допуск в точку и отключение */}
+      <WaiterPhones context={context} />
     </>
   )
 }
