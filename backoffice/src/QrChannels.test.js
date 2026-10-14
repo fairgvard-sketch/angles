@@ -210,6 +210,38 @@ describe('Menu-only does not advertise unavailable ordering', () => {
   })
 })
 
+describe('Режим «Только меню» (Kassa 183)', () => {
+  const modeButtons = (html) => [...html.matchAll(/role="radio" aria-checked="(true|false)"[^>]*>([^<]*)</g)]
+    .map((m) => [m[2].trim(), m[1] === 'true'])
+
+  it('при купленном заказе владелец выбирает: только меню или меню и заказ', () => {
+    const html = renderOnline()
+    assert.match(html, /role="radiogroup" aria-label="What guests can do"/)
+    assert.deepEqual(modeButtons(html), [['Menu only', false], ['Menu &amp; ordering', true]])
+    assert.match(html, /channel-switch/)
+    assert.match(html, /How guests order/)
+  })
+
+  it('«Только меню» прячет приём заказов и честно говорит, что увидит гость', () => {
+    const html = renderOnline({ settings: { online_orders: { ...onlineSettings.online_orders, menu_only: true } } })
+    assert.deepEqual(modeButtons(html), [['Menu only', true], ['Menu &amp; ordering', false]])
+    assert.doesNotMatch(html, /channel-switch|Ordering is live|Ordering is paused/)
+    assert.doesNotMatch(html, /How guests order|Opening hours|Table QR codes/)
+    assert.match(html, /no cart, and dishes have no Add button/)
+    for (const label of ['Copy link', 'Download QR', 'Look of the guest page', 'Put the menu on your website']) {
+      assert.ok(html.includes(label), label)
+    }
+  })
+
+  it('без покупки заказа выбирать нечего — переключателя режима нет', () => {
+    const html = renderOnline({
+      context: { ...context, products: ['menu'], capabilities: ['catalog_manage', 'public_menu'] },
+    })
+    assert.doesNotMatch(html, /What guests can do/)
+    assert.match(html, /Browse-only menu/)
+  })
+})
+
 describe('Брони: настройки на месте', () => {
   it('канал брони выключается тумблером', () => {
     assert.match(renderReserve(), /Reservations are open/)

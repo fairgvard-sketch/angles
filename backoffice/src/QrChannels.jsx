@@ -9,7 +9,7 @@ import { fetchNotificationOutbox } from './reservations'
 import {
   ORDER_TYPES, ORDER_TYPE_LABELS,
   ONLINE_BACKGROUND_PRESETS, PUBLIC_MENU_ORIGIN,
-  onlineEnabled, orderTypes, toggleOrderType, saveOnlineOrders,
+  onlineEnabled, menuOnlyMode, orderTypes, toggleOrderType, saveOnlineOrders,
   reservationsEnabled, saveReservations,
   uploadHeroVideo,
   orderUrl, tableOrderUrl, reserveUrl,
@@ -121,7 +121,7 @@ function ChannelBlockers({ blockers, channel, onGo }) {
   )
 }
 
-function ChannelBar({ title, enabled, onToggle, onLabel, offLabel, url, qrUrl, qrName, offNote, staticLabel, staticNote }) {
+function ChannelBar({ title, enabled, onToggle, onLabel, offLabel, url, qrUrl, qrName, offNote, staticLabel, staticNote, modeControl, hideSwitch = false }) {
   const [copyState, copy] = useCopy(url)
   const codeUrl = qrUrl || url
 
@@ -130,7 +130,8 @@ function ChannelBar({ title, enabled, onToggle, onLabel, offLabel, url, qrUrl, q
       <div className="channel-bar-main">
         <div className="channel-bar-state">
           <h2>{title}</h2>
-          {staticLabel ? <StatusBadge tone="off" label={staticLabel} /> : <button
+          {modeControl}
+          {staticLabel ? <StatusBadge tone="off" label={staticLabel} /> : !hideSwitch && <button
             type="button"
             className={`channel-switch${enabled ? ' is-on' : ''}`}
             aria-pressed={enabled}
@@ -179,7 +180,7 @@ function ChannelBar({ title, enabled, onToggle, onLabel, offLabel, url, qrUrl, q
         </div>
 
         {staticNote && <p className="form-hint">{staticNote}</p>}
-        {!staticLabel && !enabled && (
+        {!staticLabel && !hideSwitch && !enabled && (
           <p className="channel-off-note" role="status">
             <AlertTriangle aria-hidden />
             {offNote}
@@ -775,6 +776,10 @@ export function OnlineTab({
   // Используем тот же effective capability, что навигация и публичный API,
   // а не сохранённый тумблер, который мог остаться от прежнего доступа.
   const canOrder = hasCapability(context, 'online_orders')
+  // Заказ куплен, но владелец мог оставить гостям только меню: тогда
+  // настройки приёма (типы, часы, QR столов) прячутся, как без покупки.
+  const menuOnly = menuOnlyMode(settings)
+  const ordering = canOrder && !menuOnly
   const enabled = onlineEnabled(settings)
   const types = orderTypes(settings)
   const online = settings.online_orders || {}
@@ -798,7 +803,36 @@ export function OnlineTab({
         qrName="counter"
         offNote="Ordering is paused — guests who scan the code see the menu but cannot order."
         staticLabel={canOrder ? null : 'Browse-only menu'}
-        staticNote={canOrder ? null : 'Guests can browse the menu without a cart or checkout. Online ordering is not included in this workspace’s current access.'}
+        staticNote={canOrder
+          ? menuOnly
+            ? 'Guests see the menu only: no cart, and dishes have no Add button. Switch to Menu & ordering to take orders.'
+            : null
+          : 'Guests can browse the menu without a cart or checkout. Online ordering is not included in this workspace’s current access.'}
+        hideSwitch={menuOnly}
+        modeControl={canOrder && (
+          // Выбор одного из двух: radiogroup говорит это читалке. Без
+          // покупки заказа выбирать нечего — страница и так витрина.
+          <span className="perm-switch qr-mode-switch" role="radiogroup" aria-label="What guests can do">
+            <button
+              type="button"
+              role="radio"
+              aria-checked={menuOnly}
+              className={menuOnly ? 'is-active' : ''}
+              onClick={() => { if (!menuOnly) patch({ menu_only: true }) }}
+            >
+              Menu only
+            </button>
+            <button
+              type="button"
+              role="radio"
+              aria-checked={!menuOnly}
+              className={menuOnly ? '' : 'is-active'}
+              onClick={() => { if (menuOnly) patch({ menu_only: false }) }}
+            >
+              Menu &amp; ordering
+            </button>
+          </span>
+        )}
       />
 
       <h2 className="setting-section-title">Guest experience</h2>
@@ -813,7 +847,7 @@ export function OnlineTab({
           <SlugBlock locationId={locationId} slug={slug} onSaved={onSlugSaved} />
         </SettingGroup>
 
-        {canOrder && <SettingGroup
+        {ordering && <SettingGroup
           {...group('ordering')}
           icon={ShoppingBag}
           title="How guests order"
@@ -838,7 +872,7 @@ export function OnlineTab({
           )}
         </SettingGroup>}
 
-        {canOrder && <SettingGroup
+        {ordering && <SettingGroup
           {...group('hours')}
           icon={Clock}
           title="Opening hours"
@@ -926,7 +960,7 @@ export function OnlineTab({
 
       <h2 className="setting-section-title">Ways guests open the menu</h2>
       <div className="setting-rows">
-        {canOrder && <SettingGroup
+        {ordering && <SettingGroup
           {...group('tables')}
           icon={Table}
           title="Table QR codes"
@@ -1961,7 +1995,7 @@ function QrChannelWorkspace({ context, locationId, channel, onNavigate }) {
       locationId: activeId,
       tables,
       settings: settings?.online_orders,
-      orderingAvailable: canOrder,
+      orderingAvailable: canOrder && !menuOnlyMode(settings),
     })
     : reserveBlockers(checklist)
   // Каталог редактируется в своём разделе. Ярлык показываем только
@@ -2009,7 +2043,7 @@ function QrChannelWorkspace({ context, locationId, channel, onNavigate }) {
             {/* Готовность канала — до настроек: бесполезно править вид
                 страницы, на которой гостю нечего заказать. */}
             <ChannelBlockers
-              channel={tab === 'online' && !canOrder ? 'menu' : tab}
+              channel={tab === 'online' && (!canOrder || menuOnlyMode(settings)) ? 'menu' : tab}
               blockers={blockers}
               onGo={(action) => {
                 // Блокер ведёт либо в другой раздел, либо в группу

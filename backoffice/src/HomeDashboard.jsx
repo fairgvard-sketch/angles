@@ -513,8 +513,8 @@ function ScopedDashboard({ context, locationId, onNavigate, children }) {
                     <div className="data-row">
                       <span><ShoppingBag aria-hidden /> Online ordering</span>
                       <StatusBadge
-                        tone={data.channels.orders ? 'on' : 'off'}
-                        label={data.channels.orders ? 'On' : 'Off'}
+                        tone={data.channels.orders && !data.channels.menuOnly ? 'on' : 'off'}
+                        label={data.channels.menuOnly ? 'Menu only' : data.channels.orders ? 'On' : 'Off'}
                       />
                     </div>
                   )}

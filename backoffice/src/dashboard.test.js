@@ -284,6 +284,14 @@ describe('«требует внимания»', () => {
     assert.equal(rsv.action.tab, undefined)
   })
 
+  it('«Только меню» — выбор владельца, а не тревога (Kassa 183)', () => {
+    const items = attentionItems({
+      ...base,
+      channels: { orders: false, menuOnly: true, reservations: true, slug: '', locationId: 'loc-1' },
+    })
+    assert.ok(!items.some((i) => i.id === 'channel-orders'))
+  })
+
   it('заявка на активацию видна здесь — карточка продуктов уехала в аккаунт', () => {
     const items = attentionItems({
       ...base,

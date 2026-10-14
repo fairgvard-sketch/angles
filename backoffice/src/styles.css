@@ -1644,6 +1644,9 @@ a { color: inherit; }
    а не только положением — владелец видит «работает» с расстояния. */
 .channel-switch { flex: 0 0 auto; display: inline-flex; align-items: center; gap: 10px; padding: 8px 14px 8px 10px; border: 1px solid #d8dae0; border-radius: var(--r-pill); background: var(--c-surface); color: var(--c-text-muted); font-size: 13px; font-weight: 750; cursor: pointer; }
 .channel-switch:hover { border-color: #b7bbc2; }
+/* Режим QR-меню (Kassa 183): «Только меню» / «Меню и заказ» рядом с
+   названием канала — крупнее переключателя прав, это главный выбор экрана. */
+.qr-mode-switch button { min-height: 36px; padding: 0 14px; font-size: 13px; }
 .channel-switch i { width: 34px; height: 20px; flex: 0 0 auto; position: relative; border-radius: var(--r-pill); background: var(--c-border); transition: background-color .16s ease; }
 .channel-switch i::after { content: ''; position: absolute; top: 2px; inset-inline-start: 2px; width: 16px; height: 16px; border-radius: 50%; background: var(--c-surface); box-shadow: 0 1px 2px rgb(20 22 27 / 30%); transition: transform .16s ease; }
 .channel-switch.is-on { border-color: #b7ddc4; background: #f2faf5; color: #2c6b45; }

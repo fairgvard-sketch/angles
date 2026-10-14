@@ -53,3 +53,16 @@
 
 `npm test` — 856 тестов (686 модульных + 170 браузерных), сборка зелёная.
 Живой приёмки владельцем не было.
+
+## Режим «Только меню» (Kassa 183, 14.10.2026)
+
+В шапке канала QR Menu, если заказ куплен (`online_orders`), стоит
+переключатель «Menu only / Menu & ordering». «Menu only» сохраняет
+`online_orders.menu_only = true` через тот же `patch_location_settings_web`.
+В этом режиме экран прячет тумблер приёма, «How guests order», «Opening
+hours» и «Table QR codes», блокер «нет столов» не считается, а под ссылкой
+сказано, что видит гость. На главной статус канала — «Menu only», строки
+«Online ordering is off» нет. Без покупки заказа переключателя нет: экран,
+как и раньше, показывает «Browse-only menu». Гостевая страница и серверный
+отказ — в `kassa/docs/online-orders.md`, раздел «Режим «Только меню» (183)».
+Тесты — `QrChannels.test.js`, `dashboard.test.js`.

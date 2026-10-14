@@ -4,7 +4,7 @@ import { bucketOrders, dayStartMs } from './orders-inbox'
 import { fetchFleet, deviceStatus, deviceAdvice, isArchived, lastSeenLabel } from './devices'
 import { fetchSalesReport } from './sales'
 import { fetchLocation, fetchLocationSlug } from './settings'
-import { onlineEnabled, reservationsEnabled } from './online'
+import { menuOnlyMode, onlineEnabled, reservationsEnabled } from './online'
 import { PRODUCT_META, hasCapability, productState } from './navigation'
 import { delta } from './reporting'
 
@@ -68,6 +68,8 @@ export async function fetchChannels(locationId) {
   const settings = location?.settings || {}
   return {
     orders: onlineEnabled(settings),
+    // «Только меню» — выбор владельца, а не поломка: не тревожим им
+    menuOnly: menuOnlyMode(settings),
     reservations: reservationsEnabled(settings),
     slug: slug || '',
     locationId,
@@ -447,7 +449,7 @@ export function attentionItems({
   }
 
   // Каналы: гостевая страница выключена — значит гость видит «закрыто».
-  if (channels && can('online_orders') && !channels.orders) {
+  if (channels && can('online_orders') && !channels.orders && !channels.menuOnly) {
     items.push({
       id: 'channel-orders',
       tone: 'info',

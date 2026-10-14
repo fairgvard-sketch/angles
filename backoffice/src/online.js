@@ -177,6 +177,16 @@ export function onlineEnabled(settings) {
   return settings?.online_orders?.enabled !== false
 }
 
+/**
+ * Режим «Только меню» (Kassa 183): гость видит меню без корзины и без
+ * кнопки «Добавить», сервер не принимает заявки. Отсутствие ключа — меню
+ * и заказ, как было. Это выбор владельца, а не доступ: заказ остаётся
+ * купленным, и вернуть его можно одним переключателем.
+ */
+export function menuOnlyMode(settings) {
+  return settings?.online_orders?.menu_only === true
+}
+
 /** Дефолт до появления ключа order_types (055). */
 export function orderTypes(settings) {
   return settings?.online_orders?.order_types ?? ['here', 'takeaway']
