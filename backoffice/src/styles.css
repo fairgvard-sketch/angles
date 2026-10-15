@@ -3942,6 +3942,19 @@ a { color: inherit; }
   gap: var(--sp-2); align-items: center;
 }
 
+/* Переводы QR-меню (Kassa 184): язык — отдельная группа полей */
+.cat-form .translation-block {
+  display: grid; gap: var(--sp-3); min-width: 0;
+  margin: 0; padding: 0; border: 0;
+}
+.cat-form .translation-block + .translation-block {
+  padding-top: var(--sp-3); border-top: 1px solid var(--c-border-soft);
+}
+.cat-form .translation-block legend {
+  padding: 0; margin-bottom: var(--sp-2);
+  font-size: 13px; font-weight: 800; color: #2a2d33;
+}
+
 /* Диалог формы: компактный, но не тесный */
 .form-dialog { display: grid; gap: var(--sp-3); }
 .form-dialog-body { display: grid; gap: var(--sp-3); }

@@ -187,6 +187,28 @@ export function menuOnlyMode(settings) {
   return settings?.online_orders?.menu_only === true
 }
 
+// ── Языки QR-меню (Kassa 184) ───────────────────────────────
+
+/** Языки, которые владелец включает гостю. Иврит — язык самого меню, он есть всегда. */
+export const MENU_LANGUAGES = ['en', 'ru']
+
+export const MENU_LANGUAGE_LABELS = { he: 'Hebrew', en: 'English', ru: 'Russian' }
+
+/** Включённые языки в порядке переключателя гостя; мусор отбрасывается. */
+export function menuLanguages(settings) {
+  const list = settings?.online_orders?.languages
+  return Array.isArray(list) ? MENU_LANGUAGES.filter((lang) => list.includes(lang)) : []
+}
+
+export function toggleMenuLanguage(current, lang) {
+  const on = current.includes(lang)
+  return MENU_LANGUAGES.filter((code) => (code === lang ? !on : current.includes(code)))
+}
+
+export function menuLanguagesSummary(settings) {
+  return ['he', ...menuLanguages(settings)].map((lang) => MENU_LANGUAGE_LABELS[lang]).join(' · ')
+}
+
 /** Дефолт до появления ключа order_types (055). */
 export function orderTypes(settings) {
   return settings?.online_orders?.order_types ?? ['here', 'takeaway']

@@ -2,7 +2,7 @@ import { useEffect, useRef, useState } from 'react'
 import {
   AlertTriangle, ArrowDown, ArrowUp, Check, Clock, Copy, Download, ExternalLink,
   Image, LayoutGrid, ListChecks, QrCode, RefreshCw, ShoppingBag, Table, Code2,
-  ListTree, CalendarClock, Contact, Ban, Trash2, Send, CreditCard,
+  ListTree, CalendarClock, Contact, Ban, Trash2, Send, CreditCard, Languages,
 } from 'lucide-react'
 import { fetchLocation, fetchLocationSlug, fetchTables, saveLocationSlug } from './settings'
 import { fetchNotificationOutbox } from './reservations'
@@ -10,6 +10,7 @@ import {
   ORDER_TYPES, ORDER_TYPE_LABELS,
   ONLINE_BACKGROUND_PRESETS, PUBLIC_MENU_ORIGIN,
   onlineEnabled, menuOnlyMode, orderTypes, toggleOrderType, saveOnlineOrders,
+  MENU_LANGUAGES, MENU_LANGUAGE_LABELS, menuLanguages, menuLanguagesSummary, toggleMenuLanguage,
   reservationsEnabled, saveReservations,
   uploadHeroVideo,
   orderUrl, tableOrderUrl, reserveUrl,
@@ -32,6 +33,7 @@ import {
 } from './reservation-rules'
 import { hasCapability } from './navigation'
 import { fetchCategories, fetchItems } from './menu'
+import { translationCoverage } from './translations'
 import { fetchLaunchChecklist } from './launch'
 import { optimizeHeroVideo } from './hero-video'
 import { blockerSummary, menuBlockers, reserveBlockers } from './channel-readiness'
@@ -770,7 +772,7 @@ function backgroundLabel(value) {
  */
 export function OnlineTab({
   context, locationId, settings, tables, patch, slug, onSlugSaved,
-  url, openGroup, onOpenGroup, onManageCatalogue,
+  url, openGroup, onOpenGroup, onManageCatalogue, catalogue = null,
 }) {
   // public_menu не означает online_orders: Menu — витрина без корзины.
   // Используем тот же effective capability, что навигация и публичный API,
@@ -783,6 +785,10 @@ export function OnlineTab({
   const enabled = onlineEnabled(settings)
   const types = orderTypes(settings)
   const online = settings.online_orders || {}
+  const languages = menuLanguages(settings)
+  // Покрытие переводом считается по уже загруженному каталогу точки;
+  // нет каталога — не выдумываем цифры
+  const coverage = catalogue ? translationCoverage(catalogue, locationId) : null
   const [selectedTableId, setSelectedTableId] = useState(tables[0]?.id || '')
   const selectedTable = tables.find((table) => table.id === selectedTableId) || tables[0] || null
 
@@ -890,6 +896,29 @@ export function OnlineTab({
             </p>
           )}
         </SettingGroup>}
+
+        <SettingGroup
+          {...group('languages')}
+          icon={Languages}
+          title="Menu languages"
+          hint="Languages guests can switch the QR menu to."
+          value={menuLanguagesSummary(settings)}
+        >
+          {MENU_LANGUAGES.map((code) => (
+            <Toggle
+              key={code}
+              label={MENU_LANGUAGE_LABELS[code]}
+              hint={coverage && coverage[code].total > 0
+                ? `${coverage[code].done} of ${coverage[code].total} dishes translated`
+                : undefined}
+              checked={languages.includes(code)}
+              onChange={() => patch({ languages: toggleMenuLanguage(languages, code) })}
+            />
+          ))}
+          <p className="form-hint">
+            Hebrew is the menu’s own language and is always on. Guests switch language on the cover and in the header. Translations live in Catalogue — on each item, category and modifier; anything not translated shows the original name. Orders, kitchen tickets and receipts stay in Hebrew.
+          </p>
+        </SettingGroup>
 
         <SettingGroup
           {...group('look')}
@@ -2072,6 +2101,7 @@ function QrChannelWorkspace({ context, locationId, channel, onNavigate }) {
                 openGroup={openGroup}
                 onOpenGroup={setOpenGroup}
                 onManageCatalogue={canManageCatalogue ? () => onNavigate('menu') : null}
+                catalogue={catalogue}
               />
             ) : (
               <ReserveTab

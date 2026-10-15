@@ -66,3 +66,18 @@ hours» и «Table QR codes», блокер «нет столов» не счи�
 как и раньше, показывает «Browse-only menu». Гостевая страница и серверный
 отказ — в `kassa/docs/online-orders.md`, раздел «Режим «Только меню» (183)».
 Тесты — `QrChannels.test.js`, `dashboard.test.js`.
+
+## Языки меню (Kassa 184, 15.10.2026)
+
+Группа «Menu languages» в QR Menu: иврит включён всегда, English и Russian —
+тумблерами (`online_orders.languages`, тот же `patch_location_settings_web`).
+Под каждым тумблером — сколько блюд точки, видимых гостю, уже переведено
+(считается по каталогу, который экран и так грузит для готовности канала).
+Сами переводы правятся в Catalogue: у блюда — секция «QR menu translations»
+(название, описание, размеры), у категории — «Edit name & translations» в
+меню категории, у группы добавок и добавки — поля в конце их диалогов.
+Пустое поле — гость видит оригинал; касса, тикеты и чеки переводов не
+читают. Гостевая страница, выбор языка и выкатка — в
+`kassa/docs/online-orders.md`, раздел «Языки меню (184)». Тесты —
+`QrChannels.test.js`, `ItemEditor.test.js`, `translations.test.js`,
+`test/catalogue.test.mjs`.

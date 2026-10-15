@@ -142,15 +142,15 @@ describe('QR-меню: настройки на месте', () => {
     assert.doesNotMatch(html, /Publish changes/)
   })
 
-  it('все шесть групп настроек существуют и раскрываются', () => {
+  it('все семь групп настроек существуют и раскрываются', () => {
     const html = renderOnline()
     for (const title of [
-      'Link &amp; address', 'How guests order', 'Opening hours',
+      'Link &amp; address', 'How guests order', 'Opening hours', 'Menu languages',
       'Look of the guest page', 'Table QR codes', 'Put the menu on your website',
     ]) {
       assert.match(html, new RegExp(title), title)
     }
-    assert.equal((html.match(/aria-expanded="false"/g) || []).length, 6)
+    assert.equal((html.match(/aria-expanded="false"/g) || []).length, 7)
   })
 
   it('значение в свёрнутой строке — своё, а не пример из макета', () => {
@@ -158,6 +158,7 @@ describe('QR-меню: настройки на месте', () => {
     assert.match(html, /Sun–Mon 08:00–20:00/)      // hours из настроек
     assert.match(html, /Dine in · Takeaway/)        // выбранные типы заказа
     assert.match(html, /1 tables/)                  // столы точки
+    assert.match(html, /<[^>]*>Hebrew<\//)           // языки меню без включённых
     assert.doesNotMatch(html, /48 items/)           // цифры из макета
   })
 
@@ -239,6 +240,41 @@ describe('Режим «Только меню» (Kassa 183)', () => {
     })
     assert.doesNotMatch(html, /What guests can do/)
     assert.match(html, /Browse-only menu/)
+  })
+})
+
+describe('Языки QR-меню (Kassa 184)', () => {
+  it('иврит всегда, английский и русский включает владелец', () => {
+    const html = renderOnline({ openGroup: 'languages' })
+    assert.match(html, /Menu languages/)
+    assert.match(html, /Hebrew<\/[a-z]+>/)
+    assert.match(html, /<strong>English<\/strong>/)
+    assert.match(html, /<strong>Russian<\/strong>/)
+    assert.match(html, /Hebrew is the menu’s own language and is always on/)
+  })
+
+  it('строка показывает включённые языки, тумблеры — их состояние', () => {
+    const html = renderOnline({
+      openGroup: 'languages',
+      settings: { online_orders: { ...onlineSettings.online_orders, languages: ['ru', 'en', 'fr'] } },
+    })
+    assert.match(html, /Hebrew · English · Russian/)
+    assert.equal((html.match(/type="checkbox" checked=""/g) ?? []).length >= 2, true)
+  })
+
+  it('покрытие переводом считается по блюдам точки, которые видит гость', () => {
+    const html = renderOnline({
+      openGroup: 'languages',
+      catalogue: {
+        categories: [{ id: 'c-1', location_id: 'loc-1', is_active: true }],
+        items: [
+          { id: 'i-1', category_id: 'c-1', is_available: true, translations: { en: { name: 'Latte' } } },
+          { id: 'i-2', category_id: 'c-1', is_available: true, translations: {} },
+        ],
+      },
+    })
+    assert.match(html, /1 of 2 dishes translated/)
+    assert.match(html, /0 of 2 dishes translated/)
   })
 })
 

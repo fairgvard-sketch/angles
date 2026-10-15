@@ -2,6 +2,9 @@ import { useEffect, useState } from 'react'
 import { ChevronDown, ImageOff, Plus, Trash2 } from 'lucide-react'
 import { agorotToShekels, shekelsToAgorot, bulkErrorText } from './menu'
 import { GAP_LABELS, courseLabel, itemGaps, money, priceLabel, sizesLabel } from './catalog'
+import {
+  MENU_TRANSLATION_LANGS, translationDraft, translationPayload, translationSummary,
+} from './translations'
 import Drawer from './ui/Drawer'
 import ConfirmDialog from './ui/ConfirmDialog'
 import { Button } from './ui/Button'
@@ -24,6 +27,17 @@ import useNarrow from './ui/useNarrow'
 
 function priceInput(agorot) {
   return agorot != null ? String(agorotToShekels(agorot)) : ''
+}
+
+/** Размер в форме: прежние переводы держим, чтобы не стереть невидимые языки */
+function variantState(v) {
+  return {
+    name: v.name,
+    price: priceInput(v.price),
+    is_default: v.is_default,
+    translations: translationDraft(v.translations),
+    savedTranslations: v.translations ?? {},
+  }
 }
 
 /** Optional item settings collapse on a phone, but stay visible on desktop. */
@@ -107,6 +121,10 @@ function ItemDetails({ item, stations, modifierGroups }) {
           <dt>Course</dt>
           <dd>{courseLabel(item.course)}</dd>
         </div>
+        <div>
+          <dt>QR menu translations</dt>
+          <dd>{translationSummary(item.translations)}</dd>
+        </div>
       </dl>
 
       {variants.length > 0 && (
@@ -158,9 +176,10 @@ export default function ItemEditor({
   // Артикул: по нему ищут в каталоге и сверяются с поставщиком.
   const [sku, setSku] = useState(item.sku || '')
   const [variants, setVariants] = useState(
-    (item.item_variants || []).slice().sort((a, b) => a.sort_order - b.sort_order)
-      .map((v) => ({ name: v.name, price: priceInput(v.price), is_default: v.is_default }))
+    (item.item_variants || []).slice().sort((a, b) => a.sort_order - b.sort_order).map(variantState)
   )
+  // Переводы для гостя QR-меню (Kassa 184): название и описание
+  const [translations, setTranslations] = useState(translationDraft(item.translations, true))
   const [groupIds, setGroupIds] = useState(
     (item.menu_item_modifier_groups || []).map((g) => g.group_id)
   )
@@ -170,7 +189,9 @@ export default function ItemEditor({
   const [confirming, setConfirming] = useState(false)
   const [deleting, setDeleting] = useState(false)
   const narrow = useNarrow()
-  const [optionalOpen, setOptionalOpen] = useState({ photo: false, sizes: false, modifiers: false })
+  const [optionalOpen, setOptionalOpen] = useState({
+    photo: false, sizes: false, translations: false, modifiers: false,
+  })
 
   const sectionOpen = (key) => !narrow || optionalOpen[key]
   const toggleSection = (key) => setOptionalOpen((current) => ({
@@ -195,17 +216,29 @@ export default function ItemEditor({
     setImageUrl(item.image_url || '')
     setSku(item.sku || '')
     setVariants((item.item_variants || []).slice().sort((a, b) => a.sort_order - b.sort_order)
-      .map((v) => ({ name: v.name, price: priceInput(v.price), is_default: v.is_default })))
+      .map(variantState))
+    setTranslations(translationDraft(item.translations, true))
     setGroupIds((item.menu_item_modifier_groups || []).map((g) => g.group_id))
-    setOptionalOpen({ photo: false, sizes: false, modifiers: false })
+    setOptionalOpen({ photo: false, sizes: false, translations: false, modifiers: false })
     setError('')
   }, [item.id]) // eslint-disable-line react-hooks/exhaustive-deps
 
   function addVariant() {
-    setVariants((v) => [...v, { name: '', price: price || '0', is_default: v.length === 0 }])
+    setVariants((v) => [...v, {
+      name: '', price: price || '0', is_default: v.length === 0,
+      translations: translationDraft(null), savedTranslations: {},
+    }])
   }
   function updateVariant(i, patch) {
     setVariants((v) => v.map((x, idx) => idx === i ? { ...x, ...patch } : x))
+  }
+  function updateTranslation(code, field, value) {
+    setTranslations((current) => ({ ...current, [code]: { ...current[code], [field]: value } }))
+  }
+  function updateVariantTranslation(i, code, value) {
+    setVariants((v) => v.map((x, idx) => idx === i
+      ? { ...x, translations: { ...x.translations, [code]: { name: value } } }
+      : x))
   }
   function removeVariant(i) {
     setVariants((v) => v.filter((_, idx) => idx !== i))
@@ -235,7 +268,10 @@ export default function ItemEditor({
       if (!v.name.trim()) { setError('Variant name required'); return }
       const vp = shekelsToAgorot(v.price)
       if (vp === null) { setError(`Invalid price for “${v.name}”`); return }
-      parsedVariants.push({ name: v.name.trim(), price: vp, is_default: v.is_default })
+      parsedVariants.push({
+        name: v.name.trim(), price: vp, is_default: v.is_default,
+        translations: translationPayload(v.translations, v.savedTranslations),
+      })
     }
 
     setSaving(true)
@@ -254,6 +290,7 @@ export default function ItemEditor({
         ask_modifiers: askModifiers,
         variants: parsedVariants,
         modifier_group_ids: groupIds,
+        translations: translationPayload(translations, item.translations),
       }, item.id || null)
       await onSaved()
     } catch (e) {
@@ -463,6 +500,52 @@ export default function ItemEditor({
                   <Trash2 />
                 </button>
               </div>
+            ))}
+          </EditorSection>
+
+          <EditorSection
+            title="QR menu translations"
+            summary={translationSummary(translationPayload(translations))}
+            open={sectionOpen('translations')}
+            collapsible={narrow}
+            onToggle={() => toggleSection('translations')}
+          >
+            <p className="hint">
+              Guests who switch the QR menu to English or Russian see these. An empty field shows the original. The register, kitchen tickets and receipts always use the original.
+            </p>
+            {MENU_TRANSLATION_LANGS.map(({ code, label }) => (
+              <fieldset key={code} className="translation-block">
+                <legend>{label}</legend>
+                <label><span>Name</span>
+                  <input
+                    lang={code}
+                    value={translations[code].name}
+                    maxLength={120}
+                    placeholder={name || 'Item name'}
+                    onChange={(e) => updateTranslation(code, 'name', e.target.value)}
+                  />
+                </label>
+                <label><span>Description</span>
+                  <input
+                    lang={code}
+                    value={translations[code].description}
+                    maxLength={1000}
+                    placeholder={description || 'Optional'}
+                    onChange={(e) => updateTranslation(code, 'description', e.target.value)}
+                  />
+                </label>
+                {variants.map((v, i) => (
+                  <label key={i}><span>{`Size “${v.name || i + 1}”`}</span>
+                    <input
+                      lang={code}
+                      value={v.translations[code].name}
+                      maxLength={120}
+                      placeholder={v.name || 'Size name'}
+                      onChange={(e) => updateVariantTranslation(i, code, e.target.value)}
+                    />
+                  </label>
+                ))}
+              </fieldset>
             ))}
           </EditorSection>
 

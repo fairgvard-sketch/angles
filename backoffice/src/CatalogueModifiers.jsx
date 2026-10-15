@@ -12,6 +12,8 @@ import {
 import Drawer from './ui/Drawer'
 import ConfirmDialog from './ui/ConfirmDialog'
 import FormDialog from './ui/FormDialog'
+import TranslationFields from './ui/TranslationFields'
+import { translationDraft, translationPayload } from './translations'
 import { Button } from './ui/Button'
 import { RowMenu, OrderButtons } from './ui/RowMenu'
 import useNarrow from './ui/useNarrow'
@@ -64,6 +66,7 @@ function GroupForm({ group, count, context, onDone, onCancel }) {
   const [name, setName] = useState(group?.name ?? '')
   const [min, setMin] = useState(String(group?.min_select ?? 0))
   const [max, setMax] = useState(String(group?.max_select ?? 1))
+  const [translations, setTranslations] = useState(translationDraft(group?.translations))
   const [busy, setBusy] = useState(false)
   const [error, setError] = useState('')
 
@@ -78,8 +81,13 @@ function GroupForm({ group, count, context, onDone, onCancel }) {
     setBusy(true)
     setError('')
     try {
-      if (isNew) await createModifierGroup(context, name.trim(), lo, hi, count)
-      else await updateModifierGroup(group.id, { name: name.trim(), min_select: lo, max_select: hi })
+      const translated = translationPayload(translations, group?.translations)
+      if (isNew) await createModifierGroup(context, name.trim(), lo, hi, count, translated)
+      else {
+        await updateModifierGroup(group.id, {
+          name: name.trim(), min_select: lo, max_select: hi, translations: translated,
+        })
+      }
       await onDone()
     } catch (e) {
       setError(bulkErrorText(e.message))
@@ -129,6 +137,7 @@ function GroupForm({ group, count, context, onDone, onCancel }) {
         {invalid || `Guests see: ${preview}`}
       </p>
       <p className="hint">Maximum 0 means there is no limit.</p>
+      <TranslationFields draft={translations} original={name.trim()} onChange={setTranslations} />
     </FormDialog>
   )
 }
@@ -142,6 +151,7 @@ function ModifierForm({ modifier, group, count, context, onDone, onCancel }) {
   )
   const [isDefault, setIsDefault] = useState(Boolean(modifier?.is_default))
   const [available, setAvailable] = useState(modifier?.is_available ?? true)
+  const [translations, setTranslations] = useState(translationDraft(modifier?.translations))
   const [busy, setBusy] = useState(false)
   const [error, setError] = useState('')
 
@@ -153,14 +163,15 @@ function ModifierForm({ modifier, group, count, context, onDone, onCancel }) {
     setError('')
     try {
       let id = modifier?.id
+      const translated = translationPayload(translations, modifier?.translations)
       if (isNew) {
         id = await createModifier(context, group.id, {
           name: name.trim(), price_delta: delta, is_default: false,
-          is_available: available, sort_order: count,
+          is_available: available, sort_order: count, translations: translated,
         })
       } else {
         await updateModifier(id, {
-          name: name.trim(), price_delta: delta, is_available: available,
+          name: name.trim(), price_delta: delta, is_available: available, translations: translated,
         })
       }
       /*
@@ -214,6 +225,7 @@ function ModifierForm({ modifier, group, count, context, onDone, onCancel }) {
         <input type="checkbox" checked={available} onChange={(e) => setAvailable(e.target.checked)} />
         <span>Available to order</span>
       </label>
+      <TranslationFields draft={translations} original={name.trim()} onChange={setTranslations} />
     </FormDialog>
   )
 }

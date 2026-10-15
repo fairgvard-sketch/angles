@@ -609,7 +609,8 @@ describe('каталог: диалог категории', { skip }, () => {
     }))
     assert.equal(state.location, 'loc-1', 'текущая точка обязана быть выбрана заранее')
     assert.equal(state.focused, 'INPUT')
-    assert.deepEqual(state.labels, ['Category name', 'Location'])
+    // Переводы для QR-меню (Kassa 184) — после основных полей
+    assert.deepEqual(state.labels, ['Category name', 'Location', 'English name', 'Russian name'])
     await page.close()
   })
 

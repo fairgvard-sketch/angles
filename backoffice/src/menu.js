@@ -31,7 +31,7 @@ function orgId(context) {
 export async function fetchCategories() {
   const { data, error } = await supabase
     .from('menu_categories')
-    .select('id, location_id, name, sort_order, is_active, icon, loyalty_stamps')
+    .select('id, location_id, name, sort_order, is_active, icon, loyalty_stamps, translations')
     .order('sort_order')
   if (error) throw new Error(error.message)
   return data
@@ -40,7 +40,7 @@ export async function fetchCategories() {
 export async function fetchItems() {
   const { data, error } = await supabase
     .from('menu_items')
-    .select('id, category_id, station_id, course, name, description, price, image_url, is_available, is_favorite, ask_modifiers, sku, sort_order, item_variants (id, name, price, is_default, sort_order), menu_item_modifier_groups (group_id, sort_order)')
+    .select('id, category_id, station_id, course, name, description, price, image_url, is_available, is_favorite, ask_modifiers, sku, sort_order, translations, item_variants (id, name, price, is_default, sort_order, translations), menu_item_modifier_groups (group_id, sort_order)')
     .order('sort_order')
   if (error) throw new Error(error.message)
   return data
@@ -49,7 +49,7 @@ export async function fetchItems() {
 export async function fetchModifierGroups() {
   const { data, error } = await supabase
     .from('modifier_groups')
-    .select('id, name, min_select, max_select, sort_order, modifiers (id, name, price_delta, is_default, is_available, sort_order)')
+    .select('id, name, min_select, max_select, sort_order, translations, modifiers (id, name, price_delta, is_default, is_available, sort_order, translations)')
     .order('sort_order')
   if (error) throw new Error(error.message)
   data.forEach((g) => g.modifiers?.sort((a, b) => a.sort_order - b.sort_order))
@@ -67,12 +67,14 @@ export async function fetchStations() {
 
 // ── Категории (прямые запросы, org из RLS) ───────────────────
 
-export async function createCategory(context, locationId, name, sortOrder) {
+export async function createCategory(context, locationId, name, sortOrder, translations = {}) {
   const { error } = await supabase.from('menu_categories').insert({
     org_id: orgId(context),
     location_id: locationId,
     name,
     sort_order: sortOrder,
+    // Переводы для гостя QR-меню (Kassa 184); форму держит триггер базы
+    translations,
   })
   if (error) throw new Error(error.message)
 }
@@ -127,6 +129,9 @@ export function itemPayload(input) {
     // Курс подачи (Kassa 179): ключ только от редактора, который им
     // управляет, — иначе сервер (179) курс не трогает
     ...('course' in input ? { course: input.course ?? null } : {}),
+    // Переводы для гостя QR-меню (Kassa 184): ключ — полная замена,
+    // без ключа сервер переводы не трогает
+    ...('translations' in input ? { translations: input.translations ?? {} } : {}),
   }
 }
 
@@ -134,8 +139,11 @@ export function itemPayload(input) {
 export async function saveItem(input, id = null) {
   const { data, error } = await supabase.rpc('save_menu_item', {
     p_item: itemPayload(input),
+    // Размеры пересоздаются при каждом сохранении; без ключа translations
+    // сервер (184) переносит их переводы по имени размера
     p_variants: (input.variants || []).map((v) => ({
       name: v.name, price: v.price, is_default: v.is_default,
+      ...('translations' in v ? { translations: v.translations ?? {} } : {}),
     })),
     p_group_ids: input.modifier_group_ids || [],
     p_item_id: id,
@@ -192,9 +200,12 @@ export async function reorderItems(orderedIds) {
 
 // ── Модификаторы (прямые запросы, org-scoped) ────────────────
 
-export async function createModifierGroup(context, name, minSelect, maxSelect, sortOrder) {
+export async function createModifierGroup(context, name, minSelect, maxSelect, sortOrder, translations = {}) {
   const { data, error } = await supabase.from('modifier_groups')
-    .insert({ org_id: orgId(context), name, min_select: minSelect, max_select: maxSelect, sort_order: sortOrder })
+    .insert({
+      org_id: orgId(context), name, min_select: minSelect, max_select: maxSelect,
+      sort_order: sortOrder, translations,
+    })
     .select('id').single()
   if (error) throw new Error(error.message)
   return data.id
@@ -220,6 +231,7 @@ export async function createModifier(context, groupId, patch) {
     is_default: patch.is_default ?? false,
     is_available: patch.is_available ?? true,
     sort_order: patch.sort_order ?? 0,
+    translations: patch.translations ?? {},
   }).select('id').single()
   if (error) throw new Error(error.message)
   return data.id

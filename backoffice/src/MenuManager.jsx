@@ -4,7 +4,7 @@ import {
 } from 'lucide-react'
 import {
   fetchCategories, fetchItems, fetchModifierGroups, fetchStations,
-  createCategory, deleteCategory,
+  createCategory, deleteCategory, updateCategory,
   saveItem, deleteItem, uploadItemImage,
   bulkUpdateItems, bulkErrorText, reorderItems,
 } from './menu'
@@ -19,6 +19,8 @@ import Tabs from './ui/Tabs'
 import { Button, IconButton } from './ui/Button'
 import { RowMenu, OrderButtons } from './ui/RowMenu'
 import FormDialog from './ui/FormDialog'
+import TranslationFields from './ui/TranslationFields'
+import { translationDraft, translationPayload } from './translations'
 import ConfirmDialog from './ui/ConfirmDialog'
 import { SearchField } from './ui/Layout'
 import { overlayClass, useOverlayExit } from './ui/overlay-motion'
@@ -198,6 +200,7 @@ function BulkReview({ rows, action, busy, error, onCancel, onApply }) {
 /** Диалог новой категории: имя и точка, которой она принадлежит */
 function CategoryDialog({ context, locationId, count, onDone, onCancel }) {
   const [name, setName] = useState('')
+  const [translations, setTranslations] = useState(translationDraft(null))
   const [location, setLocation] = useState(locationId || context.locations?.[0]?.id || '')
   const [busy, setBusy] = useState(false)
   const [error, setError] = useState('')
@@ -209,7 +212,7 @@ function CategoryDialog({ context, locationId, count, onDone, onCancel }) {
     setBusy(true)
     setError('')
     try {
-      await createCategory(context, location, name.trim(), count)
+      await createCategory(context, location, name.trim(), count, translationPayload(translations))
       await onDone()
     } catch (e) {
       setError(bulkErrorText(e.message))
@@ -248,6 +251,52 @@ function CategoryDialog({ context, locationId, count, onDone, onCancel }) {
           </select>
         </label>
       )}
+      <TranslationFields draft={translations} original={name.trim()} onChange={setTranslations} />
+    </FormDialog>
+  )
+}
+
+/**
+ * Правка категории: название и его переводы для QR-меню (Kassa 184).
+ * Раньше категорию можно было только создать и удалить — перевести
+ * «משקאות חמים» было негде.
+ */
+function CategoryEditDialog({ category, onDone, onCancel }) {
+  const [name, setName] = useState(category.name || '')
+  const [translations, setTranslations] = useState(translationDraft(category.translations))
+  const [busy, setBusy] = useState(false)
+  const [error, setError] = useState('')
+
+  async function submit() {
+    if (!name.trim()) { setError('Give the category a name.'); return }
+    setBusy(true)
+    setError('')
+    try {
+      await updateCategory(category.id, {
+        name: name.trim(),
+        translations: translationPayload(translations, category.translations),
+      })
+      await onDone()
+    } catch (e) {
+      setError(bulkErrorText(e.message))
+      setBusy(false)
+    }
+  }
+
+  return (
+    <FormDialog
+      title={`Edit ${category.name}`}
+      submitLabel="Save category"
+      busy={busy}
+      error={error}
+      onSubmit={submit}
+      onCancel={onCancel}
+    >
+      <label className="qr-field">
+        <span>Category name</span>
+        <input value={name} maxLength={64} onChange={(e) => setName(e.target.value)} />
+      </label>
+      <TranslationFields draft={translations} original={name.trim()} onChange={setTranslations} />
     </FormDialog>
   )
 }
@@ -451,6 +500,7 @@ export function ItemsTab({
    * уходило молча. Спрашиваем своим диалогом.
    */
   const [removing, setRemoving] = useState(null)
+  const [editingCategory, setEditingCategory] = useState(null)
   async function removeCategory(id) {
     try { await deleteCategory(id); await reload() } catch (e) { setError(bulkErrorText(e.message)) }
   }
@@ -657,6 +707,7 @@ export function ItemsTab({
               moving={moving}
               onMove={moveItem}
               orderOf={orderOf}
+              onEdit={() => setEditingCategory(data.categories.find((c) => c.id === cat.id) ?? cat)}
               onDelete={() => setRemoving({ id: cat.id, name: cat.name })}
             />
           ))}
@@ -701,6 +752,14 @@ export function ItemsTab({
           tone="danger"
           onCancel={() => setRemoving(null)}
           onConfirm={async () => { const { id } = removing; setRemoving(null); await removeCategory(id) }}
+        />
+      )}
+
+      {editingCategory && (
+        <CategoryEditDialog
+          category={editingCategory}
+          onDone={async () => { setEditingCategory(null); await reload() }}
+          onCancel={() => setEditingCategory(null)}
         />
       )}
 
@@ -913,7 +972,7 @@ function ItemCards({
  */
 function CategorySection({
   title, items, catNames, stationNames, narrow, selecting, selected, onToggle,
-  openId, onOpen, onAction, menuFor, moving, onMove, orderOf, onDelete,
+  openId, onOpen, onAction, menuFor, moving, onMove, orderOf, onEdit, onDelete,
 }) {
   const [collapsed, setCollapsed] = useState(false)
   return (
@@ -934,8 +993,11 @@ function CategorySection({
         {onDelete && (
           <RowMenu
             label={`Actions for category ${title}`}
-            items={[{ key: 'delete', label: 'Delete category', tone: 'danger' }]}
-            onPick={onDelete}
+            items={[
+              onEdit && { key: 'edit', label: 'Edit name & translations' },
+              { key: 'delete', label: 'Delete category', tone: 'danger' },
+            ]}
+            onPick={(key) => (key === 'edit' ? onEdit() : onDelete())}
           />
         )}
       </div>

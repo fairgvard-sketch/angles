@@ -71,3 +71,34 @@ describe('course in the save payload', () => {
     assert.equal('course' in itemPayload(base), false)
   })
 })
+
+describe('QR menu translations (Kassa 184)', () => {
+  const translated = {
+    ...item,
+    name: 'קפוצ׳ינו',
+    translations: { en: { name: 'Cappuccino', description: 'Milk foam' }, he: { name: 'קפוצ׳ינו' } },
+    item_variants: [{ id: 'v-1', name: 'קטן', price: 1400, is_default: true, sort_order: 0,
+      translations: { ru: { name: 'Маленький' } } }],
+  }
+
+  it('the card names the languages the item is translated to', () => {
+    assert.match(render(), /<dt>QR menu translations<\/dt><dd>Not translated<\/dd>/)
+    assert.match(render({ item: translated }), /<dt>QR menu translations<\/dt><dd>English<\/dd>/)
+  })
+
+  it('the editor shows English and Russian fields for the name, description and each size', () => {
+    const markup = render({ item: translated, editing: true })
+    assert.match(markup, /<legend>English<\/legend>/)
+    assert.match(markup, /<legend>Russian<\/legend>/)
+    assert.match(markup, /value="Cappuccino"/)
+    assert.match(markup, /value="Маленький"/)
+    assert.match(markup, /Size “קטן”/)
+  })
+
+  it('sends translations only from an editor that manages them', () => {
+    const base = { name: 'Latte', category_id: 'cat-1', price: 1200, is_available: true }
+    assert.deepEqual(itemPayload({ ...base, translations: { en: { name: 'Latte' } } }).translations,
+      { en: { name: 'Latte' } })
+    assert.equal('translations' in itemPayload(base), false)
+  })
+})
